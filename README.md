@@ -3,7 +3,7 @@
 A Buffett-checklist-based PWA for tracking and analyzing long-term Indian
 equity positions. Local-first storage (IndexedDB), manual sync to Google
 Drive, Screener `.xlsx` import, and NSE-sourced shareholding/bulk-deal/
-corporate-action data.
+corporate-action data
 
 ## Status of each piece — read this before debugging
 
