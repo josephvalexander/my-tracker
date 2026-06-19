@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Portfolio Tracker</title>
+<meta name="theme-color" content="#1D9E75" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="stylesheet" href="css/styles.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+</head>
+<body>
+
+<div id="app">
+  <main id="screen-container"></main>
+
+  <nav id="bottom-nav" class="bottom-nav">
+    <button class="nav-item" data-screen="watchlist">
+      <span class="nav-icon">&#9776;</span>
+      <span class="nav-label">Watchlist</span>
+    </button>
+    <button class="nav-item" data-screen="holdings">
+      <span class="nav-icon">&#128176;</span>
+      <span class="nav-label">Holdings</span>
+    </button>
+    <button class="nav-item" data-screen="portfolio">
+      <span class="nav-icon">&#128202;</span>
+      <span class="nav-label">Portfolio</span>
+    </button>
+    <button class="nav-item" data-screen="archived">
+      <span class="nav-icon">&#128193;</span>
+      <span class="nav-label">Archived</span>
+    </button>
+    <button class="nav-item" data-screen="settings">
+      <span class="nav-icon">&#9881;</span>
+      <span class="nav-label">Settings</span>
+    </button>
+  </nav>
+</div>
+
+<script src="js/calculations.js"></script>
+<script src="js/holdingsCalculations.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/screenerParser.js"></script>
+<script src="js/nseClient.js"></script>
+<script src="js/driveSync.js"></script>
+<script src="js/screens/watchlist.js"></script>
+<script src="js/screens/stockDetail.js"></script>
+<script src="js/screens/holdings.js"></script>
+<script src="js/screens/portfolio.js"></script>
+<script src="js/screens/archived.js"></script>
+<script src="js/screens/settings.js"></script>
+<script src="js/screens/addStock.js"></script>
+<script src="js/router.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
