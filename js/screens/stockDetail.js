@@ -19,10 +19,12 @@ function verdictBanner(verdict) {
   const isYes = verdict.verdict === "Yes";
   const cls = isYes ? "verdict-yes" : "verdict-no";
   const chips = verdict.checks
-    .map(
-      (c) =>
-        `<span class="chip-small ${c.pass ? "chip-small-pass" : "chip-small-fail"}">${c.pass ? "✓" : "✗"} ${c.label}</span>`
-    )
+    .map((c) => {
+      if (c.pass === null) {
+        return `<span class="chip-small chip-small-unknown">? ${c.label}</span>`;
+      }
+      return `<span class="chip-small ${c.pass ? "chip-small-pass" : "chip-small-fail"}">${c.pass ? "✓" : "✗"} ${c.label}</span>`;
+    })
     .join("");
   const flagSummary = isYes
     ? `${verdict.hardFlags.length} hard flags, ${verdict.softFlags.length} soft flags`
@@ -68,7 +70,7 @@ const stockDetailScreen = {
           <button class="back-btn" onclick="history.back()">&larr;</button>
           <div class="detail-title">
             <div class="detail-name">${stock.name || stock.ticker}</div>
-            <div class="detail-meta">${stock.ticker} · ${stock.sector || "—"} · NSE</div>
+            <div class="detail-meta">${stock.ticker} · ${stock.sector || "Sector not set"} · NSE</div>
           </div>
           <div class="detail-price">
             <div class="price-main">${formatCurrency(stock.fundamentals?.currentPrice)}</div>
@@ -100,7 +102,7 @@ const stockDetailScreen = {
         <div class="card metric-card">
           ${metricRow("Debt to equity", de, formatRatio(de), colorForMetric(de, DEFAULT_RULES.de))}
           ${metricRow("Cash EPS gap (OCF/sh − EPS)", cashGap, cashGap !== null ? cashGap.toFixed(2) : "N/A", cashGap !== null ? (cashGap >= 0 ? "green" : "red") : null)}
-          ${metricRow("Free cash flow yield", fcfY, fcfY !== null ? formatPct(fcfY, 1) : "N/A", null)}
+          ${metricRow("Free cash flow yield (approx.)", fcfY, fcfY !== null ? formatPct(fcfY.value, 1) + " ⚠" : "N/A", null)}
           ${metricRow("Dividend payout trend", divTrend, divTrend ? `${divTrend.start.toFixed(0)}% → ${divTrend.end.toFixed(0)}%` : "N/A", null)}
           ${metricRow("Share count trend (5y)", shareTrend, shareTrend || "N/A", null)}
           ${metricRow("Earnings consistency (10y)", consistency, consistency !== null ? `${consistency}/10` : "N/A — needs 10y data", colorForMetric(consistency, DEFAULT_RULES.earningsConsistency))}

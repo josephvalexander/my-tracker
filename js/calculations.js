@@ -198,21 +198,28 @@ function retainedEarningsRatio(stock, years = 10) {
 
 /**
  * Free cash flow yield % = FCF / market cap.
- * FCF approximated as operating cash flow minus capex. Screener's raw
- * export doesn't always isolate capex cleanly from "Capital Work in
- * Progress" deltas, so this uses OCF + investing cash flow as a rough
- * proxy when a dedicated capex line isn't available — flagged in the
- * UI as an approximation, not a precise figure.
+ * FCF approximated as operating cash flow minus capex, where capex is
+ * itself approximated as -1 * investing cash flow. This is a known
+ * weak approximation: investing cash flow also includes things like
+ * purchases/maturities of investments and deposits, which cash-rich
+ * companies use heavily and which have nothing to do with capex. For
+ * such companies this can swing FCF yield negative even when the
+ * underlying business throws off plenty of cash. Screener's raw export
+ * has no dedicated capex line to use instead. Always show the
+ * `isApproximate: true` flag in the UI so this isn't read as a precise
+ * number — treat it as a rough screen, not a hard rule input.
  */
 function fcfYield(stock) {
   const annual = stock?.fundamentals?.annual;
   const marketCap = stock?.fundamentals?.marketCap;
   if (!annual || !marketCap) return null;
-  const lastIdx = annual.operatingCashFlow.length - 1;
-  const ocf = annual.operatingCashFlow[lastIdx];
-  const investingCf = annual.investingCashFlow?.[lastIdx] ?? 0;
-  const fcfApprox = ocf + investingCf; // investing CF is usually negative (capex outflow)
-  return (fcfApprox / marketCap) * 100;
+  const idx = lastValidIndex(annual.operatingCashFlow || []);
+  if (idx === -1) return null;
+  const ocf = annual.operatingCashFlow[idx];
+  const investingCf = annual.investingCashFlow?.[idx] ?? null;
+  if (investingCf === null) return null;
+  const fcfApprox = ocf + investingCf;
+  return { value: (fcfApprox / marketCap) * 100, isApproximate: true };
 }
 
 /** Dividend payout ratio % per year, and the 5-year trend direction. */
@@ -297,10 +304,14 @@ function deriveVerdict(stock) {
     const pass = pledging === 0;
     checks.push({ label: pass ? "No pledging" : `${pledging}% pledged`, pass });
     if (!pass) hardFlags.push("pledgingAboveZero");
+  } else {
+    checks.push({ label: "Pledging — not checked, no NSE data yet", pass: null });
   }
   if (promoterHistory.length >= 2) {
     checks.push({ label: promoterDeclining ? "Promoter holding declining" : "Promoter holding stable/rising", pass: !promoterDeclining });
     if (promoterDeclining) hardFlags.push("promoterHoldingDeclining");
+  } else {
+    checks.push({ label: "Promoter trend — not checked, needs 2+ quarters of NSE data", pass: null });
   }
 
   const softFlags = [];

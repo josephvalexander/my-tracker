@@ -59,7 +59,7 @@ function stockRow(stock) {
       <div class="stock-row-grid">
         <div class="stock-identity">
           <div class="stock-name">${stock.name || stock.ticker}</div>
-          <div class="stock-meta">${stock.ticker} · ${stock.sector || "—"}</div>
+          <div class="stock-meta">${stock.ticker} · ${stock.sector || "Sector not set"}</div>
         </div>
         ${metricChip("ROE", roe, formatPct(roe), roeColor)}
         ${metricChip("D/E", de, formatRatio(de), deColor)}
