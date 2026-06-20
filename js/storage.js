@@ -85,7 +85,9 @@ async function getAll(storeName) {
 
 const StockStore = {
   get: (ticker) => get("stocks", ticker),
-  set: (ticker, stock) => set("stocks", ticker, stock),
+  set: (ticker, stock) => set("stocks", ticker, { ...stock, updatedAt: new Date().toISOString() }),
+  /** Writes without touching updatedAt — used only by importAll, which needs to preserve the incoming record's own timestamp for future comparisons. */
+  setRaw: (ticker, stock) => set("stocks", ticker, stock),
   remove: (ticker) => remove("stocks", ticker),
   getAll: async () => (await getAll("stocks")).map((r) => r.value),
   getActive: async () => (await StockStore.getAll()).filter((s) => s.status === "active"),
@@ -94,7 +96,8 @@ const StockStore = {
 
 const HoldingStore = {
   get: (ticker) => get("holdings", ticker),
-  set: (ticker, holding) => set("holdings", ticker, holding),
+  set: (ticker, holding) => set("holdings", ticker, { ...holding, updatedAt: new Date().toISOString() }),
+  setRaw: (ticker, holding) => set("holdings", ticker, holding),
   remove: (ticker) => remove("holdings", ticker),
   getAll: async () => (await getAll("holdings")).map((r) => r.value),
 };
@@ -102,8 +105,6 @@ const HoldingStore = {
 const MetaStore = {
   getSettings: () => get("meta", "settings"),
   setSettings: (settings) => set("meta", "settings", settings),
-  getSectorBenchmarks: () => get("meta", "sectorBenchmarks"),
-  setSectorBenchmarks: (benchmarks) => set("meta", "sectorBenchmarks", benchmarks),
 };
 
 /** Archive a stock: flips status, keeps all data (notes, thesis, fundamentals). */
@@ -128,25 +129,37 @@ async function exportAll() {
   const stocks = await StockStore.getAll();
   const holdings = await HoldingStore.getAll();
   const settings = await MetaStore.getSettings();
-  const sectorBenchmarks = await MetaStore.getSectorBenchmarks();
-  return { stocks, holdings, settings, sectorBenchmarks, exportedAt: new Date().toISOString() };
+  return { stocks, holdings, settings, exportedAt: new Date().toISOString() };
 }
 
 /**
  * Import a JSON blob (from Drive pull or manual restore).
- * Overwrites local data for any ticker present in the import — this is
- * the "pull" half of manual sync. Caller is responsible for showing a
- * diff/confirmation UI before calling this, since it overwrites.
+ *
+ * Per-stock, per-holding last-write-wins by comparing `updatedAt`
+ * timestamps (added specifically to support auto-pull-on-open safely —
+ * see app.js). If the incoming record has no `updatedAt` (older data
+ * written before this field existed) it's treated as older than
+ * anything local, so a stale Drive copy can't silently overwrite a
+ * local record that's never been pushed yet.
  */
 async function importAll(data) {
   for (const stock of data.stocks || []) {
-    await StockStore.set(stock.ticker, stock);
+    const local = await StockStore.get(stock.ticker);
+    const incomingTime = stock.updatedAt ? new Date(stock.updatedAt).getTime() : 0;
+    const localTime = local?.updatedAt ? new Date(local.updatedAt).getTime() : 0;
+    if (!local || incomingTime >= localTime) {
+      await StockStore.setRaw(stock.ticker, stock);
+    }
   }
   for (const holding of data.holdings || []) {
-    await HoldingStore.set(holding.ticker, holding);
+    const local = await HoldingStore.get(holding.ticker);
+    const incomingTime = holding.updatedAt ? new Date(holding.updatedAt).getTime() : 0;
+    const localTime = local?.updatedAt ? new Date(local.updatedAt).getTime() : 0;
+    if (!local || incomingTime >= localTime) {
+      await HoldingStore.setRaw(holding.ticker, holding);
+    }
   }
   if (data.settings) await MetaStore.setSettings(data.settings);
-  if (data.sectorBenchmarks) await MetaStore.setSectorBenchmarks(data.sectorBenchmarks);
 }
 
 const storageExports = { StockStore, HoldingStore, MetaStore, archiveStock, deleteStockPermanently, exportAll, importAll };

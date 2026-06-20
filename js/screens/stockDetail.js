@@ -182,7 +182,6 @@ const stockDetailScreen = {
 
         <div class="detail-tab-row">
           <button class="detail-tab-btn" data-go="#stockCharts/${ticker}">Charts</button>
-          <button class="detail-tab-btn" data-go="#stockSector/${ticker}">vs sector</button>
           <button class="detail-tab-btn" data-go="#stockNotes/${ticker}">My thesis</button>
         </div>
       </div>`;

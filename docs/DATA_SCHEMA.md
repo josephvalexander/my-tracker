@@ -11,7 +11,6 @@ and `js/nseClient.js` together — they all assume this structure.
 stocks:{ticker}        -> Stock object (see below)
 holdings:{ticker}      -> Holding object (My Holdings tab)
 settings               -> Settings object
-sectorBenchmarks        -> { [sector]: { roe, de, epsCagr, pe, fcfYield } }
 ```
 
 ## Stock object

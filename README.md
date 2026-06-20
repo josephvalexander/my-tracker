@@ -19,7 +19,7 @@ site. Knowing which is which will save you time:
 | `js/holdingsCalculations.js` | **Tested** with synthetic numbers matching the original mockup design — allocation %, profit %, totals all compute correctly. |
 | `js/storage.js` | **Not yet run in a real browser.** IndexedDB code is standard and should work, but only Node-side logic was tested in this build session (no real browser/IndexedDB available in the dev sandbox). Test this first when you load the app for real. |
 | `js/nseClient.js` | **Unverified scaffold.** The fetch logic, error handling, and batch-refresh-with-delay structure are sound, but the actual field names used to parse NSE's JSON responses (`promoterGroup`, `fii`, etc. in `fetchShareholding`) are educated guesses — I could not call the real NSE API from this environment to confirm response shape. **This is the first thing to debug** once you try a real fetch: open browser devtools, look at the actual JSON NSE returns, and adjust the field mappings in `nseClient.js` to match. |
-| `js/driveSync.js` | **Unverified scaffold**, intentionally minimal. Wire your existing OAuth token flow from V-Plantations/Veettu Chilavu into the `accessToken` parameter — this file assumes that already exists rather than rebuilding it. |
+| `js/driveSync.js` | **Implemented for real** — Google Identity Services OAuth token flow, auto-pull-on-open, manual push. **Needs one setup step before it works**: create an OAuth 2.0 Client ID (Web application type) in Google Cloud Console, add your GitHub Pages URL under "Authorized JavaScript origins", enable the Drive API on that project, then paste the client ID into `DRIVE_CLIENT_ID` at the top of `js/driveSync.js`. Until that's done, "Connect Drive" will fail with an auth error — that's expected, not a bug. |
 | UI screens (`js/screens/*.js`, `css/styles.css`) | **Not visually verified** — written carefully against the mockup designs from planning, but never actually rendered in a browser during this build session. Expect minor CSS/layout fixes once you open it for real. |
 
 ## Setup
@@ -40,13 +40,15 @@ site. Knowing which is which will save you time:
 - **Icons**: `icons/icon-192.png` and `icons/icon-512.png` referenced in
   `manifest.json` don't exist yet — add your own app icon at those sizes
   or the PWA install prompt will look broken.
-- **Stock charts/sector/notes sub-screens**: the detail screen's tab row
-  links to `#stockCharts/`, `#stockSector/`, `#stockNotes/` routes that
-  aren't registered yet — these are the Charts, vs Sector, and My Thesis
-  tabs from the mockups. Same pattern as the other screen files; build
-  these next following the same `registerScreen()` convention.
 - **Add Holding screen**: `#addHolding` is referenced from the Holdings
   tab's empty state but not yet built — same pattern as `addStock.js`.
+- **AI-drafted qualitative fields**: business description, competitive
+  advantage, and market position are manual text fields with no draft
+  assist yet — discussed as a future addition (Gemini, web-grounded),
+  not yet built.
+- **DCF calculator**: `intrinsicValue` is a manual field for now — a
+  base-case DCF calculator (auto-pulled FCF + editable growth/discount
+  rate assumptions) is planned but not yet built.
 - **Batch NSE refresh UI**: `nseClient.js batchRefresh()` exists and
   works structurally, but the screen that lets you select stocks and
   watch progress (from the earlier mockup) isn't wired up yet.
