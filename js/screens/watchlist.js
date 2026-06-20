@@ -19,15 +19,18 @@ function metricChip(label, value, formatted, colorClass) {
 function entryZoneBanner(stock) {
   const status = entryZoneStatus(stock);
   if (!status) {
-    return `<div class="zone-banner zone-neutral"><span>No target price set</span></div>`;
+    return `<div class="zone-banner zone-neutral"><span>No target price set — add an intrinsic value estimate or set a target manually</span></div>`;
   }
+  const targetLabel = status.isDefaulted
+    ? `suggested target ₹${Math.round(status.target).toLocaleString("en-IN")} (15% below IV)`
+    : `target ₹${Math.round(status.target).toLocaleString("en-IN")}`;
   if (status.inZone) {
     return `<div class="zone-banner zone-good">
-      <span>In entry zone — target ₹${status.target.toLocaleString("en-IN")}, now ${Math.abs(status.pctFromTarget).toFixed(0)}% below</span>
+      <span>In entry zone — ${targetLabel}, now ${Math.abs(status.pctFromTarget).toFixed(0)}% below</span>
     </div>`;
   }
   return `<div class="zone-banner zone-wait">
-    <span>${status.pctFromTarget.toFixed(0)}% above target ₹${status.target.toLocaleString("en-IN")} — wait</span>
+    <span>${status.pctFromTarget.toFixed(0)}% above ${targetLabel} — wait</span>
   </div>`;
 }
 
@@ -56,6 +59,7 @@ function stockRow(stock) {
           <div class="price-main">${formatCurrency(cmp)}</div>
           <div class="price-sub">${iv ? `IV ₹${iv.low.toLocaleString("en-IN")}+` : "No IV set"}</div>
         </div>
+        <button class="row-menu-btn" data-menu-ticker="${stock.ticker}" aria-label="Row options">&#8942;</button>
       </div>
       ${entryZoneBanner(stock)}
     </div>`;
@@ -91,8 +95,21 @@ const watchlistScreen = {
     }
 
     listEl.querySelectorAll(".stock-row").forEach((row) => {
-      row.addEventListener("click", () => {
+      row.addEventListener("click", (e) => {
+        if (e.target.closest(".row-menu-btn")) return; // don't navigate when the menu button itself was clicked
         window.location.hash = `#stock/${row.dataset.ticker}`;
+      });
+    });
+
+    listEl.querySelectorAll(".row-menu-btn").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const ticker = btn.dataset.menuTicker;
+        const confirmed = confirm(`Archive ${ticker}? It'll move to Archived (under Settings) — your notes and data stay intact and you can restore it anytime.`);
+        if (confirmed) {
+          await archiveStock(ticker);
+          navigate("#watchlist");
+        }
       });
     });
 

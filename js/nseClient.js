@@ -35,6 +35,7 @@ const ENDPOINTS = {
   shareholding: (symbol) => `${NSE_BASE}/api/corporate-shareholding-pattern?index=equities&symbol=${symbol}`,
   largeDeals: () => `${NSE_BASE}/api/snapshot-capital-market-largedeal`,
   corporateActions: (symbol) => `${NSE_BASE}/api/corporates-corporateActions?index=equities&symbol=${symbol}`,
+  quote: (symbol) => `${NSE_BASE}/api/quote-equity?symbol=${symbol}`,
 };
 
 async function nseFetch(url) {
@@ -78,6 +79,29 @@ async function fetchShareholding(symbol) {
     public: parseFloat(r.public ?? 0),
     pledged: parseFloat(r.pledgedPercentage ?? r.encumbered ?? 0),
   }));
+}
+
+/**
+ * Fetches company name, industry/sector, market cap, and 52-week
+ * high/low from NSE's quote endpoint. This is the one genuinely
+ * automatable source for "sector" — there is no free API for business
+ * descriptions, competitive moat, or market position, those stay
+ * manual fields by necessity (see js/screens/stockDetail.js qualitative
+ * section comments).
+ */
+async function fetchQuoteInfo(symbol) {
+  const data = await nseFetch(ENDPOINTS.quote(symbol));
+  const info = data?.info ?? {};
+  const priceInfo = data?.priceInfo ?? {};
+  const industryInfo = data?.industryInfo ?? data?.metadata ?? {};
+  return {
+    name: info.companyName ?? null,
+    sector: industryInfo.industry ?? industryInfo.macro ?? null,
+    currentPrice: priceInfo.lastPrice ?? null,
+    marketCap: priceInfo.totalMarketCap ?? null,
+    week52High: priceInfo.weekHighLow?.max ?? null,
+    week52Low: priceInfo.weekHighLow?.min ?? null,
+  };
 }
 
 /**
@@ -134,7 +158,7 @@ function extractRatio(subject) {
  * visible to the UI rather than swallowed into one boolean.
  */
 async function refreshStockFromNse(symbol) {
-  const result = { symbol, shareholding: null, bulkDeals: null, corporateActions: null, errors: {} };
+  const result = { symbol, shareholding: null, bulkDeals: null, corporateActions: null, quoteInfo: null, errors: {} };
 
   try {
     result.shareholding = await fetchShareholding(symbol);
@@ -154,8 +178,14 @@ async function refreshStockFromNse(symbol) {
     result.errors.corporateActions = err.message;
   }
 
+  try {
+    result.quoteInfo = await fetchQuoteInfo(symbol);
+  } catch (err) {
+    result.errors.quoteInfo = err.message;
+  }
+
   result.success = Object.keys(result.errors).length === 0;
-  result.partial = Object.keys(result.errors).length > 0 && Object.keys(result.errors).length < 3;
+  result.partial = Object.keys(result.errors).length > 0 && Object.keys(result.errors).length < 4;
 
   return result;
 }
@@ -183,6 +213,7 @@ const nseClientExports = {
   fetchShareholding,
   fetchBulkDeals,
   fetchCorporateActions,
+  fetchQuoteInfo,
   refreshStockFromNse,
   batchRefresh,
   NseFetchError,

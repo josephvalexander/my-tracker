@@ -90,14 +90,7 @@ const addStockScreen = {
         <div class="form-group">
           <label>Ticker (NSE symbol)</label>
           <input type="text" id="ticker-input" placeholder="e.g. CAPLIPOINT" />
-        </div>
-        <div class="form-group">
-          <label>Company name</label>
-          <input type="text" id="name-input" placeholder="e.g. Caplin Point Laboratories Ltd" />
-        </div>
-        <div class="form-group">
-          <label>Sector</label>
-          <input type="text" id="sector-input" placeholder="e.g. Pharma" />
+          <div class="field-hint">Company name and sector are filled in automatically once you upload a Screener export below.</div>
         </div>
 
         <button id="create-stock-btn" class="btn btn-primary">Add to watchlist</button>
@@ -113,8 +106,6 @@ const addStockScreen = {
   async afterRender() {
     document.getElementById("create-stock-btn").addEventListener("click", async () => {
       const ticker = document.getElementById("ticker-input").value.trim().toUpperCase();
-      const name = document.getElementById("name-input").value.trim();
-      const sector = document.getElementById("sector-input").value.trim();
 
       if (!ticker) {
         alert("Ticker is required.");
@@ -129,8 +120,8 @@ const addStockScreen = {
 
       const stock = {
         ticker,
-        name: name || ticker,
-        sector: sector || null,
+        name: ticker,
+        sector: null,
         status: "active",
         addedDate: new Date().toISOString().slice(0, 10),
         archivedDate: null,
@@ -168,10 +159,30 @@ const addStockScreen = {
             "screener-dropzone-status"
           ).innerHTML = `<div class="dropzone-success-text">✓ Parsed ${stockFundamentals.annual.years?.length ?? 0} years of data from ${file.name}</div>`;
 
+          // Run the same metrics the detail screen will show, so the
+          // preview reflects exactly what got computed — not just that
+          // parsing finished without crashing.
+          const roe = roe5yAvg(currentStock);
+          const de = debtToEquity(currentStock);
+          const cagr = epsCagr(currentStock);
+          const yearsFound = stockFundamentals.annual.years?.length ?? 0;
+          const sharesGaps = (stockFundamentals.annual.sharesOutstandingHistory || []).filter(
+            (v) => v === null || v === undefined
+          ).length;
+
           document.getElementById("upload-preview").innerHTML = `
-            <div class="card">
-              ${warnings.map((w) => `<div class="warning-text">⚠ ${w}</div>`).join("")}
-              <button class="btn btn-small" onclick="window.location.hash='#stock/${ticker}'">View stock</button>
+            <div class="card preview-card">
+              <div class="section-label" style="margin-top:0;">Preview before saving</div>
+              <table class="preview-table">
+                <tr><td>Detected company</td><td>${companyName || "Not found"}</td></tr>
+                <tr><td>Years of data</td><td>${yearsFound} ${yearsFound >= 10 ? "✓" : yearsFound > 0 ? "⚠ fewer than 10" : "✗"}</td></tr>
+                <tr><td>ROE (5y avg)</td><td>${roe !== null ? formatPct(roe) + " ✓" : "N/A ⚠"}</td></tr>
+                <tr><td>D/E</td><td>${de !== null ? formatRatio(de) + " ✓" : "N/A ⚠"}</td></tr>
+                <tr><td>EPS CAGR (5y)</td><td>${cagr !== null ? formatPct(cagr) + " ✓" : "N/A ⚠"}</td></tr>
+                <tr><td>Share count gaps</td><td>${sharesGaps === 0 ? "None ✓" : `${sharesGaps} year(s) missing ⚠`}</td></tr>
+              </table>
+              ${warnings.length > 0 ? `<div class="preview-warnings">${warnings.map((w) => `<div class="warning-text">⚠ ${w}</div>`).join("")}</div>` : ""}
+              <button class="btn btn-primary" style="margin-top:10px;" onclick="window.location.hash='#stock/${ticker}'">View full stock page</button>
             </div>`;
         } catch (err) {
           document.getElementById(

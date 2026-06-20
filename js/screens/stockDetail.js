@@ -41,6 +41,63 @@ function verdictBanner(verdict) {
     </div>`;
 }
 
+function priceContextStrip(stock) {
+  const pc = stock.priceContext || {};
+  const peBand = pc.peHistory5y;
+  return `
+    <div class="price-context-grid">
+      <div class="price-context-box">
+        <div class="price-context-label">Market cap</div>
+        <div class="price-context-value">${stock.fundamentals?.marketCap ? "₹" + stock.fundamentals.marketCap.toLocaleString("en-IN") + " Cr" : "—"}</div>
+      </div>
+      <div class="price-context-box">
+        <div class="price-context-label">52w range</div>
+        <div class="price-context-value">${pc.week52Low && pc.week52High ? `${pc.week52Low.toLocaleString("en-IN")}–${pc.week52High.toLocaleString("en-IN")}` : "—"}</div>
+      </div>
+      <div class="price-context-box">
+        <div class="price-context-label">All-time range</div>
+        <div class="price-context-value">${pc.allTimeLow && pc.allTimeHigh ? `${pc.allTimeLow.toLocaleString("en-IN")}–${pc.allTimeHigh.toLocaleString("en-IN")}` : "—"}</div>
+      </div>
+      <div class="price-context-box">
+        <div class="price-context-label">P/E (5y band)</div>
+        <div class="price-context-value">${peBand ? `${peBand.current} <span class="muted">(${peBand.min}–${peBand.max})</span>` : "—"}</div>
+      </div>
+    </div>`;
+}
+
+function entryZoneSection(stock) {
+  const status = entryZoneStatus(stock);
+  const iv = stock.intrinsicValue;
+
+  const ivBanner = iv
+    ? `<div class="iv-banner">
+        <span>Intrinsic value (${iv.method || "manual"})</span>
+        <span class="iv-value">₹${Math.round(iv.low).toLocaleString("en-IN")} – ₹${Math.round(iv.high).toLocaleString("en-IN")}</span>
+      </div>`
+    : `<div class="iv-banner iv-banner-empty">
+        <span>No intrinsic value set</span>
+        <button class="btn btn-small" onclick="window.location.hash='#editStock/${stock.ticker}'">Add IV estimate</button>
+      </div>`;
+
+  if (!status) {
+    return `${ivBanner}<div class="zone-banner zone-neutral"><span>No target price set — add an intrinsic value estimate above, or set a target manually</span></div>`;
+  }
+
+  const targetLabel = status.isDefaulted
+    ? `suggested target ₹${Math.round(status.target).toLocaleString("en-IN")} (15% below IV)`
+    : `your target ₹${Math.round(status.target).toLocaleString("en-IN")}`;
+  const zoneCls = status.inZone ? "zone-good" : "zone-wait";
+  const zoneText = status.inZone
+    ? `In entry zone — ${targetLabel}, now ${Math.abs(status.pctFromTarget).toFixed(0)}% below`
+    : `${status.pctFromTarget.toFixed(0)}% above ${targetLabel} — wait`;
+
+  return `${ivBanner}
+    <div class="zone-banner ${zoneCls}">
+      <span>${zoneText}</span>
+      <button class="btn btn-small zone-edit-btn" onclick="window.location.hash='#editStock/${stock.ticker}'">${status.isDefaulted ? "Set my own target" : "Edit target"}</button>
+    </div>`;
+}
+
 const stockDetailScreen = {
   async render(params) {
     const ticker = params[0];
@@ -54,7 +111,6 @@ const stockDetailScreen = {
     const roce = roce5yAvg(stock);
     const cagr = epsCagr(stock);
     const de = debtToEquity(stock);
-    const interestCoverage = null; // requires PBT/interest split not always present — see calculations.js roceHistory note
     const cashGap = cashEpsGap(stock);
     const fcfY = fcfYield(stock);
     const divTrend = dividendPayoutTrend(stock);
@@ -77,18 +133,20 @@ const stockDetailScreen = {
           </div>
         </div>
 
+        ${priceContextStrip(stock)}
+        ${entryZoneSection(stock)}
         ${verdictBanner(verdict)}
 
-        <div class="section-label">Business</div>
+        <div class="section-label">Business <span class="section-label-note">(manual — no free source gives this)</span></div>
         <div class="card">${stock.qualitative?.business || '<span class="muted">Not set yet — add this from the edit screen.</span>'}</div>
 
-        <div class="section-label">Competitive advantage</div>
+        <div class="section-label">Competitive advantage <span class="section-label-note">(manual)</span></div>
         <div class="card">
           ${stock.qualitative?.moatDescription || '<span class="muted">Not set yet.</span>'}
           <div class="tag-row">${(stock.qualitative?.moatTags || []).map((t) => `<span class="tag">${t.replace(/_/g, " ")}</span>`).join("")}</div>
         </div>
 
-        <div class="section-label">Market position</div>
+        <div class="section-label">Market position <span class="section-label-note">(manual)</span></div>
         <div class="card">${stock.qualitative?.marketPosition || '<span class="muted">Not set yet.</span>'}</div>
 
         <div class="section-label">Profitability & capital efficiency</div>
@@ -122,12 +180,20 @@ const stockDetailScreen = {
             : stock.corporateActions.actions.map((a) => `<div class="action-row">${a.type} ${a.ratio || ""} — ${a.date}</div>`).join("")}
         </div>
 
-        <div class="tab-row">
-          <button class="tab-btn" onclick="window.location.hash='#stockCharts/${ticker}'">Charts</button>
-          <button class="tab-btn" onclick="window.location.hash='#stockSector/${ticker}'">vs sector</button>
-          <button class="tab-btn" onclick="window.location.hash='#stockNotes/${ticker}'">My thesis</button>
+        <div class="detail-tab-row">
+          <button class="detail-tab-btn" data-go="#stockCharts/${ticker}">Charts</button>
+          <button class="detail-tab-btn" data-go="#stockSector/${ticker}">vs sector</button>
+          <button class="detail-tab-btn" data-go="#stockNotes/${ticker}">My thesis</button>
         </div>
       </div>`;
+  },
+
+  async afterRender() {
+    document.querySelectorAll(".detail-tab-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        window.location.hash = btn.dataset.go;
+      });
+    });
   },
 };
 

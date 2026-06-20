@@ -159,10 +159,14 @@ function cashEpsGap(stock) {
  */
 function shareCountTrend(stock, years = 5) {
   const annual = stock?.fundamentals?.annual;
-  if (!annual) return null;
-  const shares = lastN(annual.sharesOutstandingHistory, years + 1);
-  if (shares.length < 2) return null;
-  const pctChange = ((shares[shares.length - 1] - shares[0]) / shares[0]) * 100;
+  if (!annual?.sharesOutstandingHistory?.length) return null;
+  const endIdx = lastValidIndex(annual.sharesOutstandingHistory);
+  if (endIdx === -1) return null;
+  const startIdx = endIdx - years;
+  if (startIdx < 0 || annual.sharesOutstandingHistory[startIdx] === null) return null;
+  const startShares = annual.sharesOutstandingHistory[startIdx];
+  const endShares = annual.sharesOutstandingHistory[endIdx];
+  const pctChange = ((endShares - startShares) / startShares) * 100;
   if (pctChange < -1) return "declining";
   if (pctChange > 1) return "rising";
   return "flat";
@@ -332,17 +336,37 @@ function deriveVerdict(stock) {
   return { verdict, hardFlags, softFlags, checks };
 }
 
-/** Entry zone status against the user-set target price. */
+/**
+ * Entry zone status. Uses the user's manually-set targetEntryPrice if
+ * present (explicit override always wins). If not set but an intrinsic
+ * value range exists, defaults the target to 15% below the LOW end of
+ * that range — a deliberately conservative margin of safety, since the
+ * low end of an IV estimate is already the more cautious number.
+ * `isDefaulted: true` tells the UI to show this as a suggested target,
+ * not a value the user actually chose, so it can offer an edit/override
+ * affordance rather than presenting it as a firm decision.
+ */
 function entryZoneStatus(stock) {
-  const target = stock?.targetEntryPrice;
   const cmp = stock?.fundamentals?.currentPrice;
-  if (!target || !cmp) return null;
+  if (!cmp) return null;
+
+  let target = stock?.targetEntryPrice;
+  let isDefaulted = false;
+
+  if (!target && stock?.intrinsicValue?.low) {
+    target = stock.intrinsicValue.low * 0.85; // 15% margin of safety below the conservative IV bound
+    isDefaulted = true;
+  }
+
+  if (!target) return null;
+
   const pctFromTarget = ((cmp - target) / target) * 100;
   return {
     target,
     cmp,
     pctFromTarget,
     inZone: cmp <= target,
+    isDefaulted,
   };
 }
 

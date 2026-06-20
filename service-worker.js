@@ -22,11 +22,15 @@ const APP_SHELL = [
   "./js/app.js",
   "./js/screens/watchlist.js",
   "./js/screens/stockDetail.js",
+  "./js/screens/stockCharts.js",
+  "./js/screens/stockSector.js",
+  "./js/screens/stockNotes.js",
   "./js/screens/holdings.js",
   "./js/screens/portfolio.js",
   "./js/screens/archived.js",
   "./js/screens/settings.js",
   "./js/screens/addStock.js",
+  "./js/screens/help.js",
   "./manifest.json",
 ];
 
