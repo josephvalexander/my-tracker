@@ -8,12 +8,6 @@
  * current price.
  */
 
-function formatCurrencyShort(v) {
-  if (v === null || v === undefined) return "—";
-  if (v >= 100000) return `₹${(v / 100000).toFixed(2)}L`;
-  return `₹${Math.round(v).toLocaleString("en-IN")}`;
-}
-
 function holdingRow(row, allocationColor) {
   const profitClass = row.profitPct === null ? "muted" : row.profitPct >= 0 ? "text-good" : "text-bad";
   const profitText = row.profitPct === null ? "—" : `${row.profitPct >= 0 ? "+" : ""}${row.profitPct.toFixed(1)}%`;

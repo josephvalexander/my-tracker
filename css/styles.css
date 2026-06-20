@@ -117,9 +117,9 @@ body {
   border-top: 0.5px solid var(--color-border);
   padding-bottom: env(safe-area-inset-bottom);
 }
-.nav-item { flex: 1; background: none; border: none; padding: 8px 0; text-align: center; color: var(--color-text-tertiary); cursor: pointer; }
-.nav-item.active { color: #0c447c; }
-.nav-icon { display: block; font-size: 18px; }
+.nav-item { flex: 1; background: none; border: none; padding: 8px 0; text-align: center; color: var(--color-text-tertiary); cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.nav-item.active { color: #1D9E75; }
+.nav-icon { width: 22px; height: 22px; }
 .nav-label { font-size: 10px; }
 
 /* Stock detail */

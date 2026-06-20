@@ -16,18 +16,6 @@ function metricChip(label, value, formatted, colorClass) {
     </div>`;
 }
 
-function formatPct(v, decimals = 0) {
-  return v === null || v === undefined ? "—" : `${v.toFixed(decimals)}%`;
-}
-
-function formatRatio(v, decimals = 2) {
-  return v === null || v === undefined ? "—" : v.toFixed(decimals);
-}
-
-function formatCurrency(v) {
-  return v === null || v === undefined ? "—" : `₹${Math.round(v).toLocaleString("en-IN")}`;
-}
-
 function entryZoneBanner(stock) {
   const status = entryZoneStatus(stock);
   if (!status) {

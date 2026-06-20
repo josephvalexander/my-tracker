@@ -179,13 +179,17 @@ async function batchRefresh(symbols, onProgress, delayMs = 1500) {
   return results;
 }
 
+const nseClientExports = {
+  fetchShareholding,
+  fetchBulkDeals,
+  fetchCorporateActions,
+  refreshStockFromNse,
+  batchRefresh,
+  NseFetchError,
+};
+
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = {
-    fetchShareholding,
-    fetchBulkDeals,
-    fetchCorporateActions,
-    refreshStockFromNse,
-    batchRefresh,
-    NseFetchError,
-  };
+  module.exports = nseClientExports;
+} else if (typeof window !== "undefined") {
+  Object.assign(window, nseClientExports);
 }

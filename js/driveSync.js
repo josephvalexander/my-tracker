@@ -106,6 +106,10 @@ function summarizeDiff(local, remote) {
   return { onlyInRemote, onlyInLocal, remoteExportedAt };
 }
 
+const driveSyncExports = { pushToDrive, pullFromDrive, summarizeDiff, findBackupFileId };
+
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { pushToDrive, pullFromDrive, summarizeDiff, findBackupFileId };
+  module.exports = driveSyncExports;
+} else if (typeof window !== "undefined") {
+  Object.assign(window, driveSyncExports);
 }

@@ -206,6 +206,10 @@ function parseScreenerFile(arrayBuffer, XLSX) {
   return { stockFundamentals, companyName, warnings };
 }
 
+const screenerParserExports = { parseScreenerFile, excelSerialToFYLabel, ROW_LABELS };
+
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { parseScreenerFile, excelSerialToFYLabel, ROW_LABELS };
+  module.exports = screenerParserExports;
+} else if (typeof window !== "undefined") {
+  Object.assign(window, screenerParserExports);
 }

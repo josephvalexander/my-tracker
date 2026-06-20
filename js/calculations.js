@@ -32,13 +32,15 @@ function lastValidIndex(arr) {
   return -1;
 }
 
-/** Equity = share capital + reserves, per year. */
+/** Equity = share capital + reserves, per year. Returns [] if data is missing. */
 function equityHistory(annual) {
-  return annual.equityShareCapital.map((cap, i) => cap + annual.reserves[i]);
+  if (!annual?.equityShareCapital?.length || !annual?.reserves?.length) return [];
+  return annual.equityShareCapital.map((cap, i) => cap + (annual.reserves[i] ?? 0));
 }
 
-/** EPS per year, in rupees (net profit is in Cr, shares is a raw count). */
+/** EPS per year, in rupees (net profit is in Cr, shares is a raw count). Returns [] if data is missing. */
 function epsHistory(annual) {
+  if (!annual?.netProfit?.length || !annual?.sharesOutstandingHistory?.length) return [];
   return annual.netProfit.map((np, i) => {
     const shares = annual.sharesOutstandingHistory[i];
     if (!shares || np === null || np === undefined) return null;
@@ -46,8 +48,9 @@ function epsHistory(annual) {
   });
 }
 
-/** Operating cash flow per share, in rupees. */
+/** Operating cash flow per share, in rupees. Returns [] if data is missing. */
 function ocfPerShareHistory(annual) {
+  if (!annual?.operatingCashFlow?.length || !annual?.sharesOutstandingHistory?.length) return [];
   return annual.operatingCashFlow.map((ocf, i) => {
     const shares = annual.sharesOutstandingHistory[i];
     if (!shares || ocf === null || ocf === undefined) return null;
@@ -55,10 +58,11 @@ function ocfPerShareHistory(annual) {
   });
 }
 
-/** ROE % per year. */
+/** ROE % per year. Returns [] if data is missing. */
 function roeHistory(annual) {
   const equity = equityHistory(annual);
-  return annual.netProfit.map((np, i) => (np / equity[i]) * 100);
+  if (equity.length === 0 || !annual?.netProfit?.length) return [];
+  return annual.netProfit.map((np, i) => (equity[i] ? (np / equity[i]) * 100 : null));
 }
 
 /** ROE %, averaged over the trailing N years (default 5). */
@@ -77,12 +81,12 @@ function roe5yAvg(stock, years = 5) {
  * rather than guessing.
  */
 function roceHistory(annual) {
-  if (!annual.profitBeforeTax || !annual.interest) return null;
+  if (!annual?.profitBeforeTax || !annual?.interest || !annual?.totalAssets?.length) return null;
   const capitalEmployed = annual.totalAssets.map(
     (total, i) => total - (annual.otherLiabilities?.[i] ?? 0)
   );
   return annual.profitBeforeTax.map(
-    (pbt, i) => ((pbt + (annual.interest[i] ?? 0)) / capitalEmployed[i]) * 100
+    (pbt, i) => (capitalEmployed[i] ? ((pbt + (annual.interest[i] ?? 0)) / capitalEmployed[i]) * 100 : null)
   );
 }
 
@@ -97,10 +101,11 @@ function roce5yAvg(stock, years = 5) {
 /** D/E = total borrowings / equity, most recent year. */
 function debtToEquity(stock) {
   const annual = stock?.fundamentals?.annual;
-  if (!annual) return null;
+  if (!annual?.borrowings?.length) return null;
   const equity = equityHistory(annual);
+  if (equity.length === 0) return null;
   const lastIdx = annual.borrowings.length - 1;
-  if (equity[lastIdx] === 0) return 0;
+  if (!equity[lastIdx]) return equity[lastIdx] === 0 ? 0 : null;
   return annual.borrowings[lastIdx] / equity[lastIdx];
 }
 
@@ -173,7 +178,7 @@ function shareCountTrend(stock, years = 5) {
  */
 function retainedEarningsRatio(stock, years = 10) {
   const annual = stock?.fundamentals?.annual;
-  if (!annual || !annual.priceAtYearEnd) return null;
+  if (!annual?.priceAtYearEnd?.length || !annual?.netProfit?.length || !annual?.sharesOutstandingHistory?.length) return null;
   const n = Math.min(years, annual.netProfit.length - 1);
   if (n < 2) return null;
 
@@ -190,6 +195,7 @@ function retainedEarningsRatio(stock, years = 10) {
     annual.priceAtYearEnd[startIdx] * annual.sharesOutstandingHistory[startIdx];
   const endMarketCap =
     annual.priceAtYearEnd[endIdx] * annual.sharesOutstandingHistory[endIdx];
+  if (!Number.isFinite(startMarketCap) || !Number.isFinite(endMarketCap)) return null;
   const marketCapIncrease = (endMarketCap - startMarketCap) / RUPEES_PER_CRORE;
 
   if (marketCapIncrease <= 0) return null; // ratio undefined/meaningless if market cap fell
@@ -225,7 +231,7 @@ function fcfYield(stock) {
 /** Dividend payout ratio % per year, and the 5-year trend direction. */
 function dividendPayoutTrend(stock, years = 5) {
   const annual = stock?.fundamentals?.annual;
-  if (!annual || !annual.dividendAmount) return null;
+  if (!annual?.dividendAmount?.length || !annual?.netProfit?.length) return null;
   const payout = annual.netProfit.map((np, i) =>
     np > 0 ? ((annual.dividendAmount[i] ?? 0) / np) * 100 : null
   );
@@ -340,25 +346,29 @@ function entryZoneStatus(stock) {
   };
 }
 
+const calculationsExports = {
+  roe5yAvg,
+  roce5yAvg,
+  debtToEquity,
+  epsCagr,
+  earningsConsistencyScore,
+  cashEpsGap,
+  shareCountTrend,
+  retainedEarningsRatio,
+  fcfYield,
+  dividendPayoutTrend,
+  colorForMetric,
+  deriveVerdict,
+  entryZoneStatus,
+  DEFAULT_RULES,
+  epsHistory,
+  roeHistory,
+  equityHistory,
+  lastValidIndex,
+};
+
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = {
-    roe5yAvg,
-    roce5yAvg,
-    debtToEquity,
-    epsCagr,
-    earningsConsistencyScore,
-    cashEpsGap,
-    shareCountTrend,
-    retainedEarningsRatio,
-    fcfYield,
-    dividendPayoutTrend,
-    colorForMetric,
-    deriveVerdict,
-    entryZoneStatus,
-    DEFAULT_RULES,
-    epsHistory,
-    roeHistory,
-    equityHistory,
-    lastValidIndex,
-  };
+  module.exports = calculationsExports;
+} else if (typeof window !== "undefined") {
+  Object.assign(window, calculationsExports);
 }

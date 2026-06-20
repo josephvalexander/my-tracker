@@ -11,6 +11,7 @@ const APP_SHELL = [
   "./",
   "./index.html",
   "./css/styles.css",
+  "./js/formatters.js",
   "./js/calculations.js",
   "./js/holdingsCalculations.js",
   "./js/storage.js",

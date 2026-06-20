@@ -149,6 +149,10 @@ async function importAll(data) {
   if (data.sectorBenchmarks) await MetaStore.setSectorBenchmarks(data.sectorBenchmarks);
 }
 
+const storageExports = { StockStore, HoldingStore, MetaStore, archiveStock, deleteStockPermanently, exportAll, importAll };
+
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { StockStore, HoldingStore, MetaStore, archiveStock, deleteStockPermanently, exportAll, importAll };
+  module.exports = storageExports;
+} else if (typeof window !== "undefined") {
+  Object.assign(window, storageExports);
 }

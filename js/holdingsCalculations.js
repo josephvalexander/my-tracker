@@ -75,6 +75,10 @@ function buildHoldingsSummary(holdings, priceMap) {
   };
 }
 
+const holdingsCalculationsExports = { currentValue, investedValue, profitPct, profitAbsolute, buildHoldingsSummary };
+
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { currentValue, investedValue, profitPct, profitAbsolute, buildHoldingsSummary };
+  module.exports = holdingsCalculationsExports;
+} else if (typeof window !== "undefined") {
+  Object.assign(window, holdingsCalculationsExports);
 }
