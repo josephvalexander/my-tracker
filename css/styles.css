@@ -236,6 +236,29 @@ body {
 .glossary-term { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
 .glossary-explain { font-size: 12px; color: var(--color-text-secondary); line-height: 1.5; }
 
+.drive-status-line { font-size: 11px; color: var(--color-text-tertiary); margin-bottom: 10px; display: flex; justify-content: space-between; }
+.drive-status-line a { color: #0c447c; }
+
+.nse-refresh-card { font-size: 13px; }
+.nse-refresh-title { font-weight: 600; font-size: 13px; }
+.nse-refresh-steps { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.nse-step { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.nse-step-num { width: 20px; height: 20px; border-radius: 50%; background: #e6f1fb; color: #0c447c; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.nse-step span:not(.nse-step-num) { flex: 1; }
+.btn-primary-outline { border: 1.5px solid #85b7eb; background: #e6f1fb; color: #0c447c; }
+.nse-fetch-success { color: var(--color-green); font-size: 12px; }
+.nse-fetch-partial { color: var(--color-yellow); font-size: 12px; }
+.nse-fetch-error { color: var(--color-red); font-size: 11px; }
+
+.batch-select-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 0.5px solid var(--color-border); font-size: 13px; cursor: pointer; }
+.batch-select-row:last-child { border-bottom: none; }
+.batch-result-row { font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
+
+.tag-checkbox { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; background: var(--color-bg); border-radius: var(--radius-md); padding: 4px 9px; cursor: pointer; }
+.ai-draft-btn { font-size: 11px; }
+.ai-sources-box { margin-top: 8px; display: flex; flex-direction: column; gap: 3px; }
+.ai-source-link { font-size: 10px; color: var(--color-text-tertiary); text-decoration: underline; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+
 .action-row { padding: 6px 0; font-size: 13px; border-bottom: 0.5px solid var(--color-border); }
 .action-row:last-child { border-bottom: none; }
 

@@ -42,13 +42,54 @@ site. Knowing which is which will save you time:
   or the PWA install prompt will look broken.
 - **Add Holding screen**: `#addHolding` is referenced from the Holdings
   tab's empty state but not yet built — same pattern as `addStock.js`.
-- **AI-drafted qualitative fields**: business description, competitive
-  advantage, and market position are manual text fields with no draft
-  assist yet — discussed as a future addition (Gemini, web-grounded),
-  not yet built.
-- **DCF calculator**: `intrinsicValue` is a manual field for now — a
-  base-case DCF calculator (auto-pulled FCF + editable growth/discount
-  rate assumptions) is planned but not yet built.
+- **DCF calculator**: `intrinsicValue` is still a manual low/high entry
+  on the edit screen — a base-case DCF calculator (auto-pulled FCF +
+  editable growth/discount rate assumptions) is planned but not yet
+  built.
+
+## NSE refresh — where it actually lives now
+
+Per-stock: open any stock's detail page, there's a "Refresh from NSE"
+card right under the price strip — click "Open" (opens NSE in a new
+tab so it sets a session cookie), then come back and click "Fetch
+now". Updates shareholding, bulk deals, corporate actions, and the
+live current price/market cap/52-week range, all from one fetch.
+
+Batch (multiple stocks at once): from the Watchlist, the "Refresh NSE"
+button in the header opens a screen where you pick which stocks to
+refresh and fetch them all with a short delay between each (to avoid
+looking like scripted traffic to NSE's rate limiter).
+
+**Known caveat, same as always with `nseClient.js`**: the exact field
+names in NSE's JSON responses were my best inference, not verified
+against a live call from this build environment. If a fetch returns
+"partial" or fails entirely, open browser devtools, look at what NSE's
+quote/shareholding endpoints actually return, and adjust the field
+mappings in `js/nseClient.js` to match.
+
+## AI draft assist — where it actually lives now
+
+Each stock's **Edit screen** (reachable via "Edit target" / "Add IV
+estimate" buttons on the detail page, or directly at `#editStock/{ticker}`)
+has a "✨ Draft with AI" button under each of the three qualitative
+fields (Business, Competitive advantage, Market position). Requires a
+free Gemini API key, pasted into Settings → "AI draft assist" once.
+
+Drafts are generated with Google Search grounding enabled — the model
+actually searches the web rather than relying purely on training data
+— and the sources it used are shown as links under the draft, so you
+can check rather than just trust it. Nothing from AI is auto-saved;
+the draft lands in the textarea, you review/edit it, then hit "Save
+changes" yourself, same as if you'd typed it.
+
+## Current price — why it can look stale, and how to fix it
+
+The Screener `.xlsx` export's "Current Price" is the price *at the
+moment you exported the file from Screener*, not a live price — this
+is a property of the export itself, not a bug. Once you've uploaded a
+Screener file, use the "Refresh from NSE" flow above to pull the
+actual live price, market cap, and 52-week range — that overwrites
+the stale Screener snapshot with current NSE data.
 - **Batch NSE refresh UI**: `nseClient.js batchRefresh()` exists and
   works structurally, but the screen that lets you select stocks and
   watch progress (from the earlier mockup) isn't wired up yet.

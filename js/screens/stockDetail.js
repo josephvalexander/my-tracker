@@ -98,6 +98,32 @@ function entryZoneSection(stock) {
     </div>`;
 }
 
+function nseRefreshSection(stock) {
+  const lastFetched = stock.shareholding?.lastUpdated || stock.bulkDeals?.lastUpdated || stock.corporateActions?.lastUpdated;
+  return `
+    <div class="card nse-refresh-card">
+      <div class="nse-refresh-top">
+        <div>
+          <div class="nse-refresh-title">Refresh from NSE</div>
+          <div class="muted" style="font-size:11px;">Price, shareholding, bulk deals & corporate actions · last fetched ${lastFetched || "never"}</div>
+        </div>
+      </div>
+      <div class="nse-refresh-steps">
+        <div class="nse-step">
+          <span class="nse-step-num">1</span>
+          <span>Open NSE, search "${stock.ticker}", let the page fully load</span>
+          <button class="btn btn-small" id="nse-open-btn">Open</button>
+        </div>
+        <div class="nse-step">
+          <span class="nse-step-num">2</span>
+          <span>Come back here and fetch</span>
+          <button class="btn btn-small btn-primary-outline" id="nse-fetch-btn">Fetch now</button>
+        </div>
+      </div>
+      <div id="nse-fetch-status"></div>
+    </div>`;
+}
+
 const stockDetailScreen = {
   async render(params) {
     const ticker = params[0];
@@ -134,6 +160,7 @@ const stockDetailScreen = {
         </div>
 
         ${priceContextStrip(stock)}
+        ${nseRefreshSection(stock)}
         ${entryZoneSection(stock)}
         ${verdictBanner(verdict)}
 
@@ -187,12 +214,68 @@ const stockDetailScreen = {
       </div>`;
   },
 
-  async afterRender() {
+  async afterRender(params) {
+    const ticker = params[0];
+
     document.querySelectorAll(".detail-tab-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         window.location.hash = btn.dataset.go;
       });
     });
+
+    const openBtn = document.getElementById("nse-open-btn");
+    if (openBtn) {
+      openBtn.addEventListener("click", () => {
+        window.open(`https://www.nseindia.com/get-quotes/equity?symbol=${ticker}`, "_blank");
+      });
+    }
+
+    const fetchBtn = document.getElementById("nse-fetch-btn");
+    if (fetchBtn) {
+      fetchBtn.addEventListener("click", async () => {
+        const statusEl = document.getElementById("nse-fetch-status");
+        statusEl.innerHTML = `<div class="muted" style="font-size:11px; margin-top:6px;">Fetching...</div>`;
+
+        const result = await refreshStockFromNse(ticker);
+        const stock = await StockStore.get(ticker);
+        const today = new Date().toISOString().slice(0, 10);
+
+        if (result.shareholding) {
+          stock.shareholding = { source: "nse_fetch", lastUpdated: today, history: result.shareholding };
+        }
+        if (result.bulkDeals) {
+          stock.bulkDeals = { source: "nse_fetch", lastUpdated: today, deals: result.bulkDeals };
+        }
+        if (result.corporateActions) {
+          stock.corporateActions = { source: "nse_fetch", lastUpdated: today, actions: result.corporateActions };
+        }
+        if (result.quoteInfo) {
+          stock.fundamentals = stock.fundamentals || {};
+          if (result.quoteInfo.currentPrice) stock.fundamentals.currentPrice = result.quoteInfo.currentPrice;
+          if (result.quoteInfo.marketCap) stock.fundamentals.marketCap = result.quoteInfo.marketCap;
+          if (result.quoteInfo.name && (!stock.name || stock.name === stock.ticker)) stock.name = result.quoteInfo.name;
+          if (result.quoteInfo.sector) stock.sector = result.quoteInfo.sector;
+          stock.priceContext = stock.priceContext || {};
+          stock.priceContext.source = "nse_fetch";
+          stock.priceContext.lastUpdated = today;
+          if (result.quoteInfo.week52High) stock.priceContext.week52High = result.quoteInfo.week52High;
+          if (result.quoteInfo.week52Low) stock.priceContext.week52Low = result.quoteInfo.week52Low;
+        }
+
+        await StockStore.set(ticker, stock);
+
+        const errorCount = Object.keys(result.errors || {}).length;
+        if (errorCount === 0) {
+          statusEl.innerHTML = `<div class="nse-fetch-success">✓ Fetched successfully</div>`;
+        } else if (result.partial) {
+          statusEl.innerHTML = `<div class="nse-fetch-partial">⚠ Partial — ${Object.entries(result.errors).map(([k, v]) => `${k}: ${v}`).join("; ")}</div>`;
+        } else {
+          statusEl.innerHTML = `<div class="nse-fetch-error">⚠ Fetch failed for all sources. NSE may need a fresh page visit (step 1), or its site structure changed — see js/nseClient.js comments. Falling back to manual entry/CSV upload is always available.</div>`;
+        }
+
+        navigate(`#stock/${ticker}`);
+      });
+    }
   },
 };
 

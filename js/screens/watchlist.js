@@ -72,10 +72,11 @@ const watchlistScreen = {
         <div class="screen-header">
           <div class="screen-title">My watchlist <span id="watchlist-count" class="muted"></span></div>
           <div class="header-actions">
-            <button id="sync-btn" class="btn btn-small">Sync</button>
+            <button id="nse-refresh-btn" class="btn btn-small">Refresh NSE</button>
             <button id="add-stock-btn" class="btn btn-small">+ Add</button>
           </div>
         </div>
+        <div id="drive-status-line" class="drive-status-line"></div>
         <div id="watchlist-list" class="stock-list">
           <div class="loading">Loading...</div>
         </div>
@@ -86,6 +87,14 @@ const watchlistScreen = {
     const stocks = await StockStore.getActive();
     const countEl = document.getElementById("watchlist-count");
     countEl.textContent = `· ${stocks.length} stock${stocks.length === 1 ? "" : "s"}`;
+
+    const settings = await MetaStore.getSettings();
+    const driveLine = document.getElementById("drive-status-line");
+    if (settings?.driveConnected) {
+      driveLine.innerHTML = `<i>Drive connected · last synced ${settings.lastSyncPush ? new Date(settings.lastSyncPush).toLocaleDateString("en-IN") : "never pushed"}</i> <a href="#settings">Manage</a>`;
+    } else {
+      driveLine.innerHTML = `<i>Working from local data only</i> <a href="#settings">Connect Drive</a>`;
+    }
 
     const listEl = document.getElementById("watchlist-list");
     if (stocks.length === 0) {
@@ -117,8 +126,8 @@ const watchlistScreen = {
       window.location.hash = "#addStock";
     });
 
-    document.getElementById("sync-btn").addEventListener("click", () => {
-      window.location.hash = "#settings/sync";
+    document.getElementById("nse-refresh-btn").addEventListener("click", () => {
+      window.location.hash = "#batchRefresh";
     });
   },
 };

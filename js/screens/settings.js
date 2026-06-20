@@ -35,6 +35,13 @@ const settingsScreen = {
           <button id="save-thresholds-btn" class="btn btn-small">Save</button>
         </div>
 
+        <div class="section-label">AI draft assist</div>
+        <div class="card">
+          <div class="muted" style="margin-bottom:8px; font-size:11px;">Used by "Draft with AI" buttons on each stock's edit screen, for the business/moat/market-position fields. Get a free key from <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a>. Stored only on this device — never committed to your repo, never sent anywhere except Google's API.</div>
+          <input type="password" id="gemini-key-input" placeholder="Paste your Gemini API key" />
+          <button id="save-gemini-key-btn" class="btn btn-small" style="margin-top:8px;">Save key</button>
+        </div>
+
         <div class="section-label">Archived stocks</div>
         <div class="card">
           <div class="muted" style="margin-bottom:8px;">Stocks you researched and passed on. Notes stay intact — restore or delete from here.</div>
@@ -147,6 +154,13 @@ const settingsScreen = {
 
     document.getElementById("de-green-input").value = settings.deRule.green;
     document.getElementById("de-yellow-input").value = settings.deRule.yellow;
+    document.getElementById("gemini-key-input").value = settings.geminiApiKey || "";
+
+    document.getElementById("save-gemini-key-btn").addEventListener("click", async () => {
+      settings.geminiApiKey = document.getElementById("gemini-key-input").value.trim();
+      await MetaStore.setSettings(settings);
+      alert(settings.geminiApiKey ? "Gemini key saved." : "Gemini key cleared.");
+    });
 
     document.getElementById("save-thresholds-btn").addEventListener("click", async () => {
       settings.deRule.green = parseFloat(document.getElementById("de-green-input").value);
