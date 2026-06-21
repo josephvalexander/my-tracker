@@ -51,6 +51,10 @@ const settingsScreen = {
         <div class="section-label">Data</div>
         <div class="card">
           <button id="export-backup-btn" class="btn btn-small">Export backup (.json)</button>
+          <div style="margin-top:10px; padding-top:10px; border-top:0.5px solid var(--color-border);">
+            <div class="muted" style="font-size:11px; margin-bottom:8px;">For the NSE scraper (GitHub Actions): export your current ticker list, then replace <code>data/tickers.json</code> in your repo with it.</div>
+            <button id="export-tickers-btn" class="btn btn-small">Export ticker list for scraper</button>
+          </div>
         </div>
       </div>`;
   },
@@ -184,6 +188,18 @@ const settingsScreen = {
       const a = document.createElement("a");
       a.href = url;
       a.download = `portfolio-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    document.getElementById("export-tickers-btn").addEventListener("click", async () => {
+      const stocks = await StockStore.getActive();
+      const tickers = stocks.map((s) => s.ticker);
+      const blob = new Blob([JSON.stringify(tickers, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "tickers.json";
       a.click();
       URL.revokeObjectURL(url);
     });

@@ -65,24 +65,74 @@ const stockChartsScreen = {
       const sales = usingQuarterly ? quarterly.sales : annual.sales;
       const netProfit = usingQuarterly ? quarterly.netProfit : annual.netProfit;
 
+      const baseFont = { family: "-apple-system, 'Segoe UI', Roboto, sans-serif", size: 11 };
+      const gridStyle = { color: "rgba(0,0,0,0.06)" };
+      const tickStyle = { font: baseFont, color: "#888780" };
+
       charts.revenuePat = new Chart(document.getElementById("chart-revenue-pat"), {
         type: "bar",
         data: {
           labels,
           datasets: [
-            { label: "Revenue", data: sales, backgroundColor: "#85B7EB" },
-            { label: "Net profit", data: netProfit, backgroundColor: "#1D9E75" },
+            { label: "Revenue", data: sales, backgroundColor: "#85B7EB", borderRadius: 4, borderSkipped: false },
+            { label: "Net profit", data: netProfit, backgroundColor: "#1D9E75", borderRadius: 4, borderSkipped: false },
           ],
         },
-        options: { responsive: true, plugins: { legend: { position: "bottom" } } },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: "bottom", labels: { font: baseFont, boxWidth: 12, boxHeight: 12, usePointStyle: true, pointStyle: "circle" } },
+            tooltip: {
+              backgroundColor: "#2c2c2a",
+              titleFont: baseFont,
+              bodyFont: baseFont,
+              padding: 10,
+              cornerRadius: 6,
+              callbacks: { label: (ctx) => `${ctx.dataset.label}: ₹${ctx.parsed.y?.toLocaleString("en-IN")} Cr` },
+            },
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: tickStyle },
+            y: { grid: gridStyle, ticks: { ...tickStyle, callback: (v) => "₹" + v.toLocaleString("en-IN") } },
+          },
+        },
       });
 
       if (!usingQuarterly) {
         const eps = epsHistory(annual);
         charts.eps = new Chart(document.getElementById("chart-eps"), {
           type: "line",
-          data: { labels, datasets: [{ label: "EPS", data: eps, borderColor: "#D85A30", tension: 0.2 }] },
-          options: { responsive: true, plugins: { legend: { display: false } } },
+          data: {
+            labels,
+            datasets: [
+              {
+                label: "EPS",
+                data: eps,
+                borderColor: "#D85A30",
+                backgroundColor: "rgba(216,90,48,0.08)",
+                tension: 0.3,
+                fill: true,
+                pointRadius: 3,
+                pointBackgroundColor: "#D85A30",
+                pointBorderColor: "#fff",
+                pointBorderWidth: 1.5,
+                borderWidth: 2,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: { backgroundColor: "#2c2c2a", titleFont: baseFont, bodyFont: baseFont, padding: 10, cornerRadius: 6, callbacks: { label: (ctx) => `EPS: ₹${ctx.parsed.y?.toFixed(2)}` } },
+            },
+            scales: {
+              x: { grid: { display: false }, ticks: tickStyle },
+              y: { grid: gridStyle, ticks: { ...tickStyle, callback: (v) => "₹" + v } },
+            },
+          },
         });
 
         const roe = roeHistory(annual);
@@ -93,16 +143,46 @@ const stockChartsScreen = {
           data: {
             labels,
             datasets: [
-              { label: "ROE %", data: roe, borderColor: "#534AB7", yAxisID: "y", tension: 0.2 },
-              { label: "D/E", data: de, borderColor: "#888780", borderDash: [4, 4], yAxisID: "y1", tension: 0.2 },
+              {
+                label: "ROE %",
+                data: roe,
+                borderColor: "#534AB7",
+                backgroundColor: "rgba(83,74,183,0.08)",
+                yAxisID: "y",
+                tension: 0.3,
+                fill: true,
+                pointRadius: 3,
+                pointBackgroundColor: "#534AB7",
+                pointBorderColor: "#fff",
+                pointBorderWidth: 1.5,
+                borderWidth: 2,
+              },
+              {
+                label: "D/E",
+                data: de,
+                borderColor: "#BA7517",
+                yAxisID: "y1",
+                borderDash: [5, 4],
+                tension: 0.3,
+                pointRadius: 3,
+                pointBackgroundColor: "#BA7517",
+                pointBorderColor: "#fff",
+                pointBorderWidth: 1.5,
+                borderWidth: 2,
+              },
             ],
           },
           options: {
             responsive: true,
-            plugins: { legend: { position: "bottom" } },
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: "bottom", labels: { font: baseFont, boxWidth: 12, boxHeight: 12, usePointStyle: true, pointStyle: "circle" } },
+              tooltip: { backgroundColor: "#2c2c2a", titleFont: baseFont, bodyFont: baseFont, padding: 10, cornerRadius: 6 },
+            },
             scales: {
-              y: { type: "linear", position: "left" },
-              y1: { type: "linear", position: "right", grid: { drawOnChartArea: false } },
+              x: { grid: { display: false }, ticks: tickStyle },
+              y: { type: "linear", position: "left", grid: gridStyle, ticks: { ...tickStyle, callback: (v) => v + "%" } },
+              y1: { type: "linear", position: "right", grid: { drawOnChartArea: false }, ticks: tickStyle },
             },
           },
         });
@@ -126,8 +206,15 @@ const stockChartsScreen = {
           },
           options: {
             responsive: true,
-            plugins: { legend: { position: "bottom" } },
-            scales: { x: { stacked: true }, y: { stacked: true, max: 100 } },
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: "bottom", labels: { font: baseFont, boxWidth: 12, boxHeight: 12, usePointStyle: true, pointStyle: "circle" } },
+              tooltip: { backgroundColor: "#2c2c2a", titleFont: baseFont, bodyFont: baseFont, padding: 10, cornerRadius: 6, callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(1)}%` } },
+            },
+            scales: {
+              x: { stacked: true, grid: { display: false }, ticks: tickStyle },
+              y: { stacked: true, max: 100, grid: gridStyle, ticks: { ...tickStyle, callback: (v) => v + "%" } },
+            },
           },
         });
       } else {

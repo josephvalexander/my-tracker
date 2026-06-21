@@ -1,13 +1,12 @@
 /**
  * screens/editStock.js
  *
- * Edit screen for everything that's manual by design: target entry
- * price, intrinsic value, and the three qualitative fields (business,
- * moat, market position) — each with a "Draft with AI" button that
- * calls Gemini with web-search grounding (js/geminiClient.js) and
- * drops the result into the textarea as an editable draft. Nothing
- * from AI is ever auto-saved; the person must hit Save themselves,
- * same as any manually-typed edit.
+ * Edit screen for everything that's manual or assumption-driven:
+ * target entry price, intrinsic value, and the three qualitative
+ * fields (business, moat, market position). AI drafting now happens
+ * once, right after a Screener upload (see addStock.js) — this screen
+ * just has plain editable textareas for those three fields, no
+ * per-field AI button.
  */
 
 const MOAT_TAG_OPTIONS = [
@@ -20,8 +19,54 @@ const MOAT_TAG_OPTIONS = [
   "none_identified",
 ];
 
-function aiDraftButton(fieldKey, label) {
-  return `<button class="btn btn-small ai-draft-btn" data-field="${fieldKey}">✨ Draft with AI — ${label}</button>`;
+function ivSection(stock) {
+  const isManual = stock.intrinsicValue && stock.intrinsicValue.method === "manual";
+  const defaultIv = calculateDefaultIV(stock);
+
+  if (isManual) {
+    return `
+      <div class="card">
+        <div class="muted" style="margin-bottom:8px; font-size:11px;">Manually entered. Switch back to the computed default below if you'd rather not maintain this by hand.</div>
+        <div style="display:flex; gap:8px;">
+          <div style="flex:1;"><label style="font-size:11px; color:var(--color-text-secondary);">Low</label><input type="number" id="iv-low-input" value="${stock.intrinsicValue?.low ?? ""}" /></div>
+          <div style="flex:1;"><label style="font-size:11px; color:var(--color-text-secondary);">High</label><input type="number" id="iv-high-input" value="${stock.intrinsicValue?.high ?? ""}" /></div>
+        </div>
+        ${defaultIv ? `<button id="use-default-iv-btn" class="btn btn-small" style="margin-top:8px;">Use computed default instead (₹${defaultIv.base.toFixed(0)})</button>` : ""}
+      </div>`;
+  }
+
+  if (!defaultIv) {
+    return `
+      <div class="card">
+        <div class="muted" style="font-size:11px; margin-bottom:8px;">Not enough cash flow data yet to compute a default (needs at least one year of positive operating cash flow and shares outstanding). Enter manually instead, or upload more Screener history.</div>
+        <div style="display:flex; gap:8px;">
+          <div style="flex:1;"><label style="font-size:11px; color:var(--color-text-secondary);">Low</label><input type="number" id="iv-low-input" value="" /></div>
+          <div style="flex:1;"><label style="font-size:11px; color:var(--color-text-secondary);">High</label><input type="number" id="iv-high-input" value="" /></div>
+        </div>
+      </div>`;
+  }
+
+  return `
+    <div class="card">
+      <div class="muted" style="font-size:11px; margin-bottom:8px;">
+        Auto-computed: simple DCF on operating cash flow (not a rigorous FCF model — capex isn't cleanly isolated in Screener's export, see Help). Adjust assumptions below; recalculates live.
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
+        <div><label style="font-size:11px; color:var(--color-text-secondary);">Growth, yrs 1–5 (%)</label><input type="number" step="0.1" id="iv-growth1-input" value="${defaultIv.assumptions.growthYears1to5.toFixed(1)}" /></div>
+        <div><label style="font-size:11px; color:var(--color-text-secondary);">Growth, yrs 6–10 (%)</label><input type="number" step="0.1" id="iv-growth2-input" value="${defaultIv.assumptions.growthYears6to10.toFixed(1)}" /></div>
+        <div><label style="font-size:11px; color:var(--color-text-secondary);">Terminal growth (%)</label><input type="number" step="0.1" id="iv-terminal-input" value="${defaultIv.assumptions.terminalGrowth}" /></div>
+        <div><label style="font-size:11px; color:var(--color-text-secondary);">Discount rate (%)</label><input type="number" step="0.1" id="iv-discount-input" value="${defaultIv.assumptions.discountRate}" /></div>
+      </div>
+      <div id="iv-computed-output" class="iv-computed-box">
+        <span>Estimate: <strong>₹${defaultIv.low.toFixed(0)} – ₹${defaultIv.high.toFixed(0)}</strong></span>
+        <span class="muted" style="font-size:11px;">(base ₹${defaultIv.base.toFixed(0)})</span>
+      </div>
+      <button id="enter-manual-iv-btn" class="btn btn-small" style="margin-top:8px;">Enter a fixed value manually instead</button>
+    </div>`;
+}
+
+function aiDraftHint(fieldName) {
+  return `<div class="muted" style="font-size:11px; margin-bottom:6px;">Drafted once with AI during Screener upload, if you used that option. Edit freely below.</div>`;
 }
 
 const editStockScreen = {
@@ -31,8 +76,6 @@ const editStockScreen = {
     if (!stock) {
       return `<div class="screen-padding"><div class="empty-state">Stock not found.</div></div>`;
     }
-    const settings = await MetaStore.getSettings();
-    const hasGeminiKey = !!settings?.geminiApiKey;
 
     return `
       <div class="screen-padding">
@@ -41,10 +84,6 @@ const editStockScreen = {
           <div class="detail-title"><div class="detail-name">Edit — ${stock.name || ticker}</div></div>
         </div>
 
-        ${!hasGeminiKey
-          ? `<div class="hint-box">Add a Gemini API key in Settings to enable "Draft with AI" buttons below. <a href="#settings">Go to Settings</a></div>`
-          : ""}
-
         <div class="section-label">Target entry price</div>
         <div class="card">
           <div class="muted" style="margin-bottom:8px; font-size:11px;">Leave blank to auto-default to 15% below your intrinsic value estimate.</div>
@@ -52,31 +91,17 @@ const editStockScreen = {
         </div>
 
         <div class="section-label">Intrinsic value estimate</div>
-        <div class="card">
-          <div style="display:flex; gap:8px;">
-            <div style="flex:1;">
-              <label style="font-size:11px; color:var(--color-text-secondary);">Low</label>
-              <input type="number" id="iv-low-input" value="${stock.intrinsicValue?.low ?? ""}" />
-            </div>
-            <div style="flex:1;">
-              <label style="font-size:11px; color:var(--color-text-secondary);">High</label>
-              <input type="number" id="iv-high-input" value="${stock.intrinsicValue?.high ?? ""}" />
-            </div>
-          </div>
-        </div>
+        <div id="iv-section-wrap">${ivSection(stock)}</div>
 
-        <div class="section-label">Business <span class="section-label-note">(AI can draft, you should verify)</span></div>
+        <div class="section-label">Business</div>
         <div class="card">
+          ${aiDraftHint("business")}
           <textarea id="business-textarea" class="note-textarea" placeholder="What does this company actually do, in one sentence?">${stock.qualitative?.business || ""}</textarea>
-          <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
-            ${aiDraftButton("business", "Business")}
-            <span id="business-ai-status" class="muted" style="font-size:11px;"></span>
-          </div>
-          <div id="business-ai-sources"></div>
         </div>
 
-        <div class="section-label">Competitive advantage <span class="section-label-note">(AI can draft, you should verify)</span></div>
+        <div class="section-label">Competitive advantage</div>
         <div class="card">
+          ${aiDraftHint("moat")}
           <textarea id="moat-textarea" class="note-textarea" placeholder="Pricing power, brand, IP, switching costs, regulatory barrier, network effect?">${stock.qualitative?.moatDescription || ""}</textarea>
           <div class="tag-row" style="margin-top:8px;">
             ${MOAT_TAG_OPTIONS.map(
@@ -84,21 +109,12 @@ const editStockScreen = {
                 `<label class="tag-checkbox"><input type="checkbox" class="moat-tag-checkbox" value="${tag}" ${stock.qualitative?.moatTags?.includes(tag) ? "checked" : ""}/> ${tag.replace(/_/g, " ")}</label>`
             ).join("")}
           </div>
-          <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
-            ${aiDraftButton("moat", "Moat")}
-            <span id="moat-ai-status" class="muted" style="font-size:11px;"></span>
-          </div>
-          <div id="moat-ai-sources"></div>
         </div>
 
-        <div class="section-label">Market position <span class="section-label-note">(AI can draft, you should verify)</span></div>
+        <div class="section-label">Market position</div>
         <div class="card">
+          ${aiDraftHint("marketPosition")}
           <textarea id="position-textarea" class="note-textarea" placeholder="Leader, top-3, or commodity player in its niche?">${stock.qualitative?.marketPosition || ""}</textarea>
-          <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
-            ${aiDraftButton("marketPosition", "Position")}
-            <span id="position-ai-status" class="muted" style="font-size:11px;"></span>
-          </div>
-          <div id="position-ai-sources"></div>
         </div>
 
         <button id="save-edit-btn" class="btn btn-primary" style="margin-top:8px;">Save changes</button>
@@ -107,59 +123,94 @@ const editStockScreen = {
 
   async afterRender(params) {
     const ticker = params[0];
+    let stock = await StockStore.get(ticker);
 
-    document.querySelectorAll(".ai-draft-btn").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const fieldKey = btn.dataset.field;
-        const statusEl = document.getElementById(`${fieldKey === "marketPosition" ? "position" : fieldKey}-ai-status`);
-        const textareaId = fieldKey === "marketPosition" ? "position-textarea" : fieldKey === "moat" ? "moat-textarea" : "business-textarea";
-        const sourcesElId = `${fieldKey === "marketPosition" ? "position" : fieldKey}-ai-sources`;
+    function wireIvSectionHandlers() {
+      const useDefaultBtn = document.getElementById("use-default-iv-btn");
+      if (useDefaultBtn) {
+        useDefaultBtn.addEventListener("click", async () => {
+          stock.intrinsicValue = null; // clear manual override, falls back to computed default on next render
+          document.getElementById("iv-section-wrap").innerHTML = ivSection(stock);
+          wireIvSectionHandlers();
+        });
+      }
 
-        const settings = await MetaStore.getSettings();
-        if (!settings?.geminiApiKey) {
-          statusEl.textContent = "Add a Gemini API key in Settings first.";
-          return;
-        }
+      const enterManualBtn = document.getElementById("enter-manual-iv-btn");
+      if (enterManualBtn) {
+        enterManualBtn.addEventListener("click", () => {
+          const defaultIv = calculateDefaultIV(stock);
+          stock.intrinsicValue = { low: defaultIv?.low ?? null, high: defaultIv?.high ?? null, method: "manual" };
+          document.getElementById("iv-section-wrap").innerHTML = ivSection(stock);
+          wireIvSectionHandlers();
+        });
+      }
 
-        statusEl.textContent = "Drafting...";
-        btn.disabled = true;
-        try {
-          const stock = await StockStore.get(ticker);
-          const { text, sources } = await draftQualitativeField(settings.geminiApiKey, fieldKey, stock);
-          document.getElementById(textareaId).value = text;
-          statusEl.textContent = "Draft inserted — review before saving.";
-          if (sources.length > 0) {
-            document.getElementById(sourcesElId).innerHTML = `
-              <div class="ai-sources-box">
-                <div class="muted" style="font-size:10px;">Sources used:</div>
-                ${sources.map((s) => `<a href="${s.uri}" target="_blank" class="ai-source-link">${s.title || s.uri}</a>`).join("")}
-              </div>`;
+      ["iv-growth1-input", "iv-growth2-input", "iv-terminal-input", "iv-discount-input"].forEach((id) => {
+        const input = document.getElementById(id);
+        if (!input) return;
+        input.addEventListener("input", () => {
+          const overrides = {
+            growthYears1to5: parseFloat(document.getElementById("iv-growth1-input").value),
+            growthYears6to10: parseFloat(document.getElementById("iv-growth2-input").value),
+            terminalGrowth: parseFloat(document.getElementById("iv-terminal-input").value),
+            discountRate: parseFloat(document.getElementById("iv-discount-input").value),
+          };
+          const recomputed = calculateDefaultIV(stock, overrides);
+          const outputEl = document.getElementById("iv-computed-output");
+          if (recomputed && outputEl) {
+            outputEl.innerHTML = `
+              <span>Estimate: <strong>₹${recomputed.low.toFixed(0)} – ₹${recomputed.high.toFixed(0)}</strong></span>
+              <span class="muted" style="font-size:11px;">(base ₹${recomputed.base.toFixed(0)})</span>`;
+            outputEl.dataset.low = recomputed.low;
+            outputEl.dataset.high = recomputed.high;
+          } else if (outputEl) {
+            outputEl.innerHTML = `<span class="text-red">Invalid assumptions — discount rate must be above terminal growth.</span>`;
           }
-        } catch (err) {
-          statusEl.textContent = `Draft failed: ${err.message}`;
-        } finally {
-          btn.disabled = false;
-        }
+        });
       });
-    });
+    }
+
+    wireIvSectionHandlers();
 
     document.getElementById("save-edit-btn").addEventListener("click", async () => {
-      const stock = await StockStore.get(ticker);
+      const current = await StockStore.get(ticker);
 
       const targetVal = document.getElementById("target-price-input").value;
-      stock.targetEntryPrice = targetVal ? parseFloat(targetVal) : null;
+      current.targetEntryPrice = targetVal ? parseFloat(targetVal) : null;
 
-      const ivLow = document.getElementById("iv-low-input").value;
-      const ivHigh = document.getElementById("iv-high-input").value;
-      stock.intrinsicValue = ivLow && ivHigh ? { low: parseFloat(ivLow), high: parseFloat(ivHigh), method: "manual", lastCalculated: new Date().toISOString().slice(0, 10) } : null;
+      const manualLowInput = document.getElementById("iv-low-input");
+      const computedOutput = document.getElementById("iv-computed-output");
 
-      stock.qualitative = stock.qualitative || {};
-      stock.qualitative.business = document.getElementById("business-textarea").value.trim();
-      stock.qualitative.moatDescription = document.getElementById("moat-textarea").value.trim();
-      stock.qualitative.moatTags = [...document.querySelectorAll(".moat-tag-checkbox:checked")].map((cb) => cb.value);
-      stock.qualitative.marketPosition = document.getElementById("position-textarea").value.trim();
+      if (manualLowInput) {
+        const ivLow = document.getElementById("iv-low-input").value;
+        const ivHigh = document.getElementById("iv-high-input").value;
+        current.intrinsicValue = ivLow && ivHigh ? { low: parseFloat(ivLow), high: parseFloat(ivHigh), method: "manual", lastCalculated: new Date().toISOString().slice(0, 10) } : null;
+      } else if (computedOutput) {
+        const overrides = {
+          growthYears1to5: parseFloat(document.getElementById("iv-growth1-input").value),
+          growthYears6to10: parseFloat(document.getElementById("iv-growth2-input").value),
+          terminalGrowth: parseFloat(document.getElementById("iv-terminal-input").value),
+          discountRate: parseFloat(document.getElementById("iv-discount-input").value),
+        };
+        const recomputed = calculateDefaultIV(current, overrides);
+        if (recomputed) {
+          current.intrinsicValue = {
+            low: recomputed.low,
+            high: recomputed.high,
+            method: "dcf_ocf_based",
+            assumptions: overrides,
+            lastCalculated: new Date().toISOString().slice(0, 10),
+          };
+        }
+      }
 
-      await StockStore.set(ticker, stock);
+      current.qualitative = current.qualitative || {};
+      current.qualitative.business = document.getElementById("business-textarea").value.trim();
+      current.qualitative.moatDescription = document.getElementById("moat-textarea").value.trim();
+      current.qualitative.moatTags = [...document.querySelectorAll(".moat-tag-checkbox:checked")].map((cb) => cb.value);
+      current.qualitative.marketPosition = document.getElementById("position-textarea").value.trim();
+
+      await StockStore.set(ticker, current);
       window.location.hash = `#stock/${ticker}`;
     });
   },

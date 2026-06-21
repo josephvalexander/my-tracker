@@ -7,95 +7,100 @@ corporate-action data.
 
 ## Status of each piece — read this before debugging
 
-This was built and tested in pieces. Some parts are verified against
-real data; one part is a structurally-sound scaffold that needs your
-own verification once it runs in a real browser against the real NSE
-site. Knowing which is which will save you time:
+This was built and tested in pieces over many rounds, several of which
+caught real bugs by testing against the actual uploaded Caplin Point
+and eClerx Screener files rather than synthetic data. Knowing what's
+verified vs not will save you time:
 
 | Module | Status |
 |---|---|
-| `js/calculations.js` | **Tested** against the real Caplin Point Screener export. ROE, D/E, EPS CAGR, Cash EPS gap, retained earnings ratio, verdict logic all verified to produce correct, sane numbers — including correctly handling a real data gap (a missing FY26 share count) without crashing. |
-| `js/screenerParser.js` | **Tested** end-to-end against your actual uploaded file. Parses company name, 10 years of P&L/balance sheet/cash flow correctly. One caveat: it assumes Screener's "Data Sheet" tab layout stays stable — if Screener changes their export template, the row-label lookups in `ROW_LABELS` are the first thing to check. |
+| `js/calculations.js` | **Tested** against real Screener exports (Caplin Point, eClerx). ROE, D/E, EPS CAGR, Cash EPS gap, retained earnings ratio, FCF/OCF-based DCF, verdict logic all verified against real numbers — including a real eClerx D/E discrepancy that turned out to be correct (lease liabilities under Ind AS 116 count as "borrowings" in Screener's data; two independent third-party sources confirmed the ~0.15-0.19 range). |
+| `js/screenerParser.js` | **Tested** end-to-end against real uploaded files. Parses company name, 10 years of P&L/balance sheet/cash flow correctly. One caveat: it assumes Screener's "Data Sheet" tab layout stays stable — if Screener changes their export template, the row-label lookups in `ROW_LABELS` are the first thing to check. |
 | `js/holdingsCalculations.js` | **Tested** with synthetic numbers matching the original mockup design — allocation %, profit %, totals all compute correctly. |
-| `js/storage.js` | **Not yet run in a real browser.** IndexedDB code is standard and should work, but only Node-side logic was tested in this build session (no real browser/IndexedDB available in the dev sandbox). Test this first when you load the app for real. |
-| `js/nseClient.js` | **Unverified scaffold.** The fetch logic, error handling, and batch-refresh-with-delay structure are sound, but the actual field names used to parse NSE's JSON responses (`promoterGroup`, `fii`, etc. in `fetchShareholding`) are educated guesses — I could not call the real NSE API from this environment to confirm response shape. **This is the first thing to debug** once you try a real fetch: open browser devtools, look at the actual JSON NSE returns, and adjust the field mappings in `nseClient.js` to match. |
+| `js/storage.js` | Tested via a real browser DOM simulation (jsdom) including last-write-wins timestamp logic for Drive sync conflicts. Worth a final sanity check in an actual browser, but the core logic has been exercised end-to-end. |
 | `js/driveSync.js` | **Implemented for real** — Google Identity Services OAuth token flow, auto-pull-on-open, manual push. **Needs one setup step before it works**: create an OAuth 2.0 Client ID (Web application type) in Google Cloud Console, add your GitHub Pages URL under "Authorized JavaScript origins", enable the Drive API on that project, then paste the client ID into `DRIVE_CLIENT_ID` at the top of `js/driveSync.js`. Until that's done, "Connect Drive" will fail with an auth error — that's expected, not a bug. |
-| UI screens (`js/screens/*.js`, `css/styles.css`) | **Not visually verified** — written carefully against the mockup designs from planning, but never actually rendered in a browser during this build session. Expect minor CSS/layout fixes once you open it for real. |
+| `js/geminiClient.js` | **Confirmed working pattern** — rebuilt to mirror a separately-confirmed-working direct browser-to-Gemini integration (API key as a `?key=` query param, not a custom header, which risks a blocked CORS preflight). Needs your own Gemini API key (free tier) in Settings to test. |
+| NSE/Yahoo live price data | **Not built** — both block direct browser requests (CORS), confirmed not theoretical. A Puppeteer-scraper workaround and a Cloudflare Worker proxy were both scoped out; scraper was built then explicitly rejected for not being real-time. See "Price, market cap..." section below. Manual entry is the current path. |
+| UI screens (`js/screens/*.js`, `css/styles.css`) | Exercised via jsdom-based route tests across every screen with real Screener data, but final visual polish (spacing, mobile responsiveness) is worth a pass in an actual browser. |
 
 ## Setup
 
 1. Copy this whole folder into your GitHub repo.
-2. Enable GitHub Pages on the repo (Settings → Pages → deploy from branch).
+2. Enable GitHub Pages on the repo (Settings → Pages → deploy via the
+   included GitHub Actions workflow, `.github/workflows/deploy.yml`).
 3. Open the deployed URL. The app shell, watchlist, and all screens
    should load with an empty state ("No stocks yet").
 4. To see it working with real data: open browser devtools console,
    paste the contents of `docs/seedSampleData.js`, press enter, then
    reload the page. This seeds one real stock (Caplin Point) with the
-   actual numbers from your uploaded Screener file.
+   actual numbers from a real Screener file.
 5. Try the "+ Add" flow to add a second stock and upload a fresh
    Screener `.xlsx` export for it — this exercises the real parser path.
 
 ## What still needs building
 
 - **Icons**: `icons/icon-192.png` and `icons/icon-512.png` referenced in
-  `manifest.json` don't exist yet — add your own app icon at those sizes
-  or the PWA install prompt will look broken.
+  `manifest.json` — placeholder icons exist; swap for real branding
+  whenever you want.
 - **Add Holding screen**: `#addHolding` is referenced from the Holdings
   tab's empty state but not yet built — same pattern as `addStock.js`.
-- **DCF calculator**: `intrinsicValue` is still a manual low/high entry
-  on the edit screen — a base-case DCF calculator (auto-pulled FCF +
-  editable growth/discount rate assumptions) is planned but not yet
-  built.
+- **Real-time NSE/Yahoo price data** — see the dedicated section below
+  for the full story on why this isn't free-and-automatable, and what
+  the remaining option (a small proxy server) would involve.
 
-## NSE refresh — where it actually lives now
+## Price, market cap, 52-week range, shareholding — manual entry for now
 
-Per-stock: open any stock's detail page, there's a "Refresh from NSE"
-card right under the price strip — click "Open" (opens NSE in a new
-tab so it sets a session cookie), then come back and click "Fetch
-now". Updates shareholding, bulk deals, corporate actions, and the
-live current price/market cap/52-week range, all from one fetch.
+**Real-time NSE/Yahoo data turned out not to be achievable for free
+from a static, backend-less PWA.** Both providers' servers block
+direct browser requests (CORS) — confirmed against a real deployment,
+not theoretical, and confirmed as a deliberate choice on their end
+(their own client libraries' maintainers state outright that browser
+calls aren't supported). Two workarounds were tried and explicitly
+ruled out:
 
-Batch (multiple stocks at once): from the Watchlist, the "Refresh NSE"
-button in the header opens a screen where you pick which stocks to
-refresh and fetch them all with a short delay between each (to avoid
-looking like scripted traffic to NSE's rate limiter).
+- **A scheduled Puppeteer scraper in GitHub Actions** — solved CORS
+  (a headless browser visiting NSE's own page isn't a cross-origin
+  request) but only gives data as fresh as the last scheduled run, not
+  real-time. Ruled out for not being real-time.
+- **Yahoo Finance** — same CORS wall as NSE; not a viable alternative.
 
-**Known caveat, same as always with `nseClient.js`**: the exact field
-names in NSE's JSON responses were my best inference, not verified
-against a live call from this build environment. If a fetch returns
-"partial" or fails entirely, open browser devtools, look at what NSE's
-quote/shareholding endpoints actually return, and adjust the field
-mappings in `js/nseClient.js` to match.
+**The remaining real-time-capable option is a small proxy server**
+(e.g. a Cloudflare Worker) sitting between the PWA and NSE/Yahoo,
+forwarding requests server-side (where CORS doesn't apply) and adding
+proper CORS headers on the way back to the browser. This was discussed
+in detail but **not yet built** — it's new infrastructure to set up
+and maintain, not just app code. If you want to revisit this later,
+the Worker code shape and tradeoffs were scoped out; ask for it
+directly rather than re-deriving the research.
+
+**For now**: every stock's detail page has a manual-entry form for
+current price, market cap, 52-week range, promoter holding, and
+promoter pledging — found on Screener's company page or NSE's site
+directly, just not auto-fillable from here. Quarterly upkeep, same
+cadence as re-uploading a Screener export.
 
 ## AI draft assist — where it actually lives now
 
-Each stock's **Edit screen** (reachable via "Edit target" / "Add IV
-estimate" buttons on the detail page, or directly at `#editStock/{ticker}`)
-has a "✨ Draft with AI" button under each of the three qualitative
-fields (Business, Competitive advantage, Market position). Requires a
-free Gemini API key, pasted into Settings → "AI draft assist" once.
+After uploading a Screener export (Add Stock screen, or re-uploading
+from a stock's page), a single **"✨ Draft business, moat & market
+position with AI"** button drafts all three qualitative fields in one
+pass — not three separate per-field buttons. Requires a free Gemini
+API key, pasted into Settings → "AI draft assist" once.
 
 Drafts are generated with Google Search grounding enabled — the model
-actually searches the web rather than relying purely on training data
-— and the sources it used are shown as links under the draft, so you
-can check rather than just trust it. Nothing from AI is auto-saved;
-the draft lands in the textarea, you review/edit it, then hit "Save
-changes" yourself, same as if you'd typed it.
+actually searches the web rather than relying purely on training data.
+Nothing from AI is auto-saved as final; the draft lands in the
+business/moat/position textareas, editable on the stock's Edit screen,
+and only takes effect once you hit "Save changes" there — same as if
+you'd typed it yourself.
 
-## Current price — why it can look stale, and how to fix it
+## Current price — why it can look stale
 
 The Screener `.xlsx` export's "Current Price" is the price *at the
 moment you exported the file from Screener*, not a live price — this
-is a property of the export itself, not a bug. Once you've uploaded a
-Screener file, use the "Refresh from NSE" flow above to pull the
-actual live price, market cap, and 52-week range — that overwrites
-the stale Screener snapshot with current NSE data.
-- **Batch NSE refresh UI**: `nseClient.js batchRefresh()` exists and
-  works structurally, but the screen that lets you select stocks and
-  watch progress (from the earlier mockup) isn't wired up yet.
-- **Google OAuth**: reuse your existing flow; just call
-  `driveSync.pushToDrive(accessToken, await exportAll())` and
-  `driveSync.pullFromDrive(accessToken)` from wherever you get a token.
+is a property of the export itself, not a bug. Update it manually on
+the stock's detail page (see the manual-entry section above) whenever
+you want it current.
 
 ## Data schema
 
@@ -126,3 +131,18 @@ declining promoter holding) forces "No". Otherwise, 2+ soft flags
 (EPS CAGR <12%, consistency <8/10, retained earnings ratio <1.0) forces
 "No". The verdict banner shows the actual checks that passed/failed, not
 just the headline answer.
+
+## Intrinsic value — auto-computed default, fully overridable
+
+`calculateDefaultIV()` in `calculations.js` runs a simple DCF using
+**operating cash flow** (not a stricter FCF figure — see the function's
+own comment for why; an earlier OCF-minus-investing-CF approximation
+was tried and produced a wildly wrong result, ~₹29 vs an actual ~₹2,400
+market price, on a real test case before being replaced) as the base,
+averaged over 3 years for stability, with default growth/discount/
+terminal-growth assumptions that are all visible and editable on the
+stock's Edit screen — adjusting any of them recalculates the estimate
+live. Falls back to manual low/high entry if there isn't enough cash
+flow history to compute a default. This is a single base case, not
+bear/base/bull, by design — kept light across 10-12 holdings rather
+than rigorous per stock.

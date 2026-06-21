@@ -232,6 +232,159 @@ function fcfYield(stock) {
   return { value: (fcfApprox / marketCap) * 100, isApproximate: true };
 }
 
+/**
+ * Average Operating Cash Flow in ₹ Cr over the trailing N years
+ * (default 3). Used as the DCF's starting cash flow figure instead of
+ * the OCF-minus-investing-CF "FCF approximation" used elsewhere in
+ * this file (see fcfYield's comment) — that approximation can swing
+ * negative or near-zero for a perfectly healthy, growing business in
+ * any year with heavy capex or investment purchases, which would make
+ * a DCF built on it wildly wrong (verified: produced a ~₹29 intrinsic
+ * value against an actual ₹2,400+ market price on a real test case —
+ * a category error, not a minor rounding difference). OCF alone
+ * overstates true free cash flow by ignoring capex entirely, but it's
+ * stable and won't randomly invalidate the whole estimate. Always
+ * label this clearly in the UI as OCF-based, not a rigorous FCF DCF.
+ */
+function averageOperatingCashFlow(stock, years = 3) {
+  const annual = stock?.fundamentals?.annual;
+  if (!annual?.operatingCashFlow?.length) return null;
+  const recent = lastN(annual.operatingCashFlow, years).filter((v) => v !== null && v !== undefined);
+  if (recent.length === 0) return null;
+  return recent.reduce((a, b) => a + b, 0) / recent.length;
+}
+
+/**
+ * Average FCF in ₹ Cr over the trailing N years (default 3), using the
+ * same OCF + investing-CF approximation as fcfYield. Averaging rather
+ * than using a single year matters here: FCF is volatile year to year
+ * (one big capex year or investment purchase can swing it negative
+ * even for a healthy, growing business), and a DCF's entire output is
+ * extremely sensitive to its starting point — anchoring on one
+ * possibly-anomalous year would make the whole estimate unreliable in
+ * exactly the cases (capex-heavy expansion phases) where you'd most
+ * want a sanity check. Returns null if there isn't enough data.
+ *
+ * NOTE: calculateDefaultIV no longer uses this as its primary input —
+ * see averageOperatingCashFlow above for why. Kept here since it's
+ * still a more honest "FCF" figure than OCF alone where it's positive,
+ * and may be useful for a future bear-case variant.
+ */
+function averageFcfAbsolute(stock, years = 3) {
+  const annual = stock?.fundamentals?.annual;
+  if (!annual?.operatingCashFlow?.length || !annual?.investingCashFlow?.length) return null;
+  const fcfSeries = annual.operatingCashFlow.map((ocf, i) => {
+    const icf = annual.investingCashFlow[i];
+    if (ocf === null || ocf === undefined || icf === null || icf === undefined) return null;
+    return ocf + icf;
+  });
+  const recent = lastN(fcfSeries, years).filter((v) => v !== null);
+  if (recent.length === 0) return null;
+  return recent.reduce((a, b) => a + b, 0) / recent.length;
+}
+
+/** Most recent year's absolute FCF in ₹ Cr (same OCF + investing-CF approximation as fcfYield, just not divided by market cap). Returns null if data is missing. */
+function latestFcfAbsolute(stock) {
+  const annual = stock?.fundamentals?.annual;
+  if (!annual) return null;
+  const idx = lastValidIndex(annual.operatingCashFlow || []);
+  if (idx === -1) return null;
+  const ocf = annual.operatingCashFlow[idx];
+  const investingCf = annual.investingCashFlow?.[idx] ?? null;
+  if (investingCf === null) return null;
+  return ocf + investingCf;
+}
+
+/** OCF CAGR over N years (default 5), as a percentage — used as the DCF's default growth-rate input, for the same stability reasons averageOperatingCashFlow is preferred over the FCF approximation as the DCF's base. */
+function ocfCagr(stock, years = 5) {
+  const annual = stock?.fundamentals?.annual;
+  if (!annual?.operatingCashFlow?.length) return null;
+  const endIdx = lastValidIndex(annual.operatingCashFlow);
+  const startIdx = endIdx - years;
+  if (endIdx === -1 || startIdx < 0 || annual.operatingCashFlow[startIdx] === null) return null;
+  const ocfStart = annual.operatingCashFlow[startIdx];
+  const ocfEnd = annual.operatingCashFlow[endIdx];
+  if (ocfStart <= 0 || ocfEnd <= 0) return null;
+  return ((ocfEnd / ocfStart) ** (1 / years) - 1) * 100;
+}
+
+/** FCF CAGR over N years (default 5), as a percentage — same pattern as epsCagr but on the FCF approximation instead of EPS. */
+function fcfCagr(stock, years = 5) {
+  const annual = stock?.fundamentals?.annual;
+  if (!annual?.operatingCashFlow?.length || !annual?.investingCashFlow?.length) return null;
+  const fcfSeries = annual.operatingCashFlow.map((ocf, i) => {
+    const icf = annual.investingCashFlow[i];
+    if (ocf === null || ocf === undefined || icf === null || icf === undefined) return null;
+    return ocf + icf;
+  });
+  const endIdx = lastValidIndex(fcfSeries);
+  const startIdx = endIdx - years;
+  if (endIdx === -1 || startIdx < 0 || fcfSeries[startIdx] === null) return null;
+  const fcfStart = fcfSeries[startIdx];
+  const fcfEnd = fcfSeries[endIdx];
+  if (fcfStart <= 0 || fcfEnd <= 0) return null; // CAGR is meaningless off a negative/zero base
+  return ((fcfEnd / fcfStart) ** (1 / years) - 1) * 100;
+}
+
+/**
+ * Base-case DCF default intrinsic value — auto-pulled inputs, sensible
+ * default assumptions, all overridable by the caller (the edit screen
+ * passes its own input values once the user adjusts anything). This
+ * is intentionally a single base case, not bear/base/bull, per the
+ * decision to keep per-stock setup light across 10-12 holdings.
+ *
+ * Mechanical part (the math) is exact. The assumption-bearing part
+ * (growth rates, discount rate, terminal growth) is real judgment —
+ * defaults are deliberately conservative, never auto-suggesting above
+ * a 25% near-term growth cap, since blindly extrapolating a high
+ * historical CAGR is the most common way a DCF misleads its user.
+ *
+ * Returns null if there isn't enough data to even form a starting FCF
+ * — the UI should fall back to a fully manual IV entry in that case.
+ */
+function calculateDefaultIV(stock, overrides = {}) {
+  const fcf0 = averageOperatingCashFlow(stock);
+  const shares = stock?.fundamentals?.sharesOutstanding;
+  if (fcf0 === null || fcf0 <= 0 || !shares) return null;
+
+  const historicalCagr = ocfCagr(stock);
+  const growthYears1to5 = overrides.growthYears1to5 ?? Math.min(historicalCagr ?? 10, 25);
+  const growthYears6to10 = overrides.growthYears6to10 ?? growthYears1to5 / 2;
+  const terminalGrowth = overrides.terminalGrowth ?? 4;
+  const discountRate = overrides.discountRate ?? 12;
+
+  if (discountRate <= terminalGrowth) return null; // Gordon growth formula breaks down otherwise
+
+  let fcf = fcf0 * 1e7; // Cr -> rupees, to keep units consistent with per-share output at the end
+  let presentValueSum = 0;
+  const yearlyProjection = [];
+
+  for (let year = 1; year <= 10; year++) {
+    const growthRate = year <= 5 ? growthYears1to5 : growthYears6to10;
+    fcf = fcf * (1 + growthRate / 100);
+    const discounted = fcf / (1 + discountRate / 100) ** year;
+    presentValueSum += discounted;
+    yearlyProjection.push({ year, fcf, discounted });
+  }
+
+  const terminalValue = (fcf * (1 + terminalGrowth / 100)) / (discountRate / 100 - terminalGrowth / 100);
+  const discountedTerminalValue = terminalValue / (1 + discountRate / 100) ** 10;
+
+  const enterpriseValue = presentValueSum + discountedTerminalValue;
+  const perShareValue = enterpriseValue / shares;
+
+  return {
+    low: perShareValue * 0.95,
+    high: perShareValue * 1.05,
+    base: perShareValue,
+    method: "dcf_ocf_based",
+    assumptions: { growthYears1to5, growthYears6to10, terminalGrowth, discountRate },
+    yearlyProjection,
+    terminalValue: discountedTerminalValue,
+    historicalOcfCagr: historicalCagr,
+  };
+}
+
 /** Dividend payout ratio % per year, and the 5-year trend direction. */
 function dividendPayoutTrend(stock, years = 5) {
   const annual = stock?.fundamentals?.annual;
@@ -380,6 +533,12 @@ const calculationsExports = {
   shareCountTrend,
   retainedEarningsRatio,
   fcfYield,
+  latestFcfAbsolute,
+  averageFcfAbsolute,
+  averageOperatingCashFlow,
+  fcfCagr,
+  ocfCagr,
+  calculateDefaultIV,
   dividendPayoutTrend,
   colorForMetric,
   deriveVerdict,

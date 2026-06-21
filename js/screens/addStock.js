@@ -83,7 +83,7 @@ const addStockScreen = {
     return `
       <div class="screen-padding">
         <div class="detail-header">
-          <button class="back-btn" onclick="history.back()">&larr;</button>
+          <button class="back-btn" onclick="window.location.hash='#watchlist'">&larr;</button>
           <div class="detail-title"><div class="detail-name">Add stock</div></div>
         </div>
 
@@ -182,8 +182,48 @@ const addStockScreen = {
                 <tr><td>Share count gaps</td><td>${sharesGaps === 0 ? "None ✓" : `${sharesGaps} year(s) missing ⚠`}</td></tr>
               </table>
               ${warnings.length > 0 ? `<div class="preview-warnings">${warnings.map((w) => `<div class="warning-text">⚠ ${w}</div>`).join("")}</div>` : ""}
-              <button class="btn btn-primary" style="margin-top:10px;" onclick="window.location.hash='#stock/${ticker}'">View full stock page</button>
+
+              <button id="ai-draft-all-btn" class="btn btn-small" style="margin-top:10px; width:100%;">✨ Draft business, moat & market position with AI</button>
+              <div id="ai-draft-all-status" class="muted" style="font-size:11px; margin-top:6px;"></div>
+
+              <button class="btn btn-primary" style="margin-top:10px; width:100%;" onclick="window.location.hash='#stock/${ticker}'">View full stock page</button>
             </div>`;
+
+          document.getElementById("ai-draft-all-btn").addEventListener("click", async (e) => {
+            const btn = e.target;
+            const statusEl = document.getElementById("ai-draft-all-status");
+            const settings = await MetaStore.getSettings();
+            if (!settings?.geminiApiKey) {
+              statusEl.textContent = "Add a Gemini API key in Settings first.";
+              return;
+            }
+
+            btn.disabled = true;
+            const fields = [
+              { key: "business", label: "business" },
+              { key: "moat", label: "competitive advantage" },
+              { key: "marketPosition", label: "market position" },
+            ];
+
+            for (const field of fields) {
+              statusEl.textContent = `Drafting ${field.label}...`;
+              try {
+                const stockNow = await StockStore.get(ticker);
+                const { text } = await draftQualitativeField(settings.geminiApiKey, field.key, stockNow);
+                stockNow.qualitative = stockNow.qualitative || {};
+                if (field.key === "business") stockNow.qualitative.business = text;
+                if (field.key === "moat") stockNow.qualitative.moatDescription = text;
+                if (field.key === "marketPosition") stockNow.qualitative.marketPosition = text;
+                await StockStore.set(ticker, stockNow);
+              } catch (err) {
+                statusEl.textContent = `Draft failed on ${field.label}: ${err.message}. You can retry from the stock's edit screen.`;
+                btn.disabled = false;
+                return;
+              }
+            }
+            statusEl.textContent = "✓ All three drafted — review and edit on the stock's page before relying on them.";
+            btn.disabled = false;
+          });
         } catch (err) {
           document.getElementById(
             "screener-dropzone-status"

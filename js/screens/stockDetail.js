@@ -99,68 +99,45 @@ function entryZoneSection(stock) {
 }
 
 function nseRefreshSection(stock) {
-  const lastFetched = stock.shareholding?.lastUpdated || stock.bulkDeals?.lastUpdated || stock.corporateActions?.lastUpdated;
   const latestShareholding = stock.shareholding?.history?.slice(-1)?.[0] ?? null;
   return `
     <div class="card nse-refresh-card">
       <div class="nse-refresh-top">
         <div>
-          <div class="nse-refresh-title">Refresh from NSE</div>
-          <div class="muted" style="font-size:11px;">Price, shareholding, bulk deals & corporate actions · last fetched ${lastFetched || "never"}</div>
+          <div class="nse-refresh-title">Price & shareholding data</div>
+          <div class="muted" style="font-size:11px;">No automated source yet — NSE and Yahoo Finance both block direct browser requests (CORS). Enter manually below; find these on Screener's company page or NSE's site directly.</div>
         </div>
       </div>
-      <div class="nse-refresh-steps">
-        <div class="nse-step">
-          <span class="nse-step-num">1</span>
-          <span>Open NSE, search "${stock.ticker}", let the page fully load</span>
-          <button class="btn btn-small" id="nse-open-btn">Open</button>
+
+      <div class="form-group" style="margin-top:10px;">
+        <label>Current price (₹)</label>
+        <input type="number" id="manual-price-input" value="${stock.fundamentals?.currentPrice ?? ""}" placeholder="e.g. 1840" />
+      </div>
+      <div class="form-group">
+        <label>Market cap (₹ Cr)</label>
+        <input type="number" id="manual-marketcap-input" value="${stock.fundamentals?.marketCap ?? ""}" placeholder="e.g. 13200" />
+      </div>
+      <div style="display:flex; gap:8px;">
+        <div class="form-group" style="flex:1;">
+          <label>52w low (₹)</label>
+          <input type="number" id="manual-52wlow-input" value="${stock.priceContext?.week52Low ?? ""}" />
         </div>
-        <div class="nse-step">
-          <span class="nse-step-num">2</span>
-          <span>Come back here and fetch</span>
-          <button class="btn btn-small btn-primary-outline" id="nse-fetch-btn">Fetch now</button>
+        <div class="form-group" style="flex:1;">
+          <label>52w high (₹)</label>
+          <input type="number" id="manual-52whigh-input" value="${stock.priceContext?.week52High ?? ""}" />
         </div>
       </div>
-      <div id="nse-fetch-status"></div>
-
-      <button id="manual-nse-toggle-btn" class="btn btn-small" style="margin-top:10px;">Enter manually instead</button>
-
-      <div id="manual-nse-form" style="display:none; margin-top:10px;">
-        <div class="hint-box" style="margin-bottom:10px;">NSE's automated fetch is currently blocked by their site's browser security policy (CORS) — this isn't fixable from the app side without a server proxy. Manual entry works reliably in the meantime; it takes under a minute per stock.</div>
-
-        <div class="form-group">
-          <label>Current price (₹)</label>
-          <input type="number" id="manual-price-input" value="${stock.fundamentals?.currentPrice ?? ""}" placeholder="e.g. 1840" />
+      <div style="display:flex; gap:8px;">
+        <div class="form-group" style="flex:1;">
+          <label>Promoter holding (%)</label>
+          <input type="number" step="0.1" id="manual-promoter-input" value="${latestShareholding?.promoter ?? ""}" />
         </div>
-        <div class="form-group">
-          <label>Market cap (₹ Cr)</label>
-          <input type="number" id="manual-marketcap-input" value="${stock.fundamentals?.marketCap ?? ""}" placeholder="e.g. 13200" />
+        <div class="form-group" style="flex:1;">
+          <label>Promoter pledging (%)</label>
+          <input type="number" step="0.1" id="manual-pledging-input" value="${latestShareholding?.pledged ?? "0"}" />
         </div>
-        <div style="display:flex; gap:8px;">
-          <div class="form-group" style="flex:1;">
-            <label>52w low (₹)</label>
-            <input type="number" id="manual-52wlow-input" value="${stock.priceContext?.week52Low ?? ""}" />
-          </div>
-          <div class="form-group" style="flex:1;">
-            <label>52w high (₹)</label>
-            <input type="number" id="manual-52whigh-input" value="${stock.priceContext?.week52High ?? ""}" />
-          </div>
-        </div>
-        <div style="display:flex; gap:8px;">
-          <div class="form-group" style="flex:1;">
-            <label>Promoter holding (%)</label>
-            <input type="number" step="0.1" id="manual-promoter-input" value="${latestShareholding?.promoter ?? ""}" />
-          </div>
-          <div class="form-group" style="flex:1;">
-            <label>Promoter pledging (%)</label>
-            <input type="number" step="0.1" id="manual-pledging-input" value="${latestShareholding?.pledged ?? "0"}" />
-          </div>
-        </div>
-        <div class="muted" style="font-size:11px; margin-bottom:8px;">
-          Find these on Screener's company page, or NSE's quote/shareholding pages directly (just can't be auto-fetched from here).
-        </div>
-        <button id="save-manual-nse-btn" class="btn btn-primary">Save</button>
       </div>
+      <button id="save-manual-nse-btn" class="btn btn-primary">Save</button>
     </div>`;
 }
 
@@ -189,7 +166,7 @@ const stockDetailScreen = {
     return `
       <div class="screen-padding">
         <div class="detail-header">
-          <button class="back-btn" onclick="history.back()">&larr;</button>
+          <button class="back-btn" onclick="window.location.hash='#watchlist'">&larr;</button>
           <div class="detail-title">
             <div class="detail-name">${stock.name || stock.ticker}</div>
             <div class="detail-meta">${stock.ticker} · ${stock.sector || "Sector not set"} · NSE</div>
@@ -263,21 +240,6 @@ const stockDetailScreen = {
       });
     });
 
-    const openBtn = document.getElementById("nse-open-btn");
-    if (openBtn) {
-      openBtn.addEventListener("click", () => {
-        window.open(`https://www.nseindia.com/get-quotes/equity?symbol=${ticker}`, "_blank");
-      });
-    }
-
-    const manualToggleBtn = document.getElementById("manual-nse-toggle-btn");
-    if (manualToggleBtn) {
-      manualToggleBtn.addEventListener("click", () => {
-        const form = document.getElementById("manual-nse-form");
-        form.style.display = form.style.display === "none" ? "block" : "none";
-      });
-    }
-
     const saveManualBtn = document.getElementById("save-manual-nse-btn");
     if (saveManualBtn) {
       saveManualBtn.addEventListener("click", async () => {
@@ -317,53 +279,6 @@ const stockDetailScreen = {
         }
 
         await StockStore.set(ticker, stock);
-        navigate(`#stock/${ticker}`);
-      });
-    }
-
-    const fetchBtn = document.getElementById("nse-fetch-btn");
-    if (fetchBtn) {
-      fetchBtn.addEventListener("click", async () => {
-        const statusEl = document.getElementById("nse-fetch-status");
-        statusEl.innerHTML = `<div class="muted" style="font-size:11px; margin-top:6px;">Fetching...</div>`;
-
-        const result = await refreshStockFromNse(ticker);
-        const stock = await StockStore.get(ticker);
-        const today = new Date().toISOString().slice(0, 10);
-
-        if (result.shareholding) {
-          stock.shareholding = { source: "nse_fetch", lastUpdated: today, history: result.shareholding };
-        }
-        if (result.bulkDeals) {
-          stock.bulkDeals = { source: "nse_fetch", lastUpdated: today, deals: result.bulkDeals };
-        }
-        if (result.corporateActions) {
-          stock.corporateActions = { source: "nse_fetch", lastUpdated: today, actions: result.corporateActions };
-        }
-        if (result.quoteInfo) {
-          stock.fundamentals = stock.fundamentals || {};
-          if (result.quoteInfo.currentPrice) stock.fundamentals.currentPrice = result.quoteInfo.currentPrice;
-          if (result.quoteInfo.marketCap) stock.fundamentals.marketCap = result.quoteInfo.marketCap;
-          if (result.quoteInfo.name && (!stock.name || stock.name === stock.ticker)) stock.name = result.quoteInfo.name;
-          if (result.quoteInfo.sector) stock.sector = result.quoteInfo.sector;
-          stock.priceContext = stock.priceContext || {};
-          stock.priceContext.source = "nse_fetch";
-          stock.priceContext.lastUpdated = today;
-          if (result.quoteInfo.week52High) stock.priceContext.week52High = result.quoteInfo.week52High;
-          if (result.quoteInfo.week52Low) stock.priceContext.week52Low = result.quoteInfo.week52Low;
-        }
-
-        await StockStore.set(ticker, stock);
-
-        const errorCount = Object.keys(result.errors || {}).length;
-        if (errorCount === 0) {
-          statusEl.innerHTML = `<div class="nse-fetch-success">✓ Fetched successfully</div>`;
-        } else if (result.partial) {
-          statusEl.innerHTML = `<div class="nse-fetch-partial">⚠ Partial — ${Object.entries(result.errors).map(([k, v]) => `${k}: ${v}`).join("; ")}</div>`;
-        } else {
-          statusEl.innerHTML = `<div class="nse-fetch-error">⚠ Fetch blocked — NSE's site doesn't allow direct browser requests from this app (a CORS restriction on their end, not something a retry fixes). Use "Enter manually instead" below.</div>`;
-        }
-
         navigate(`#stock/${ticker}`);
       });
     }

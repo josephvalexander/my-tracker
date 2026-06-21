@@ -72,7 +72,6 @@ const watchlistScreen = {
         <div class="screen-header">
           <div class="screen-title">My watchlist <span id="watchlist-count" class="muted"></span></div>
           <div class="header-actions">
-            <button id="nse-refresh-btn" class="btn btn-small">Refresh NSE</button>
             <button id="add-stock-btn" class="btn btn-small">+ Add</button>
           </div>
         </div>
@@ -124,10 +123,6 @@ const watchlistScreen = {
 
     document.getElementById("add-stock-btn").addEventListener("click", () => {
       window.location.hash = "#addStock";
-    });
-
-    document.getElementById("nse-refresh-btn").addEventListener("click", () => {
-      window.location.hash = "#batchRefresh";
     });
   },
 };

@@ -203,7 +203,8 @@ body {
 .toggle-btn-active { border-color: #85b7eb; background: #e6f1fb; color: #0c447c; }
 .chart-section-label { font-size: 13px; font-weight: 600; margin: 14px 0 6px 2px; display: flex; justify-content: space-between; }
 .chart-card { padding: 14px; }
-.chart-card canvas { max-height: 220px; }
+.chart-card { position: relative; height: 260px; }
+.chart-card canvas { max-height: none; }
 
 .sector-row-card { background: var(--color-surface); border: 0.5px solid var(--color-border); border-radius: var(--radius-lg); padding: 12px 14px; margin-bottom: 10px; }
 .sector-row-top { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px; }
@@ -258,6 +259,7 @@ body {
 .ai-draft-btn { font-size: 11px; }
 .ai-sources-box { margin-top: 8px; display: flex; flex-direction: column; gap: 3px; }
 .ai-source-link { font-size: 10px; color: var(--color-text-tertiary); text-decoration: underline; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.iv-computed-box { background: var(--color-green-bg); border-radius: var(--radius-md); padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--color-green); }
 
 .action-row { padding: 6px 0; font-size: 13px; border-bottom: 0.5px solid var(--color-border); }
 .action-row:last-child { border-bottom: none; }
