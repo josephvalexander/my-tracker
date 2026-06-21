@@ -62,10 +62,6 @@ function priceContextStrip(stock) {
         <div class="price-context-value">${pc.week52Low && pc.week52High ? `${pc.week52Low.toLocaleString("en-IN")}–${pc.week52High.toLocaleString("en-IN")}` : "Set manually below"}</div>
       </div>
       <div class="price-context-box">
-        <div class="price-context-label">All-time range</div>
-        <div class="price-context-value">${pc.allTimeLow && pc.allTimeHigh ? `${pc.allTimeLow.toLocaleString("en-IN")}–${pc.allTimeHigh.toLocaleString("en-IN")}` : "Set manually below"}</div>
-      </div>
-      <div class="price-context-box">
         <div class="price-context-label">P/E (5y band)</div>
         <div class="price-context-value">${peBand ? `${peBand.current} <span class="muted">(${peBand.min}–${peBand.max})</span>` : "—"}</div>
       </div>
@@ -144,17 +140,6 @@ function nseRefreshSection(stock) {
         </div>
         <div style="display:flex; gap:8px;">
           <div class="form-group" style="flex:1;">
-            <label>All-time low (₹)</label>
-            <input type="number" id="manual-atl-input" value="${stock.priceContext?.allTimeLow ?? ""}" />
-          </div>
-          <div class="form-group" style="flex:1;">
-            <label>All-time high (₹)</label>
-            <input type="number" id="manual-ath-input" value="${stock.priceContext?.allTimeHigh ?? ""}" />
-          </div>
-        </div>
-        <div class="muted" style="font-size:11px; margin-bottom:8px;">All-time range isn't covered by the live fetch above — it needs full price history, not just a current quote. Set once, rarely changes.</div>
-        <div style="display:flex; gap:8px;">
-          <div class="form-group" style="flex:1;">
             <label>Promoter holding (%)</label>
             <input type="number" step="0.1" id="manual-promoter-input" value="${latestShareholding?.promoter ?? ""}" />
           </div>
@@ -163,6 +148,9 @@ function nseRefreshSection(stock) {
             <input type="number" step="0.1" id="manual-pledging-input" value="${latestShareholding?.pledged ?? "0"}" />
           </div>
         </div>
+        <button id="ai-draft-shareholding-btn" class="btn btn-small" style="margin-bottom:8px;">✨ Draft with AI (fills the boxes above — you still review and save)</button>
+        <div id="shareholding-ai-status" class="muted" style="font-size:11px; margin-bottom:8px;"></div>
+        <div id="shareholding-ai-sources"></div>
         <button id="save-manual-nse-btn" class="btn btn-primary">Save</button>
       </div>
     </div>`;
@@ -275,6 +263,54 @@ const stockDetailScreen = {
       });
     }
 
+    const aiShareholdingBtn = document.getElementById("ai-draft-shareholding-btn");
+    if (aiShareholdingBtn) {
+      aiShareholdingBtn.addEventListener("click", async () => {
+        const statusEl = document.getElementById("shareholding-ai-status");
+        const sourcesEl = document.getElementById("shareholding-ai-sources");
+        const settings = await MetaStore.getSettings();
+        if (!settings?.geminiApiKey) {
+          statusEl.textContent = "Add a Gemini API key in Settings first.";
+          return;
+        }
+
+        statusEl.textContent = "Searching...";
+        aiShareholdingBtn.disabled = true;
+        try {
+          const stock = await StockStore.get(ticker);
+          const result = await draftShareholding(settings.geminiApiKey, stock);
+
+          if (result.promoterHolding !== null) {
+            document.getElementById("manual-promoter-input").value = result.promoterHolding;
+          }
+          if (result.promoterPledging !== null) {
+            document.getElementById("manual-pledging-input").value = result.promoterPledging;
+          }
+
+          const confidenceNote = result.confident
+            ? `Found for ${result.asOfQuarter || "an unspecified period"} — review before saving.`
+            : `⚠ Model was not confident in this figure${result.asOfQuarter ? ` (as of ${result.asOfQuarter})` : ""} — double-check carefully before saving, or leave blank.`;
+          statusEl.innerHTML = confidenceNote;
+
+          if (result.sources?.length > 0) {
+            sourcesEl.innerHTML = `
+              <div class="ai-sources-box">
+                <div class="muted" style="font-size:10px;">Sources used:</div>
+                ${result.sources.map((s) => `<a href="${s.uri}" target="_blank" class="ai-source-link">${s.title || s.uri}</a>`).join("")}
+              </div>`;
+          }
+
+          if (result.promoterHolding === null && result.promoterPledging === null) {
+            statusEl.textContent = "Could not find a reliable figure — try manual entry instead.";
+          }
+        } catch (err) {
+          statusEl.textContent = `Draft failed: ${err.message}`;
+        } finally {
+          aiShareholdingBtn.disabled = false;
+        }
+      });
+    }
+
     const fetchBtn = document.getElementById("nse-fetch-btn");
     if (fetchBtn) {
       fetchBtn.addEventListener("click", async () => {
@@ -299,6 +335,13 @@ const stockDetailScreen = {
           if (result.quoteInfo.todayLow) stock.priceContext.todayLow = result.quoteInfo.todayLow;
           if (result.quoteInfo.todayHigh) stock.priceContext.todayHigh = result.quoteInfo.todayHigh;
           if (result.quoteInfo.previousClose) stock.priceContext.previousClose = result.quoteInfo.previousClose;
+
+          // No BSE source confirmed working actually returns market
+          // cap (it's only on the Angular page we can't read) — derive
+          // it instead from the price we just fetched and shares
+          // outstanding from the Screener upload.
+          const derivedMarketCap = calculateMarketCap(stock);
+          if (derivedMarketCap) stock.fundamentals.marketCap = derivedMarketCap;
         }
 
         if (result.shareholding && result.shareholding.length > 0) {
@@ -333,8 +376,6 @@ const stockDetailScreen = {
         const marketCap = parseFloat(document.getElementById("manual-marketcap-input").value);
         const week52Low = parseFloat(document.getElementById("manual-52wlow-input").value);
         const week52High = parseFloat(document.getElementById("manual-52whigh-input").value);
-        const allTimeLow = parseFloat(document.getElementById("manual-atl-input").value);
-        const allTimeHigh = parseFloat(document.getElementById("manual-ath-input").value);
         const promoter = parseFloat(document.getElementById("manual-promoter-input").value);
         const pledged = parseFloat(document.getElementById("manual-pledging-input").value);
 
@@ -347,8 +388,6 @@ const stockDetailScreen = {
         stock.priceContext.lastUpdated = today;
         if (!Number.isNaN(week52Low)) stock.priceContext.week52Low = week52Low;
         if (!Number.isNaN(week52High)) stock.priceContext.week52High = week52High;
-        if (!Number.isNaN(allTimeLow)) stock.priceContext.allTimeLow = allTimeLow;
-        if (!Number.isNaN(allTimeHigh)) stock.priceContext.allTimeHigh = allTimeHigh;
 
         if (!Number.isNaN(promoter)) {
           stock.shareholding = stock.shareholding || { history: [] };

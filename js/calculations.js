@@ -219,6 +219,24 @@ function retainedEarningsRatio(stock, years = 10) {
  * `isApproximate: true` flag in the UI so this isn't read as a precise
  * number — treat it as a rough screen, not a hard rule input.
  */
+/**
+ * Market cap in ₹ Cr, derived as currentPrice × sharesOutstanding —
+ * not fetched from anywhere, since no BSE source confirmed working in
+ * this app actually returns it (it's only visible on BSE's
+ * Angular-rendered page, which a server-side fetch can't read — same
+ * dead end as 52-week range and bulk deals). This is the better fix
+ * than chasing another scrape attempt: the inputs are already
+ * reliable (price from the live BSE quote, or the Screener upload;
+ * shares outstanding from the Screener upload), so there's no reason
+ * to depend on a fragile scrape for a number this easy to compute.
+ */
+function calculateMarketCap(stock) {
+  const price = stock?.fundamentals?.currentPrice;
+  const shares = stock?.fundamentals?.sharesOutstanding;
+  if (!price || !shares) return null;
+  return (price * shares) / 1e7; // shares is a raw count, result in ₹ Cr
+}
+
 function fcfYield(stock) {
   const annual = stock?.fundamentals?.annual;
   const marketCap = stock?.fundamentals?.marketCap;
@@ -532,6 +550,7 @@ const calculationsExports = {
   cashEpsGap,
   shareCountTrend,
   retainedEarningsRatio,
+  calculateMarketCap,
   fcfYield,
   latestFcfAbsolute,
   averageFcfAbsolute,

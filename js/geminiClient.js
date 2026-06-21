@@ -77,12 +77,15 @@ async function callGemini(apiKey, prompt, withSearch) {
  * back to a non-grounded request if the key doesn't have search
  * grounding enabled (surfaced by Gemini as a 400 mentioning the tool).
  */
-async function draftQualitativeField(apiKey, fieldKey, stock) {
-  const promptTemplate = FIELD_PROMPTS[fieldKey];
-  if (!promptTemplate) throw new Error(`Unknown field: ${fieldKey}`);
-
-  const prompt = promptTemplate.replaceAll("{name}", stock.name || stock.ticker).replaceAll("{ticker}", stock.ticker);
-
+/**
+ * Shared request logic: sends a prompt with search grounding, retries
+ * once on rate limit, falls back to non-grounded if the key lacks
+ * grounding, and extracts text + cited sources from the response.
+ * Used by both draftQualitativeField (free text) and draftShareholding
+ * (structured JSON) below — they differ only in the prompt and how
+ * the returned text gets parsed afterward.
+ */
+async function runGroundedPrompt(apiKey, prompt) {
   let res = await callGemini(apiKey, prompt, true);
 
   if (res.status === 429) {
@@ -122,7 +125,61 @@ async function draftQualitativeField(apiKey, fieldKey, stock) {
   return { text: text.trim(), sources };
 }
 
-const geminiClientExports = { draftQualitativeField, GeminiError, FIELD_PROMPTS };
+/**
+ * Drafts business / moat / market position as free text.
+ */
+async function draftQualitativeField(apiKey, fieldKey, stock) {
+  const promptTemplate = FIELD_PROMPTS[fieldKey];
+  if (!promptTemplate) throw new Error(`Unknown field: ${fieldKey}`);
+
+  const prompt = promptTemplate.replaceAll("{name}", stock.name || stock.ticker).replaceAll("{ticker}", stock.ticker);
+  return runGroundedPrompt(apiKey, prompt);
+}
+
+/**
+ * Drafts promoter shareholding % and pledging % as STRUCTURED data,
+ * not free text — this field feeds deriveVerdict() directly as a hard
+ * pass/fail flag (any pledging > 0% forces "No"), so a wrong number
+ * here is meaningfully more damaging than a vague business
+ * description. The prompt explicitly instructs the model to say it
+ * doesn't know rather than guess, and the result always surfaces the
+ * source + as-of date next to the number so the user has something
+ * concrete to check before saving — same "draft, never auto-save"
+ * pattern as the qualitative fields, just with a stricter prompt and
+ * structured parsing instead of free text.
+ */
+async function draftShareholding(apiKey, stock) {
+  const name = stock.name || stock.ticker;
+  const prompt = `Search for ${name} (${stock.ticker}), an Indian listed company's most recent quarterly promoter shareholding pattern. I need exactly: promoter holding percentage, and promoter pledged shares percentage. 
+
+Respond with ONLY a JSON object in this exact shape, no other text, no markdown formatting:
+{"promoterHolding": <number or null>, "promoterPledging": <number or null>, "asOfQuarter": "<e.g. Q4 FY26 or null>", "confident": <true or false>}
+
+If you cannot find a reliable, recent figure for either value, use null for that value and set "confident" to false. Do not guess or estimate — an incorrect number here is worse than an honest "unknown".`;
+
+  const { text, sources } = await runGroundedPrompt(apiKey, prompt);
+
+  // Model may wrap JSON in markdown code fences despite instructions —
+  // strip those before parsing rather than failing on them.
+  const cleaned = text.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
+
+  let parsed;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    throw new GeminiError(`Gemini's response wasn't valid JSON: ${text.slice(0, 200)}`);
+  }
+
+  return {
+    promoterHolding: typeof parsed.promoterHolding === "number" ? parsed.promoterHolding : null,
+    promoterPledging: typeof parsed.promoterPledging === "number" ? parsed.promoterPledging : null,
+    asOfQuarter: parsed.asOfQuarter ?? null,
+    confident: parsed.confident === true,
+    sources,
+  };
+}
+
+const geminiClientExports = { draftQualitativeField, draftShareholding, GeminiError, FIELD_PROMPTS };
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports = geminiClientExports;

@@ -153,6 +153,25 @@ const addStockScreen = {
           if (companyName && (!currentStock.name || currentStock.name === ticker)) {
             currentStock.name = companyName;
           }
+
+          // Auto-compute and persist the default IV right away, rather
+          // than leaving it null until the user happens to visit the
+          // edit screen — calculateDefaultIV only needs sharesOutstanding
+          // and OCF history, both of which the Screener upload just
+          // provided, so there's no reason to wait.
+          if (!currentStock.intrinsicValue || currentStock.intrinsicValue.method !== "manual") {
+            const defaultIv = calculateDefaultIV(currentStock);
+            if (defaultIv) {
+              currentStock.intrinsicValue = {
+                low: defaultIv.low,
+                high: defaultIv.high,
+                method: "dcf_ocf_based",
+                assumptions: defaultIv.assumptions,
+                lastCalculated: new Date().toISOString().slice(0, 10),
+              };
+            }
+          }
+
           await StockStore.set(ticker, currentStock);
 
           document.getElementById(

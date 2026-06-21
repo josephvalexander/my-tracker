@@ -81,8 +81,7 @@
       lastUpdated: "2026-06-18",
       week52High: 2050,
       week52Low: 1510,
-      allTimeHigh: 2407.85,
-      allTimeLow: 180,
+
       peHistory5y: { min: 18, max: 32, current: 28 },
     },
     intrinsicValue: { low: 2100, high: 2300, method: "dcf", lastCalculated: "2026-06-12" },

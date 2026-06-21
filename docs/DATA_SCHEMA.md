@@ -102,8 +102,6 @@ settings               -> Settings object
     "lastUpdated": "2026-06-18",
     "week52High": 2050,
     "week52Low": 1510,
-    "allTimeHigh": 2050,
-    "allTimeLow": 180,
     "peHistory5y": { "min": 18, "max": 32, "current": 28 }
   },
 
@@ -169,7 +167,6 @@ derived at render time, never stored.
 | `bulkDeals.*` | NSE large deals page | Auto-fetch (cookie warmup) or manual CSV |
 | `corporateActions.*` | NSE corporate actions feed | Auto-fetch (cookie warmup) or manual entry |
 | `priceContext.week52High/Low` | NSE/Yahoo | Auto-fetch |
-| `priceContext.allTimeHigh/Low` | Derived from full price history | Computed once from Yahoo historical series, cached |
 | `priceContext.peHistory5y` | Derived | Computed from `price / eps` per year in `fundamentals.annual` |
 | `intrinsicValue.*` | You | Manual entry — no formula is reliable enough to automate fully |
 | `qualitative.*` | You | Manual entry, short text + tags |
