@@ -20,7 +20,7 @@ verified vs not will save you time:
 | `js/storage.js` | Tested via a real browser DOM simulation (jsdom) including last-write-wins timestamp logic for Drive sync conflicts. Worth a final sanity check in an actual browser, but the core logic has been exercised end-to-end. |
 | `js/driveSync.js` | **Implemented for real** — Google Identity Services OAuth token flow, auto-pull-on-open, manual push. **Needs one setup step before it works**: create an OAuth 2.0 Client ID (Web application type) in Google Cloud Console, add your GitHub Pages URL under "Authorized JavaScript origins", enable the Drive API on that project, then paste the client ID into `DRIVE_CLIENT_ID` at the top of `js/driveSync.js`. Until that's done, "Connect Drive" will fail with an auth error — that's expected, not a bug. |
 | `js/geminiClient.js` | **Confirmed working pattern** — rebuilt to mirror a separately-confirmed-working direct browser-to-Gemini integration (API key as a `?key=` query param, not a custom header, which risks a blocked CORS preflight). Needs your own Gemini API key (free tier) in Settings to test. |
-| NSE/Yahoo live price data | **Not built** — both block direct browser requests (CORS), confirmed not theoretical. A Puppeteer-scraper workaround and a Cloudflare Worker proxy were both scoped out; scraper was built then explicitly rejected for not being real-time. See "Price, market cap..." section below. Manual entry is the current path. |
+| NSE live price/shareholding data | **Built** — a Cloudflare Worker (`worker/`) proxies NSE requests server-side, solving the CORS block. Needs one-time setup (deploy via Wrangler, paste the URL into `js/nseClient.js`) — see `worker/README.md`. Field-name mapping in the Worker is unverified against a live NSE response (no outbound network access to nseindia.com in the build environment); expect to fix at least one field on first real use. Manual entry remains the fallback. |
 | UI screens (`js/screens/*.js`, `css/styles.css`) | Exercised via jsdom-based route tests across every screen with real Screener data, but final visual polish (spacing, mobile responsiveness) is worth a pass in an actual browser. |
 
 ## Setup
@@ -44,40 +44,53 @@ verified vs not will save you time:
   whenever you want.
 - **Add Holding screen**: `#addHolding` is referenced from the Holdings
   tab's empty state but not yet built — same pattern as `addStock.js`.
-- **Real-time NSE/Yahoo price data** — see the dedicated section below
-  for the full story on why this isn't free-and-automatable, and what
-  the remaining option (a small proxy server) would involve.
+- **Deploy the NSE proxy Worker** — code is written (`worker/`), but
+  needs you to actually run `npx wrangler deploy` once and paste the
+  resulting URL into `js/nseClient.js` before the live-fetch buttons
+  do anything but fail. See `worker/README.md`.
 
-## Price, market cap, 52-week range, shareholding — manual entry for now
+## Price, market cap, 52-week range, shareholding — live via a proxy Worker
 
-**Real-time NSE/Yahoo data turned out not to be achievable for free
-from a static, backend-less PWA.** Both providers' servers block
-direct browser requests (CORS) — confirmed against a real deployment,
-not theoretical, and confirmed as a deliberate choice on their end
-(their own client libraries' maintainers state outright that browser
-calls aren't supported). Two workarounds were tried and explicitly
-ruled out:
+**Real-time NSE data turned out not to be achievable directly from a
+static, backend-less PWA** — NSE's servers block direct browser
+requests (CORS), confirmed against a real deployment. Two earlier
+workarounds were tried and explicitly rejected: a scheduled Puppeteer
+scraper (solved CORS but wasn't real-time) and Alpha Vantage (same
+CORS block as NSE, plus a 25-requests/day free-tier cap).
 
-- **A scheduled Puppeteer scraper in GitHub Actions** — solved CORS
-  (a headless browser visiting NSE's own page isn't a cross-origin
-  request) but only gives data as fresh as the last scheduled run, not
-  real-time. Ruled out for not being real-time.
-- **Yahoo Finance** — same CORS wall as NSE; not a viable alternative.
+**What's actually built now**: a small Cloudflare Worker
+(`worker/src/index.js`) that proxies requests to NSE server-side,
+where CORS doesn't apply at all — only the browser enforces CORS, and
+there's no browser involved in a server-to-server call. The Worker
+adds a clean CORS header on its way back to the PWA, which is the part
+that actually unblocks the browser. This is genuinely real-time: every
+fetch triggers a fresh call to NSE at that moment, no scheduled-scrape
+staleness.
 
-**The remaining real-time-capable option is a small proxy server**
-(e.g. a Cloudflare Worker) sitting between the PWA and NSE/Yahoo,
-forwarding requests server-side (where CORS doesn't apply) and adding
-proper CORS headers on the way back to the browser. This was discussed
-in detail but **not yet built** — it's new infrastructure to set up
-and maintain, not just app code. If you want to revisit this later,
-the Worker code shape and tradeoffs were scoped out; ask for it
-directly rather than re-deriving the research.
+**Setup required** (one-time, see `worker/README.md` for full steps):
+deploy the Worker via Wrangler (`npx wrangler deploy` inside the
+`worker/` folder), then paste the deployed URL into `WORKER_BASE_URL`
+at the top of `js/nseClient.js`.
 
-**For now**: every stock's detail page has a manual-entry form for
-current price, market cap, 52-week range, promoter holding, and
-promoter pledging — found on Screener's company page or NSE's site
-directly, just not auto-fillable from here. Quarterly upkeep, same
-cadence as re-uploading a Screener export.
+**On each stock's detail page**: a "Fetch live data" button calls the
+Worker for current price, market cap, 52-week range, and shareholding
+pattern. All-time high/low is NOT covered (would need full price
+history, not just a quote lookup) — that stays a manual field, set
+once since it rarely changes. A manual-entry form is also always
+available as a fallback if the live fetch fails.
+
+**Known unverified risks, stated plainly**:
+- NSE's exact JSON field names (in `worker/src/index.js`) were a
+  best-effort mapping, not verified against a live call — the
+  environment this was built in has no outbound network access to
+  `nseindia.com`. First real test will likely need at least one field
+  mapping fixed; `npx wrangler tail` while testing shows the raw NSE
+  response to fix against.
+- NSE's bot detection might treat Cloudflare's IP ranges differently
+  than a residential browser IP — a different failure mode than CORS,
+  and one that couldn't be tested from the build environment either.
+  If this happens, the manual-entry fallback is the answer, not a code
+  fix.
 
 ## AI draft assist — where it actually lives now
 

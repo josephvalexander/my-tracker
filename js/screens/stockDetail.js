@@ -100,44 +100,64 @@ function entryZoneSection(stock) {
 
 function nseRefreshSection(stock) {
   const latestShareholding = stock.shareholding?.history?.slice(-1)?.[0] ?? null;
+  const lastFetched = stock.priceContext?.lastUpdated;
   return `
     <div class="card nse-refresh-card">
       <div class="nse-refresh-top">
         <div>
           <div class="nse-refresh-title">Price & shareholding data</div>
-          <div class="muted" style="font-size:11px;">No automated source yet — NSE and Yahoo Finance both block direct browser requests (CORS). Enter manually below; find these on Screener's company page or NSE's site directly.</div>
+          <div class="muted" style="font-size:11px;">Via a proxy that routes around NSE's CORS block · ${lastFetched ? `last updated ${lastFetched}` : "not fetched yet"}</div>
         </div>
       </div>
+      <button id="nse-fetch-btn" class="btn btn-small btn-primary-outline" style="margin-top:8px;">Fetch live data</button>
+      <div id="nse-fetch-status"></div>
 
-      <div class="form-group" style="margin-top:10px;">
-        <label>Current price (₹)</label>
-        <input type="number" id="manual-price-input" value="${stock.fundamentals?.currentPrice ?? ""}" placeholder="e.g. 1840" />
-      </div>
-      <div class="form-group">
-        <label>Market cap (₹ Cr)</label>
-        <input type="number" id="manual-marketcap-input" value="${stock.fundamentals?.marketCap ?? ""}" placeholder="e.g. 13200" />
-      </div>
-      <div style="display:flex; gap:8px;">
-        <div class="form-group" style="flex:1;">
-          <label>52w low (₹)</label>
-          <input type="number" id="manual-52wlow-input" value="${stock.priceContext?.week52Low ?? ""}" />
+      <button id="manual-nse-toggle-btn" class="btn btn-small" style="margin-top:10px;">Enter manually instead</button>
+
+      <div id="manual-nse-form" style="display:none; margin-top:10px;">
+        <div class="hint-box" style="margin-bottom:10px;">Fallback if the live fetch above fails or comes back wrong — find these on Screener's company page or NSE's site directly.</div>
+
+        <div class="form-group">
+          <label>Current price (₹)</label>
+          <input type="number" id="manual-price-input" value="${stock.fundamentals?.currentPrice ?? ""}" placeholder="e.g. 1840" />
         </div>
-        <div class="form-group" style="flex:1;">
-          <label>52w high (₹)</label>
-          <input type="number" id="manual-52whigh-input" value="${stock.priceContext?.week52High ?? ""}" />
+        <div class="form-group">
+          <label>Market cap (₹ Cr)</label>
+          <input type="number" id="manual-marketcap-input" value="${stock.fundamentals?.marketCap ?? ""}" placeholder="e.g. 13200" />
         </div>
+        <div style="display:flex; gap:8px;">
+          <div class="form-group" style="flex:1;">
+            <label>52w low (₹)</label>
+            <input type="number" id="manual-52wlow-input" value="${stock.priceContext?.week52Low ?? ""}" />
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label>52w high (₹)</label>
+            <input type="number" id="manual-52whigh-input" value="${stock.priceContext?.week52High ?? ""}" />
+          </div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <div class="form-group" style="flex:1;">
+            <label>All-time low (₹)</label>
+            <input type="number" id="manual-atl-input" value="${stock.priceContext?.allTimeLow ?? ""}" />
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label>All-time high (₹)</label>
+            <input type="number" id="manual-ath-input" value="${stock.priceContext?.allTimeHigh ?? ""}" />
+          </div>
+        </div>
+        <div class="muted" style="font-size:11px; margin-bottom:8px;">All-time range isn't covered by the live fetch above — it needs full price history, not just a current quote. Set once, rarely changes.</div>
+        <div style="display:flex; gap:8px;">
+          <div class="form-group" style="flex:1;">
+            <label>Promoter holding (%)</label>
+            <input type="number" step="0.1" id="manual-promoter-input" value="${latestShareholding?.promoter ?? ""}" />
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label>Promoter pledging (%)</label>
+            <input type="number" step="0.1" id="manual-pledging-input" value="${latestShareholding?.pledged ?? "0"}" />
+          </div>
+        </div>
+        <button id="save-manual-nse-btn" class="btn btn-primary">Save</button>
       </div>
-      <div style="display:flex; gap:8px;">
-        <div class="form-group" style="flex:1;">
-          <label>Promoter holding (%)</label>
-          <input type="number" step="0.1" id="manual-promoter-input" value="${latestShareholding?.promoter ?? ""}" />
-        </div>
-        <div class="form-group" style="flex:1;">
-          <label>Promoter pledging (%)</label>
-          <input type="number" step="0.1" id="manual-pledging-input" value="${latestShareholding?.pledged ?? "0"}" />
-        </div>
-      </div>
-      <button id="save-manual-nse-btn" class="btn btn-primary">Save</button>
     </div>`;
 }
 
@@ -240,6 +260,59 @@ const stockDetailScreen = {
       });
     });
 
+    const manualToggleBtn = document.getElementById("manual-nse-toggle-btn");
+    if (manualToggleBtn) {
+      manualToggleBtn.addEventListener("click", () => {
+        const form = document.getElementById("manual-nse-form");
+        form.style.display = form.style.display === "none" ? "block" : "none";
+      });
+    }
+
+    const fetchBtn = document.getElementById("nse-fetch-btn");
+    if (fetchBtn) {
+      fetchBtn.addEventListener("click", async () => {
+        const statusEl = document.getElementById("nse-fetch-status");
+        statusEl.innerHTML = `<div class="muted" style="font-size:11px; margin-top:6px;">Fetching...</div>`;
+        fetchBtn.disabled = true;
+
+        const result = await refreshStockFromNse(ticker);
+        const stock = await StockStore.get(ticker);
+        const today = new Date().toISOString().slice(0, 10);
+
+        if (result.quoteInfo) {
+          stock.fundamentals = stock.fundamentals || {};
+          if (result.quoteInfo.currentPrice) stock.fundamentals.currentPrice = result.quoteInfo.currentPrice;
+          if (result.quoteInfo.marketCap) stock.fundamentals.marketCap = result.quoteInfo.marketCap;
+          if (result.quoteInfo.name && (!stock.name || stock.name === stock.ticker)) stock.name = result.quoteInfo.name;
+          stock.priceContext = stock.priceContext || {};
+          stock.priceContext.source = "nse_live";
+          stock.priceContext.lastUpdated = today;
+          if (result.quoteInfo.week52High) stock.priceContext.week52High = result.quoteInfo.week52High;
+          if (result.quoteInfo.week52Low) stock.priceContext.week52Low = result.quoteInfo.week52Low;
+        }
+
+        if (result.shareholding && result.shareholding.length > 0) {
+          stock.shareholding = stock.shareholding || { history: [] };
+          stock.shareholding.source = "nse_live";
+          stock.shareholding.lastUpdated = today;
+          stock.shareholding.history = result.shareholding;
+        }
+
+        await StockStore.set(ticker, stock);
+
+        if (result.success) {
+          statusEl.innerHTML = `<div class="nse-fetch-success">✓ Updated</div>`;
+        } else if (result.partial) {
+          statusEl.innerHTML = `<div class="nse-fetch-partial">⚠ Partial: ${Object.entries(result.errors).map(([k, v]) => `${k} — ${v}`).join("; ")}</div>`;
+        } else {
+          statusEl.innerHTML = `<div class="nse-fetch-error">⚠ ${Object.values(result.errors).join(" / ")} — try "Enter manually instead" below.</div>`;
+        }
+
+        fetchBtn.disabled = false;
+        navigate(`#stock/${ticker}`);
+      });
+    }
+
     const saveManualBtn = document.getElementById("save-manual-nse-btn");
     if (saveManualBtn) {
       saveManualBtn.addEventListener("click", async () => {
@@ -250,6 +323,8 @@ const stockDetailScreen = {
         const marketCap = parseFloat(document.getElementById("manual-marketcap-input").value);
         const week52Low = parseFloat(document.getElementById("manual-52wlow-input").value);
         const week52High = parseFloat(document.getElementById("manual-52whigh-input").value);
+        const allTimeLow = parseFloat(document.getElementById("manual-atl-input").value);
+        const allTimeHigh = parseFloat(document.getElementById("manual-ath-input").value);
         const promoter = parseFloat(document.getElementById("manual-promoter-input").value);
         const pledged = parseFloat(document.getElementById("manual-pledging-input").value);
 
@@ -262,6 +337,8 @@ const stockDetailScreen = {
         stock.priceContext.lastUpdated = today;
         if (!Number.isNaN(week52Low)) stock.priceContext.week52Low = week52Low;
         if (!Number.isNaN(week52High)) stock.priceContext.week52High = week52High;
+        if (!Number.isNaN(allTimeLow)) stock.priceContext.allTimeLow = allTimeLow;
+        if (!Number.isNaN(allTimeHigh)) stock.priceContext.allTimeHigh = allTimeHigh;
 
         if (!Number.isNaN(promoter)) {
           stock.shareholding = stock.shareholding || { history: [] };

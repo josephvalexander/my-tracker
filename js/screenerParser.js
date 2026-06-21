@@ -132,7 +132,15 @@ function parseScreenerFile(arrayBuffer, XLSX) {
 
   const currentPrice = getFirst(ROW_LABELS.currentPrice)?.[0] ?? null;
   const marketCap = getFirst(ROW_LABELS.marketCap)?.[0] ?? null;
-  const sharesOutstandingRaw = getFirst(ROW_LABELS.numberOfShares)?.[0] ?? null;
+  // The dedicated "Number of shares" snapshot row is consistently
+  // blank across real Screener exports (confirmed against multiple
+  // real files) — it's a parser/template quirk, not a per-stock
+  // anomaly. The actual share count lives in the "No. of Equity
+  // Shares" historical row instead (sharesOutstandingHistory below),
+  // so this snapshot field is derived from that array's last valid
+  // entry rather than read directly. The raw row is still attempted
+  // first in case some export does populate it.
+  const sharesOutstandingSnapshotRaw = getFirst(ROW_LABELS.numberOfShares)?.[0] ?? null;
 
   // Annual P&L block — first occurrence of "Report Date" under PROFIT & LOSS
   const plReportDates = idx[ROW_LABELS.plReportDate]?.[0] ?? [];
@@ -152,6 +160,15 @@ function parseScreenerFile(arrayBuffer, XLSX) {
   const cashAndBank = getFirst(ROW_LABELS.cashAndBank) ?? [];
   const sharesOutstandingHistory = getFirst(ROW_LABELS.noOfEquityShares) ?? [];
   const priceAtYearEnd = getFirst(ROW_LABELS.price) ?? [];
+
+  // Use the snapshot row if it happened to be populated, otherwise
+  // fall back to the most recent non-null value in the historical
+  // array — see the comment above sharesOutstandingSnapshotRaw.
+  const lastValidShareCount = [...sharesOutstandingHistory].reverse().find((v) => v !== null && v !== undefined);
+  const sharesOutstandingRaw = sharesOutstandingSnapshotRaw ?? lastValidShareCount ?? null;
+  if (sharesOutstandingSnapshotRaw === null && lastValidShareCount) {
+    warnings.push("Shares outstanding taken from historical data (most recent year) since the snapshot field was blank in this export.");
+  }
 
   // "Total" appears multiple times (assets total, liabilities total) —
   // the Balance Sheet section lists Total after liabilities first, then

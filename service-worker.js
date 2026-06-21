@@ -16,6 +16,7 @@ const APP_SHELL = [
   "./js/holdingsCalculations.js",
   "./js/storage.js",
   "./js/screenerParser.js",
+  "./js/nseClient.js",
   "./js/driveSync.js",
   "./js/geminiClient.js",
   "./js/router.js",
@@ -53,8 +54,9 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
-  // Never cache NSE or Google API calls — always go to network.
-  if (url.hostname.includes("nseindia.com") || url.hostname.includes("googleapis.com")) {
+  // Never cache the NSE proxy Worker or Google API calls — always go
+  // to network, since this data must always be live, never stale.
+  if (url.hostname.includes("workers.dev") || url.hostname.includes("googleapis.com") || url.hostname.includes("generativelanguage.googleapis.com")) {
     event.respondWith(fetch(event.request));
     return;
   }
