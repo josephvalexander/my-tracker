@@ -44,19 +44,26 @@ function verdictBanner(verdict) {
 function priceContextStrip(stock) {
   const pc = stock.priceContext || {};
   const peBand = pc.peHistory5y;
+  const hasTodayRange = pc.todayLow && pc.todayHigh;
   return `
     <div class="price-context-grid">
       <div class="price-context-box">
         <div class="price-context-label">Market cap</div>
         <div class="price-context-value">${stock.fundamentals?.marketCap ? "₹" + stock.fundamentals.marketCap.toLocaleString("en-IN") + " Cr" : "—"}</div>
       </div>
+      ${hasTodayRange
+        ? `<div class="price-context-box">
+            <div class="price-context-label">Today's range</div>
+            <div class="price-context-value">${pc.todayLow.toLocaleString("en-IN")}–${pc.todayHigh.toLocaleString("en-IN")}</div>
+          </div>`
+        : ""}
       <div class="price-context-box">
         <div class="price-context-label">52w range</div>
-        <div class="price-context-value">${pc.week52Low && pc.week52High ? `${pc.week52Low.toLocaleString("en-IN")}–${pc.week52High.toLocaleString("en-IN")}` : "—"}</div>
+        <div class="price-context-value">${pc.week52Low && pc.week52High ? `${pc.week52Low.toLocaleString("en-IN")}–${pc.week52High.toLocaleString("en-IN")}` : "Set manually below"}</div>
       </div>
       <div class="price-context-box">
         <div class="price-context-label">All-time range</div>
-        <div class="price-context-value">${pc.allTimeLow && pc.allTimeHigh ? `${pc.allTimeLow.toLocaleString("en-IN")}–${pc.allTimeHigh.toLocaleString("en-IN")}` : "—"}</div>
+        <div class="price-context-value">${pc.allTimeLow && pc.allTimeHigh ? `${pc.allTimeLow.toLocaleString("en-IN")}–${pc.allTimeHigh.toLocaleString("en-IN")}` : "Set manually below"}</div>
       </div>
       <div class="price-context-box">
         <div class="price-context-label">P/E (5y band)</div>
@@ -106,7 +113,7 @@ function nseRefreshSection(stock) {
       <div class="nse-refresh-top">
         <div>
           <div class="nse-refresh-title">Price & shareholding data</div>
-          <div class="muted" style="font-size:11px;">Via a proxy that routes around NSE's CORS block · ${lastFetched ? `last updated ${lastFetched}` : "not fetched yet"}</div>
+          <div class="muted" style="font-size:11px;">Live price via BSE (NSE blocks this app's requests) · ${lastFetched ? `last updated ${lastFetched}` : "not fetched yet"}</div>
         </div>
       </div>
       <button id="nse-fetch-btn" class="btn btn-small btn-primary-outline" style="margin-top:8px;">Fetch live data</button>
@@ -285,10 +292,13 @@ const stockDetailScreen = {
           if (result.quoteInfo.marketCap) stock.fundamentals.marketCap = result.quoteInfo.marketCap;
           if (result.quoteInfo.name && (!stock.name || stock.name === stock.ticker)) stock.name = result.quoteInfo.name;
           stock.priceContext = stock.priceContext || {};
-          stock.priceContext.source = "nse_live";
+          stock.priceContext.source = result.quoteInfo.source === "bse" ? "bse_live" : "nse_live";
           stock.priceContext.lastUpdated = today;
           if (result.quoteInfo.week52High) stock.priceContext.week52High = result.quoteInfo.week52High;
           if (result.quoteInfo.week52Low) stock.priceContext.week52Low = result.quoteInfo.week52Low;
+          if (result.quoteInfo.todayLow) stock.priceContext.todayLow = result.quoteInfo.todayLow;
+          if (result.quoteInfo.todayHigh) stock.priceContext.todayHigh = result.quoteInfo.todayHigh;
+          if (result.quoteInfo.previousClose) stock.priceContext.previousClose = result.quoteInfo.previousClose;
         }
 
         if (result.shareholding && result.shareholding.length > 0) {
