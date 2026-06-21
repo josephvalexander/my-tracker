@@ -24,7 +24,7 @@
  * worker/README.md) and paste its URL into WORKER_BASE_URL below.
  */
 
-const WORKER_BASE_URL = "https://REPLACE-WITH-YOUR-WORKER.YOUR-SUBDOMAIN.workers.dev";
+const WORKER_BASE_URL = "https://portfolio-tracker-nse-proxy.josephv-mec.workers.dev";
 
 class NseFetchError extends Error {
   constructor(message, status) {
