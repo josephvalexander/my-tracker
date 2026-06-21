@@ -100,6 +100,7 @@ function entryZoneSection(stock) {
 
 function nseRefreshSection(stock) {
   const lastFetched = stock.shareholding?.lastUpdated || stock.bulkDeals?.lastUpdated || stock.corporateActions?.lastUpdated;
+  const latestShareholding = stock.shareholding?.history?.slice(-1)?.[0] ?? null;
   return `
     <div class="card nse-refresh-card">
       <div class="nse-refresh-top">
@@ -121,6 +122,45 @@ function nseRefreshSection(stock) {
         </div>
       </div>
       <div id="nse-fetch-status"></div>
+
+      <button id="manual-nse-toggle-btn" class="btn btn-small" style="margin-top:10px;">Enter manually instead</button>
+
+      <div id="manual-nse-form" style="display:none; margin-top:10px;">
+        <div class="hint-box" style="margin-bottom:10px;">NSE's automated fetch is currently blocked by their site's browser security policy (CORS) — this isn't fixable from the app side without a server proxy. Manual entry works reliably in the meantime; it takes under a minute per stock.</div>
+
+        <div class="form-group">
+          <label>Current price (₹)</label>
+          <input type="number" id="manual-price-input" value="${stock.fundamentals?.currentPrice ?? ""}" placeholder="e.g. 1840" />
+        </div>
+        <div class="form-group">
+          <label>Market cap (₹ Cr)</label>
+          <input type="number" id="manual-marketcap-input" value="${stock.fundamentals?.marketCap ?? ""}" placeholder="e.g. 13200" />
+        </div>
+        <div style="display:flex; gap:8px;">
+          <div class="form-group" style="flex:1;">
+            <label>52w low (₹)</label>
+            <input type="number" id="manual-52wlow-input" value="${stock.priceContext?.week52Low ?? ""}" />
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label>52w high (₹)</label>
+            <input type="number" id="manual-52whigh-input" value="${stock.priceContext?.week52High ?? ""}" />
+          </div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <div class="form-group" style="flex:1;">
+            <label>Promoter holding (%)</label>
+            <input type="number" step="0.1" id="manual-promoter-input" value="${latestShareholding?.promoter ?? ""}" />
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label>Promoter pledging (%)</label>
+            <input type="number" step="0.1" id="manual-pledging-input" value="${latestShareholding?.pledged ?? "0"}" />
+          </div>
+        </div>
+        <div class="muted" style="font-size:11px; margin-bottom:8px;">
+          Find these on Screener's company page, or NSE's quote/shareholding pages directly (just can't be auto-fetched from here).
+        </div>
+        <button id="save-manual-nse-btn" class="btn btn-primary">Save</button>
+      </div>
     </div>`;
 }
 
@@ -230,6 +270,57 @@ const stockDetailScreen = {
       });
     }
 
+    const manualToggleBtn = document.getElementById("manual-nse-toggle-btn");
+    if (manualToggleBtn) {
+      manualToggleBtn.addEventListener("click", () => {
+        const form = document.getElementById("manual-nse-form");
+        form.style.display = form.style.display === "none" ? "block" : "none";
+      });
+    }
+
+    const saveManualBtn = document.getElementById("save-manual-nse-btn");
+    if (saveManualBtn) {
+      saveManualBtn.addEventListener("click", async () => {
+        const stock = await StockStore.get(ticker);
+        const today = new Date().toISOString().slice(0, 10);
+
+        const price = parseFloat(document.getElementById("manual-price-input").value);
+        const marketCap = parseFloat(document.getElementById("manual-marketcap-input").value);
+        const week52Low = parseFloat(document.getElementById("manual-52wlow-input").value);
+        const week52High = parseFloat(document.getElementById("manual-52whigh-input").value);
+        const promoter = parseFloat(document.getElementById("manual-promoter-input").value);
+        const pledged = parseFloat(document.getElementById("manual-pledging-input").value);
+
+        stock.fundamentals = stock.fundamentals || {};
+        if (!Number.isNaN(price)) stock.fundamentals.currentPrice = price;
+        if (!Number.isNaN(marketCap)) stock.fundamentals.marketCap = marketCap;
+
+        stock.priceContext = stock.priceContext || {};
+        stock.priceContext.source = "manual";
+        stock.priceContext.lastUpdated = today;
+        if (!Number.isNaN(week52Low)) stock.priceContext.week52Low = week52Low;
+        if (!Number.isNaN(week52High)) stock.priceContext.week52High = week52High;
+
+        if (!Number.isNaN(promoter)) {
+          stock.shareholding = stock.shareholding || { history: [] };
+          stock.shareholding.source = "manual";
+          stock.shareholding.lastUpdated = today;
+          stock.shareholding.history = stock.shareholding.history || [];
+          stock.shareholding.history.push({
+            quarter: today,
+            promoter,
+            fii: null,
+            dii: null,
+            public: null,
+            pledged: Number.isNaN(pledged) ? 0 : pledged,
+          });
+        }
+
+        await StockStore.set(ticker, stock);
+        navigate(`#stock/${ticker}`);
+      });
+    }
+
     const fetchBtn = document.getElementById("nse-fetch-btn");
     if (fetchBtn) {
       fetchBtn.addEventListener("click", async () => {
@@ -270,7 +361,7 @@ const stockDetailScreen = {
         } else if (result.partial) {
           statusEl.innerHTML = `<div class="nse-fetch-partial">⚠ Partial — ${Object.entries(result.errors).map(([k, v]) => `${k}: ${v}`).join("; ")}</div>`;
         } else {
-          statusEl.innerHTML = `<div class="nse-fetch-error">⚠ Fetch failed for all sources. NSE may need a fresh page visit (step 1), or its site structure changed — see js/nseClient.js comments. Falling back to manual entry/CSV upload is always available.</div>`;
+          statusEl.innerHTML = `<div class="nse-fetch-error">⚠ Fetch blocked — NSE's site doesn't allow direct browser requests from this app (a CORS restriction on their end, not something a retry fixes). Use "Enter manually instead" below.</div>`;
         }
 
         navigate(`#stock/${ticker}`);

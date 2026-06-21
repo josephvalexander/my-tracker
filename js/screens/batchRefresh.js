@@ -98,7 +98,7 @@ const batchRefreshScreen = {
         } else if (result.partial) {
           rowEl.innerHTML = `<span class="stock-name">${ticker}</span> <span class="nse-fetch-partial">⚠ partial — ${Object.keys(result.errors).join(", ")} failed</span>`;
         } else {
-          rowEl.innerHTML = `<span class="stock-name">${ticker}</span> <span class="nse-fetch-error">⚠ failed — try again or use manual upload</span>`;
+          rowEl.innerHTML = `<span class="stock-name">${ticker}</span> <span class="nse-fetch-error">⚠ blocked by NSE's site policy — use manual entry on the stock's own page</span>`;
         }
       });
     });
