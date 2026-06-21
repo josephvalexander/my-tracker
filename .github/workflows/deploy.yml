@@ -31,6 +31,17 @@ jobs:
           echo "CACHE_NAME is now:"
           grep CACHE_NAME service-worker.js
 
+      - name: Exclude worker/ from the Pages deploy
+        # worker/ is source for a separate Cloudflare Worker deployment
+        # (see worker/README.md and deploy-worker.yml) — it stays
+        # committed to the repo for version control, but doesn't belong
+        # in the published static site. upload-pages-artifact has no
+        # exclude option, so the actual fix is removing it from this
+        # job's checked-out copy before the upload step runs — this
+        # only affects this workflow run's temporary workspace, not
+        # the repo itself.
+        run: rm -rf worker
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
