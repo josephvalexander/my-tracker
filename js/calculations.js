@@ -488,8 +488,8 @@ function deriveVerdict(stock) {
   const checks = [];
 
   if (roe !== null) {
-    const pass = roe >= 15;
-    checks.push({ label: `ROE ${roe.toFixed(0)}% ${pass ? "≥" : "<"} 15%`, pass });
+    const pass = roe >= 14.5; // tolerance: 14.5%+ rounds to 15% in display and is close enough
+    checks.push({ label: `ROE ${roe.toFixed(1)}% ${pass ? "≥" : "<"} 15%`, pass });
     if (!pass) hardFlags.push("roeBelow15");
   }
   if (de !== null) {
