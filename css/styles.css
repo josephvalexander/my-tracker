@@ -16,8 +16,7 @@
   --radius-lg: 12px;
 }
 
-/* Dark theme — applied via data-theme="dark" on <html>, or auto via media query */
-[data-theme="dark"],
+/* Dark theme — auto via system preference */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --color-bg: #1a1a18;
@@ -35,6 +34,7 @@
   }
 }
 
+/* Dark theme — explicit override via data-theme="dark" on <html> */
 [data-theme="dark"] {
   --color-bg: #1a1a18;
   --color-surface: #2c2c2a;
