@@ -19,7 +19,10 @@ function registerScreen(name, module) {
 
 async function navigate(hash) {
   const clean = (hash || "#watchlist").replace(/^#/, "");
-  const [screenName, ...params] = clean.split("/");
+  const [screenName, ...rawParams] = clean.split("/");
+  // Decode each param segment so URL-encoded tickers (e.g. CLEAN%20SCIENCE)
+  // resolve to the actual stored key (CLEAN SCIENCE)
+  const params = rawParams.map((p) => { try { return decodeURIComponent(p); } catch { return p; } });
   const screen = screens[screenName] || screens.watchlist;
 
   const container = document.getElementById("screen-container");

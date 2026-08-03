@@ -114,7 +114,7 @@ const watchlistScreen = {
     listEl.querySelectorAll(".stock-row").forEach((row) => {
       row.addEventListener("click", (e) => {
         if (e.target.closest(".row-menu-btn")) return;
-        window.location.hash = `#stock/${row.dataset.ticker}`;
+        window.location.hash = `#stock/${encodeURIComponent(row.dataset.ticker)}`;
       });
     });
 

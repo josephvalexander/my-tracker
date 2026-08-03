@@ -1,20 +1,13 @@
 /**
  * screens/addHolding.js
  *
- * Add or edit a holding position. Only stocks already on the watchlist
- * can be added as holdings — the ticker is selected from a dropdown of
- * active stocks. Quantity and average buy price are entered manually.
+ * Add or update a holding position. Date removed — trades happen on
+ * different dates so a single purchase date per position isn't meaningful.
  */
 
 const addHoldingScreen = {
   async render() {
     const stocks = await StockStore.getActive();
-    const existingHoldings = await HoldingStore.getAll();
-    const existingTickers = new Set(existingHoldings.map((h) => h.ticker));
-
-    const options = stocks
-      .map((s) => `<option value="${s.ticker}">${s.name || s.ticker} (${s.ticker})</option>`)
-      .join("");
 
     if (stocks.length === 0) {
       return `
@@ -26,6 +19,10 @@ const addHoldingScreen = {
           <div class="empty-state">Add stocks to your watchlist first, then track your holdings here.</div>
         </div>`;
     }
+
+    const options = stocks
+      .map((s) => `<option value="${s.ticker}">${s.name || s.ticker} (${s.ticker})</option>`)
+      .join("");
 
     return `
       <div class="screen-padding">
@@ -54,11 +51,6 @@ const addHoldingScreen = {
             <input type="number" id="holding-price-input" step="0.01" placeholder="e.g. 1640.50" />
           </div>
 
-          <div class="form-group">
-            <label>Date of purchase <span class="muted">(optional)</span></label>
-            <input type="date" id="holding-date-input" value="${new Date().toISOString().slice(0, 10)}" />
-          </div>
-
           <div id="holding-save-status" class="muted" style="font-size:12px; margin-bottom:8px;"></div>
           <button id="save-holding-btn" class="btn btn-primary">Save position</button>
         </div>
@@ -74,7 +66,6 @@ const addHoldingScreen = {
     const noteEl = document.getElementById("existing-holding-note");
     const qtyInput = document.getElementById("holding-qty-input");
     const priceInput = document.getElementById("holding-price-input");
-    const dateInput = document.getElementById("holding-date-input");
 
     select.addEventListener("change", () => {
       const ticker = select.value;
@@ -83,7 +74,6 @@ const addHoldingScreen = {
         noteEl.textContent = `You already have ${existing.quantity} shares at ₹${existing.avgBuyPrice} avg — saving will replace this.`;
         qtyInput.value = existing.quantity;
         priceInput.value = existing.avgBuyPrice;
-        dateInput.value = existing.purchaseDate || new Date().toISOString().slice(0, 10);
       } else {
         noteEl.textContent = "";
         qtyInput.value = "";
@@ -95,20 +85,13 @@ const addHoldingScreen = {
       const ticker = select.value;
       const qty = parseFloat(qtyInput.value);
       const price = parseFloat(priceInput.value);
-      const date = dateInput.value;
       const statusEl = document.getElementById("holding-save-status");
 
       if (!ticker) { statusEl.textContent = "Select a stock first."; return; }
       if (!qty || qty <= 0) { statusEl.textContent = "Enter a valid quantity."; return; }
       if (!price || price <= 0) { statusEl.textContent = "Enter a valid buy price."; return; }
 
-      await HoldingStore.set(ticker, {
-        ticker,
-        quantity: qty,
-        avgBuyPrice: price,
-        purchaseDate: date || null,
-      });
-
+      await HoldingStore.set(ticker, { ticker, quantity: qty, avgBuyPrice: price });
       navigate("#holdings");
     });
   },
