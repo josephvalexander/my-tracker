@@ -1,0 +1,310 @@
+/**
+ * screens/addStock.js
+ *
+ * Add a new stock to the watchlist. On "Add to watchlist":
+ *   1. Creates the stock record immediately
+ *   2. Fetches all data from indianapi.in automatically — fundamentals,
+ *      shareholding, corporate actions, current price, 52-week range
+ *   3. Computes IV from the fetched OCF data
+ *   4. Optionally drafts qualitative fields with AI
+ *
+ * Screener.xlsx upload is kept as a manual fallback in case indianapi
+ * doesn't have data for a particular stock (very small/unlisted companies).
+ *
+ * Monthly refresh: called from stockDetail.js when lastUpdated is >30 days ago.
+ */
+
+const INDIAN_API_BASE = "https://stock.indianapi.in";
+
+/**
+ * Fetch all fundamentals + shareholding + corporate actions from indianapi.in
+ * for one stock. Called on first add and on monthly refresh.
+ */
+async function fetchIndianApiData(stockName, apiKey) {
+  const url = `${INDIAN_API_BASE}/stock?name=${encodeURIComponent(stockName)}`;
+  const response = await fetch(url, {
+    headers: { "X-Api-Key": apiKey },
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`indianapi.in responded with ${response.status}: ${text.slice(0, 200)}`);
+  }
+
+  const data = await response.json();
+  return parseIndianApiResponse(data);
+}
+
+/**
+ * Apply a parsed indianapi.in result to a stock record and save it.
+ * Used both on first add and on monthly refresh.
+ */
+async function applyIndianApiResult(ticker, parsed) {
+  const stock = await StockStore.get(ticker);
+
+  stock.fundamentals = {
+    ...parsed.stockFundamentals,
+    // Preserve any manual overrides that are more specific
+    currentPrice: parsed.stockFundamentals.currentPrice ?? stock.fundamentals?.currentPrice,
+    marketCap: parsed.stockFundamentals.marketCap ?? stock.fundamentals?.marketCap,
+  };
+
+  if (parsed.companyName && (!stock.name || stock.name === ticker)) {
+    stock.name = parsed.companyName;
+  }
+
+  // Shareholding — merge with existing if already has pledging data from AI draft
+  stock.shareholding = {
+    ...parsed.shareholding,
+    // Preserve pledging if we had it from AI draft and new data doesn't have it
+    history: parsed.shareholding.history.map((entry, i) => ({
+      ...entry,
+      pledged: entry.pledged ?? stock.shareholding?.history?.[i]?.pledged ?? null,
+    })),
+  };
+
+  // Corporate actions
+  stock.corporateActions = {
+    source: "indianapi",
+    lastUpdated: new Date().toISOString().slice(0, 10),
+    ...parsed.corporateActions,
+  };
+
+  // Price context
+  stock.priceContext = {
+    ...stock.priceContext,
+    source: "indianapi",
+    lastUpdated: new Date().toISOString().slice(0, 10),
+    week52High: parsed.priceContext.week52High,
+    week52Low: parsed.priceContext.week52Low,
+    peTTM: parsed.priceContext.peTTM ?? stock.priceContext?.peTTM ?? null,
+  };
+
+  await StockStore.set(ticker, stock);
+  return stock;
+}
+
+// ── Screener upload fallback ──────────────────────────────────────────
+
+function renderUploadZone(zoneId) {
+  return `
+    <div id="${zoneId}" class="dropzone" tabindex="0">
+      <input type="file" id="${zoneId}-input" accept=".xlsx" class="dropzone-hidden-input" />
+      <div class="dropzone-icon">&#8593;</div>
+      <div class="dropzone-text">Drag your Screener export here</div>
+      <div class="dropzone-subtext">or click to browse · .xlsx exported from screener.in</div>
+    </div>
+    <div id="${zoneId}-status" class="dropzone-status"></div>`;
+}
+
+function wireUploadZone(zoneId, onFile) {
+  const zone = document.getElementById(zoneId);
+  const input = document.getElementById(`${zoneId}-input`);
+  const status = document.getElementById(`${zoneId}-status`);
+
+  function setStatus(html) { status.innerHTML = html; }
+
+  function validateAndHandle(file) {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".xlsx")) {
+      zone.classList.add("dropzone-error");
+      setStatus(`<div class="dropzone-error-text">⚠ "${file.name}" isn't an .xlsx file.</div>`);
+      setTimeout(() => zone.classList.remove("dropzone-error"), 1500);
+      return;
+    }
+    zone.classList.remove("dropzone-active", "dropzone-error");
+    zone.classList.add("dropzone-parsing");
+    setStatus(`<div class="dropzone-parsing-text">Parsing ${file.name}...</div>`);
+    onFile(file).finally(() => zone.classList.remove("dropzone-parsing"));
+  }
+
+  zone.addEventListener("click", () => input.click());
+  zone.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") input.click(); });
+  input.addEventListener("change", (e) => validateAndHandle(e.target.files[0]));
+  ["dragenter", "dragover"].forEach((evt) => {
+    zone.addEventListener(evt, (e) => { e.preventDefault(); zone.classList.add("dropzone-active"); });
+  });
+  ["dragleave", "dragend"].forEach((evt) => {
+    zone.addEventListener(evt, (e) => { e.preventDefault(); zone.classList.remove("dropzone-active"); });
+  });
+  zone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    zone.classList.remove("dropzone-active");
+    validateAndHandle(e.dataTransfer.files[0]);
+  });
+}
+
+// ── Screen ───────────────────────────────────────────────────────────
+
+const addStockScreen = {
+  async render() {
+    return `
+      <div class="screen-padding">
+        <div class="detail-header">
+          <button class="back-btn" onclick="window.location.hash='#watchlist'">&larr;</button>
+          <div class="detail-title"><div class="detail-name">Add stock</div></div>
+        </div>
+
+        <div class="form-group">
+          <label>Ticker (NSE symbol)</label>
+          <input type="text" id="ticker-input" placeholder="e.g. CAPLIPOINT" />
+        </div>
+        <div class="form-group">
+          <label>Company name <span class="muted">(or search term — same as you'd type on Screener.in)</span></label>
+          <input type="text" id="name-input" placeholder="e.g. Caplin Point" />
+          <div class="field-hint">Used to fetch data from indianapi.in. Leave blank to use the ticker as the search term.</div>
+        </div>
+
+        <button id="create-stock-btn" class="btn btn-primary">Add &amp; fetch data</button>
+        <div id="fetch-status" class="muted" style="font-size:12px; margin-top:8px;"></div>
+
+        <div id="post-add-section" style="display:none; margin-top:24px;">
+          <div id="fetch-preview"></div>
+
+          <details style="margin-top:16px;">
+            <summary class="muted" style="cursor:pointer; font-size:12px;">Screener.xlsx fallback (if data above looks wrong or incomplete)</summary>
+            <div style="margin-top:8px;">
+              ${renderUploadZone("screener-dropzone")}
+            </div>
+          </details>
+        </div>
+      </div>`;
+  },
+
+  async afterRender() {
+    document.getElementById("create-stock-btn").addEventListener("click", async () => {
+      const ticker = document.getElementById("ticker-input").value.trim().toUpperCase();
+      const nameInput = document.getElementById("name-input").value.trim();
+      const searchName = nameInput || ticker;
+      const statusEl = document.getElementById("fetch-status");
+
+      if (!ticker) { alert("Ticker is required."); return; }
+
+      const existing = await StockStore.get(ticker);
+      // Only block re-add if stock is genuinely active on the watchlist.
+      // Deleted stocks should be fully gone; archived stocks (from before
+      // the delete-instead-of-archive change) should be cleaned up first.
+      if (existing) {
+        if (existing.status === "active") {
+          alert("This stock is already on your watchlist.");
+          return;
+        }
+        // Stale archived record — delete it so we can re-add cleanly
+        await deleteStockPermanently(ticker);
+      }
+
+      const settings = await MetaStore.getSettings();
+      const apiKey = settings?.indianApiKey;
+
+      // Create the stock record immediately
+      const stock = {
+        ticker, name: nameInput || ticker, sector: null, status: "active",
+        addedDate: new Date().toISOString().slice(0, 10),
+        archivedDate: null, archiveReason: null,
+        qualitative: { business: "", moatDescription: "", moatTags: [], marketPosition: "", marketPositionTag: "" },
+        targetEntryPrice: null,
+        fundamentals: { source: null, lastUpdated: null, currentPrice: null, marketCap: null, annual: {}, quarterly: {} },
+        shareholding: { source: null, lastUpdated: null, history: [] },
+        corporateActions: { source: null, lastUpdated: null, dividends: [], splits: [], bonus: [] },
+        priceContext: { source: null, lastUpdated: null },
+        intrinsicValue: null, notes: [], thesis: { text: "", lastUpdated: null },
+      };
+      await StockStore.set(ticker, stock);
+
+      document.getElementById("create-stock-btn").disabled = true;
+      document.getElementById("post-add-section").style.display = "block";
+
+      // Fetch from indianapi.in if key is configured
+      if (!apiKey) {
+        statusEl.innerHTML = `<span style="color:var(--color-warning);">⚠ No indianapi.in key in Settings — upload a Screener file below to add data, or add your key in Settings first.</span>`;
+        wireScreenerFallback(ticker);
+        return;
+      }
+
+      statusEl.textContent = "Fetching from indianapi.in...";
+      try {
+        const parsed = await fetchIndianApiData(searchName, apiKey);
+        const updatedStock = await applyIndianApiResult(ticker, parsed);
+
+        const roe = roe5yAvg(updatedStock);
+        const de = debtToEquity(updatedStock);
+        const cagr = epsCagr(updatedStock);
+        const years = parsed.stockFundamentals.annual.years?.length ?? 0;
+        const latestShareholding = parsed.shareholding.history?.slice(-1)?.[0];
+
+        statusEl.textContent = "";
+        document.getElementById("fetch-preview").innerHTML = `
+          <div class="card preview-card">
+            <div class="section-label" style="margin-top:0;">Fetched from indianapi.in</div>
+            <table class="preview-table">
+              <tr><td>Company</td><td>${parsed.companyName || ticker}</td></tr>
+              <tr><td>Current price</td><td>${parsed.stockFundamentals.currentPrice ? "₹" + parsed.stockFundamentals.currentPrice.toLocaleString("en-IN") : "—"}</td></tr>
+              <tr><td>52w range</td><td>${parsed.priceContext.week52Low && parsed.priceContext.week52High ? `₹${parsed.priceContext.week52Low.toLocaleString("en-IN")} – ₹${parsed.priceContext.week52High.toLocaleString("en-IN")}` : "—"}</td></tr>
+              <tr><td>Years of data</td><td>${years} ${years >= 8 ? "✓" : "⚠ fewer than 8"}</td></tr>
+              <tr><td>ROE (5y avg)</td><td>${roe !== null ? formatPct(roe) : "N/A"}</td></tr>
+              <tr><td>D/E</td><td>${de !== null ? formatRatio(de) : "N/A"}</td></tr>
+              <tr><td>EPS CAGR (5y)</td><td>${cagr !== null ? formatPct(cagr) : "N/A"}</td></tr>
+              <tr><td>Promoter holding</td><td>${latestShareholding?.promoter != null ? latestShareholding.promoter + "% (Q: " + latestShareholding.quarter + ")" : "—"}</td></tr>
+              <tr><td>Dividends on record</td><td>${parsed.corporateActions.dividends?.length ?? 0}</td></tr>
+            </table>
+            ${parsed.warnings.length > 0 ? `<div class="preview-warnings">${parsed.warnings.map(w => `<div class="warning-text">⚠ ${w}</div>`).join("")}</div>` : ""}
+
+            <button id="ai-draft-all-btn" class="btn btn-small" style="margin-top:10px; width:100%;">✨ Draft business, moat &amp; market position with AI</button>
+            <div id="ai-draft-all-status" class="muted" style="font-size:11px; margin-top:6px;"></div>
+
+            <button class="btn btn-primary" style="margin-top:10px; width:100%;" onclick="window.location.hash='#stock/${ticker}'">View full stock page &rarr;</button>
+          </div>`;
+
+        document.getElementById("ai-draft-all-btn").addEventListener("click", async (e) => {
+          const btn = e.target;
+          const aiStatus = document.getElementById("ai-draft-all-status");
+          const s = await MetaStore.getSettings();
+          if (!s?.geminiApiKey) { aiStatus.textContent = "Add a Gemini API key in Settings first."; return; }
+          btn.disabled = true;
+          for (const field of [{ key: "business", label: "business" }, { key: "moat", label: "competitive advantage" }, { key: "marketPosition", label: "market position" }]) {
+            aiStatus.textContent = `Drafting ${field.label}...`;
+            try {
+              const stockNow = await StockStore.get(ticker);
+              const { text } = await draftQualitativeField(s.geminiApiKey, field.key, stockNow);
+              stockNow.qualitative = stockNow.qualitative || {};
+              if (field.key === "business") stockNow.qualitative.business = text;
+              if (field.key === "moat") stockNow.qualitative.moatDescription = text;
+              if (field.key === "marketPosition") stockNow.qualitative.marketPosition = text;
+              await StockStore.set(ticker, stockNow);
+            } catch (err) {
+              aiStatus.textContent = `Draft failed on ${field.label}: ${err.message}`;
+              btn.disabled = false;
+              return;
+            }
+          }
+          aiStatus.textContent = "✓ All three drafted — review on the stock page.";
+          btn.disabled = false;
+        });
+
+      } catch (err) {
+        statusEl.innerHTML = `<span style="color:var(--color-error);">⚠ Fetch failed: ${err.message}</span>`;
+        wireScreenerFallback(ticker);
+      }
+
+      wireScreenerFallback(ticker);
+    });
+
+    function wireScreenerFallback(ticker) {
+      wireUploadZone("screener-dropzone", async (file) => {
+        try {
+          const buffer = await file.arrayBuffer();
+          const { stockFundamentals, companyName } = parseScreenerFile(buffer, XLSX);
+          const currentStock = await StockStore.get(ticker);
+          currentStock.fundamentals = stockFundamentals;
+          if (companyName && (!currentStock.name || currentStock.name === ticker)) currentStock.name = companyName;
+          await StockStore.set(ticker, currentStock);
+          document.getElementById("screener-dropzone-status").innerHTML = `<div class="dropzone-success-text">✓ Parsed ${stockFundamentals.annual.years?.length ?? 0} years from ${file.name}</div>`;
+        } catch (err) {
+          document.getElementById("screener-dropzone-status").innerHTML = `<div class="dropzone-error-text">⚠ Parse failed: ${err.message}</div>`;
+        }
+      });
+    }
+  },
+};
+
+registerScreen("addStock", addStockScreen);
