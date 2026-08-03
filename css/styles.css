@@ -173,6 +173,7 @@ body {
 .verdict-word { font-size: 18px; font-weight: 700; margin-right: 8px; }
 .verdict-detail { font-size: 11px; }
 .verdict-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.verdict-soft-note { font-size: 11px; color: var(--color-text-secondary); margin-top: 6px; font-style: italic; }
 .chip-small { font-size: 11px; background: var(--color-surface); border-radius: var(--radius-md); padding: 3px 8px; }
 .chip-small-pass { color: var(--color-green); }
 .chip-small-fail { color: var(--color-red); }

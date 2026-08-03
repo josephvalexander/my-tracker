@@ -261,23 +261,19 @@ const addStockScreen = {
           const s = await MetaStore.getSettings();
           if (!s?.geminiApiKey) { aiStatus.textContent = "Add a Gemini API key in Settings first."; return; }
           btn.disabled = true;
-          for (const field of [{ key: "business", label: "business" }, { key: "moat", label: "competitive advantage" }, { key: "marketPosition", label: "market position" }]) {
-            aiStatus.textContent = `Drafting ${field.label}...`;
-            try {
-              const stockNow = await StockStore.get(ticker);
-              const { text } = await draftQualitativeField(s.geminiApiKey, field.key, stockNow);
-              stockNow.qualitative = stockNow.qualitative || {};
-              if (field.key === "business") stockNow.qualitative.business = text;
-              if (field.key === "moat") stockNow.qualitative.moatDescription = text;
-              if (field.key === "marketPosition") stockNow.qualitative.marketPosition = text;
-              await StockStore.set(ticker, stockNow);
-            } catch (err) {
-              aiStatus.textContent = `Draft failed on ${field.label}: ${err.message}`;
-              btn.disabled = false;
-              return;
-            }
+          aiStatus.textContent = "Drafting business, moat & market position...";
+          try {
+            const stockNow = await StockStore.get(ticker);
+            const result = await draftAllQualitative(s.geminiApiKey, stockNow);
+            stockNow.qualitative = stockNow.qualitative || {};
+            stockNow.qualitative.business = result.business;
+            stockNow.qualitative.moatDescription = result.moat;
+            stockNow.qualitative.marketPosition = result.marketPosition;
+            await StockStore.set(ticker, stockNow);
+            aiStatus.textContent = "✓ All three drafted — review on the stock page.";
+          } catch (err) {
+            aiStatus.textContent = `Draft failed: ${err.message}`;
           }
-          aiStatus.textContent = "✓ All three drafted — review on the stock page.";
           btn.disabled = false;
         });
 

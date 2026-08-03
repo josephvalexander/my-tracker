@@ -53,7 +53,7 @@ function buildRequestBody(prompt, withSearch) {
   return JSON.stringify({
     contents: [{ parts: [{ text: prompt }] }],
     ...(withSearch ? { tools: [{ google_search: {} }] } : {}),
-    generationConfig: { temperature: 0.3, maxOutputTokens: 300 },
+    generationConfig: { temperature: 0.3, maxOutputTokens: 600 },
   });
 }
 
@@ -73,24 +73,38 @@ async function callGemini(apiKey, prompt, withSearch) {
  * `sources` are the grounding citations Gemini actually used — always
  * show these in the UI so the draft is checkable, not just trusted.
  *
- * Retries once on a 429 (rate limit) after a short backoff, and falls
+ * Retries with exponential backoff on 429 (rate limit), falls
  * back to a non-grounded request if the key doesn't have search
  * grounding enabled (surfaced by Gemini as a 400 mentioning the tool).
  */
 /**
  * Shared request logic: sends a prompt with search grounding, retries
- * once on rate limit, falls back to non-grounded if the key lacks
- * grounding, and extracts text + cited sources from the response.
+ * with exponential backoff on rate limit (15 RPM free tier means bursting
+ * 3 sequential calls can easily hit the per-minute cap), falls back to
+ * non-grounded if the key lacks grounding, and extracts text + cited
+ * sources from the response.
  * Used by both draftQualitativeField (free text) and draftShareholding
  * (structured JSON) below — they differ only in the prompt and how
  * the returned text gets parsed afterward.
  */
 async function runGroundedPrompt(apiKey, prompt) {
-  let res = await callGemini(apiKey, prompt, true);
+  // 8s → 20s → 65s — the 65s clears the full 60-second RPM window
+  const RETRY_DELAYS = [8000, 20000, 65000];
+  let res;
+
+  for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
+    res = await callGemini(apiKey, prompt, true);
+    if (res.status !== 429) break;
+    if (attempt < RETRY_DELAYS.length) {
+      await new Promise((r) => setTimeout(r, RETRY_DELAYS[attempt]));
+    }
+  }
 
   if (res.status === 429) {
-    await new Promise((r) => setTimeout(r, 8000));
-    res = await callGemini(apiKey, prompt, true);
+    throw new GeminiError(
+      "Gemini rate limit hit — too many requests in one minute. Wait a moment and try again.",
+      429
+    );
   }
 
   if (!res.ok) {
@@ -126,12 +140,55 @@ async function runGroundedPrompt(apiKey, prompt) {
 }
 
 /**
- * Drafts business / moat / market position as free text.
+ * Drafts business description, competitive advantage/moat, and market
+ * position in a SINGLE Gemini call, returning all three as structured
+ * JSON. One call instead of three means no per-minute rate limit
+ * issues from sequential bursting, and faster overall since there's
+ * only one round-trip.
+ *
+ * Returns { business, moat, marketPosition, sources } — all three
+ * fields plus the grounding citations. Always a draft for the user
+ * to review; never auto-saved.
+ */
+async function draftAllQualitative(apiKey, stock) {
+  const name = stock.name || stock.ticker;
+  const prompt = `Search for ${name} (${stock.ticker}), an Indian listed company. I need three things about this business. Respond with ONLY a JSON object in this exact shape, no other text, no markdown:
+
+{
+  "business": "<one plain sentence: what does this company actually do, no jargon>",
+  "moat": "<one or two plain sentences: competitive advantage if any — pricing power, brand, IP, switching costs, regulatory barrier, network effect. Say plainly if there is no clear durable advantage>",
+  "marketPosition": "<one plain sentence: market leader, top-3 player, or commodity/undifferentiated player in its space>"
+}
+
+Be specific and factual. Do not invent advantages that aren't clearly evidenced.`;
+
+  const { text, sources } = await runGroundedPrompt(apiKey, prompt);
+
+  const cleaned = text.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
+
+  let parsed;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    // If JSON fails, try to extract any useful text and return it all as business field
+    throw new GeminiError(`Gemini response wasn't valid JSON. Raw: ${text.slice(0, 300)}`);
+  }
+
+  return {
+    business: typeof parsed.business === "string" ? parsed.business.trim() : "",
+    moat: typeof parsed.moat === "string" ? parsed.moat.trim() : "",
+    marketPosition: typeof parsed.marketPosition === "string" ? parsed.marketPosition.trim() : "",
+    sources,
+  };
+}
+
+/**
+ * Single-field draft — kept for any future per-field re-draft use,
+ * but "Draft all" now uses draftAllQualitative (single call).
  */
 async function draftQualitativeField(apiKey, fieldKey, stock) {
   const promptTemplate = FIELD_PROMPTS[fieldKey];
   if (!promptTemplate) throw new Error(`Unknown field: ${fieldKey}`);
-
   const prompt = promptTemplate.replaceAll("{name}", stock.name || stock.ticker).replaceAll("{ticker}", stock.ticker);
   return runGroundedPrompt(apiKey, prompt);
 }
@@ -179,7 +236,7 @@ If you cannot find a reliable, recent figure for either value, use null for that
   };
 }
 
-const geminiClientExports = { draftQualitativeField, draftShareholding, GeminiError, FIELD_PROMPTS };
+const geminiClientExports = { draftAllQualitative, draftQualitativeField, draftShareholding, GeminiError, FIELD_PROMPTS };
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports = geminiClientExports;

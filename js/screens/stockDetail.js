@@ -26,9 +26,33 @@ function verdictBanner(verdict) {
       return `<span class="chip-small ${c.pass ? "chip-small-pass" : "chip-small-fail"}">${c.pass ? "✓" : "✗"} ${c.label}</span>`;
     })
     .join("");
-  const flagSummary = isYes
-    ? `${verdict.hardFlags.length} hard flags, ${verdict.softFlags.length} soft flags`
-    : `${verdict.hardFlags.length} hard flag${verdict.hardFlags.length === 1 ? "" : "s"} found`;
+
+  // Human-readable soft flag labels
+  const SOFT_FLAG_LABELS = {
+    epsCagrBelow12:   "EPS CAGR < 12%",
+    consistencyBelow5: "Earnings consistency < 5/6",
+    rerBelow1:        "Retained earnings ratio < 1x",
+  };
+
+  // Show WHY it's No — hard flags first, then soft flags if they're the reason
+  let flagSummary;
+  if (isYes) {
+    const parts = [];
+    if (verdict.hardFlags.length === 0) parts.push("0 hard flags");
+    if (verdict.softFlags.length > 0) parts.push(`${verdict.softFlags.length} soft flag${verdict.softFlags.length === 1 ? "" : "s"}`);
+    flagSummary = parts.join(", ") || "0 flags";
+  } else if (verdict.hardFlags.length > 0) {
+    flagSummary = `${verdict.hardFlags.length} hard flag${verdict.hardFlags.length === 1 ? "" : "s"} found`;
+  } else {
+    // No from soft flags — show exactly which ones
+    const softLabels = verdict.softFlags.map((f) => SOFT_FLAG_LABELS[f] || f).join(", ");
+    flagSummary = `soft flags: ${softLabels}`;
+  }
+
+  // Soft flag chips — shown below the hard-flag chips when they're the reason for No
+  const softChips = (!isYes && verdict.hardFlags.length === 0 && verdict.softFlags.length > 0)
+    ? `<div class="verdict-soft-note">These aren't hard disqualifiers — use your judgement:</div>`
+    : "";
 
   return `
     <div class="verdict-banner ${cls}">
@@ -38,6 +62,7 @@ function verdictBanner(verdict) {
         <span class="verdict-detail">auto-derived from checklist · ${flagSummary}</span>
       </div>
       <div class="verdict-chips">${chips}</div>
+      ${softChips}
     </div>`;
 }
 

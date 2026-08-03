@@ -511,7 +511,7 @@ function deriveVerdict(stock) {
 
   let verdict = "Yes";
   if (hardFlags.length > 0) verdict = "No";
-  else if (softFlags.length >= 2) verdict = "No";
+  else if (softFlags.length >= 3) verdict = "No"; // needs all 3 soft flags to fail
 
   return { verdict, hardFlags, softFlags, checks };
 }
