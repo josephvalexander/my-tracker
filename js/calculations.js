@@ -124,21 +124,21 @@ function epsCagr(stock, years = 5) {
 }
 
 /**
- * Earnings consistency score: years out of the last 10 with positive
+ * Earnings consistency score: years out of the last 6 with positive
  * EPS growth vs the prior year. Returns null (render as N/A) if fewer
- * than 10 years of history exist, per the spec.
+ * than 6 years of history exist, per the spec.
  */
 function earningsConsistencyScore(stock) {
   const annual = stock?.fundamentals?.annual;
   if (!annual) return null;
   const eps = epsHistory(annual);
-  if (eps.length < 11) return null; // need 10 YoY comparisons = 11 data points
-  const last11 = lastN(eps, 11);
+  if (eps.length < 7) return null; // need 6 YoY comparisons = 7 data points
+  const last7 = lastN(eps, 7);
   let positiveYears = 0;
-  for (let i = 1; i < last11.length; i++) {
-    if (last11[i] > last11[i - 1]) positiveYears++;
+  for (let i = 1; i < last7.length; i++) {
+    if (last7[i] > last7[i - 1]) positiveYears++;
   }
-  return positiveYears; // out of 10
+  return positiveYears; // out of 6
 }
 
 /** Cash EPS gap = OCF per share minus reported EPS, most recent valid year. */
@@ -444,7 +444,7 @@ const DEFAULT_RULES = {
   roce: { green: 15, yellow: 10, direction: "higherIsBetter" },
   de: { green: 0.1, yellow: 0.2, direction: "lowerIsBetter" },
   epsCagr: { green: 12, yellow: 6, direction: "higherIsBetter" },
-  earningsConsistency: { green: 8, yellow: 6, direction: "higherIsBetter" },
+  earningsConsistency: { green: 5, yellow: 4, direction: "higherIsBetter" },
   promoterHolding: { green: 50, yellow: 40, direction: "higherIsBetter" },
   promoterPledging: { green: 0, yellow: 0.01, direction: "lowerIsBetter" }, // any pledging = red
   retainedEarningsRatio: { green: 1.0, yellow: 0.6, direction: "higherIsBetter" },
@@ -486,7 +486,7 @@ function deriveVerdict(stock) {
     checks.push({ label: pass ? "No pledging" : `${pledging}% pledged`, pass });
     if (!pass) hardFlags.push("pledgingAboveZero");
   } else {
-    checks.push({ label: "Pledging — not checked, no NSE data yet", pass: null });
+    checks.push({ label: "Pledging — not in indianapi data, check manually", pass: null });
   }
   if (promoterHistory.length >= 2) {
     checks.push({ label: promoterDeclining ? "Promoter holding declining" : "Promoter holding stable/rising", pass: !promoterDeclining });
@@ -497,7 +497,7 @@ function deriveVerdict(stock) {
 
   const softFlags = [];
   if (cagr !== null && cagr < 12) softFlags.push("epsCagrBelow12");
-  if (consistency !== null && consistency < 8) softFlags.push("consistencyBelow8");
+  if (consistency !== null && consistency < 5) softFlags.push("consistencyBelow5");
   if (rer !== null && rer < 1.0) softFlags.push("rerBelow1");
 
   let verdict = "Yes";

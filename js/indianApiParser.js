@@ -150,11 +150,15 @@ function parseIndianApiResponse(data) {
   const corporateActions = parseCorporateActions(data.stockCorporateActionData);
 
   // ── Price context
+  const reusable = data.stockDetailsReusableData ?? {};
+  const peTTM = parseFloat(reusable.pPerEBasicExcludingExtraordinaryItemsTTM) || null;
+
   const priceContext = {
     source: "indianapi",
     lastUpdated: new Date().toISOString().slice(0, 10),
     week52High: parseFloat(data.yearHigh) || null,
     week52Low: parseFloat(data.yearLow) || null,
+    peTTM,
   };
 
   // Current price — prefer NSE

@@ -72,9 +72,11 @@ const watchlistScreen = {
         <div class="screen-header">
           <div class="screen-title">My watchlist <span id="watchlist-count" class="muted"></span></div>
           <div class="header-actions">
+            <button id="refresh-prices-btn" class="btn btn-small">↻ Prices</button>
             <button id="add-stock-btn" class="btn btn-small">+ Add</button>
           </div>
         </div>
+        <div id="refresh-progress" class="muted" style="font-size:11px; min-height:16px; margin-bottom:4px;"></div>
         <div id="drive-status-line" class="drive-status-line"></div>
         <div id="watchlist-list" class="stock-list">
           <div class="loading">Loading...</div>
@@ -104,7 +106,7 @@ const watchlistScreen = {
 
     listEl.querySelectorAll(".stock-row").forEach((row) => {
       row.addEventListener("click", (e) => {
-        if (e.target.closest(".row-menu-btn")) return; // don't navigate when the menu button itself was clicked
+        if (e.target.closest(".row-menu-btn")) return;
         window.location.hash = `#stock/${row.dataset.ticker}`;
       });
     });
@@ -123,6 +125,70 @@ const watchlistScreen = {
 
     document.getElementById("add-stock-btn").addEventListener("click", () => {
       window.location.hash = "#addStock";
+    });
+
+    // ── Batch price refresh ──────────────────────────────────────────
+    document.getElementById("refresh-prices-btn").addEventListener("click", async () => {
+      if (stocks.length === 0) return;
+      const btn = document.getElementById("refresh-prices-btn");
+      const progressEl = document.getElementById("refresh-progress");
+      btn.disabled = true;
+
+      let updated = 0;
+      let failed = 0;
+
+      for (const stock of stocks) {
+        progressEl.textContent = `Fetching ${stock.ticker}… (${updated + failed + 1}/${stocks.length})`;
+
+        try {
+          const result = await refreshStockFromNse(stock.ticker);
+          if (result.quoteInfo) {
+            const fresh = await StockStore.get(stock.ticker);
+            const today = new Date().toISOString().slice(0, 10);
+
+            fresh.fundamentals = fresh.fundamentals || {};
+            if (result.quoteInfo.currentPrice) fresh.fundamentals.currentPrice = result.quoteInfo.currentPrice;
+            if (result.quoteInfo.marketCap) fresh.fundamentals.marketCap = result.quoteInfo.marketCap;
+
+            fresh.priceContext = fresh.priceContext || {};
+            fresh.priceContext.source = result.quoteInfo.source;
+            fresh.priceContext.lastUpdated = today;
+            if (result.quoteInfo.week52High) fresh.priceContext.week52High = result.quoteInfo.week52High;
+            if (result.quoteInfo.week52Low)  fresh.priceContext.week52Low  = result.quoteInfo.week52Low;
+            if (result.quoteInfo.todayLow)   fresh.priceContext.todayLow   = result.quoteInfo.todayLow;
+            if (result.quoteInfo.todayHigh)  fresh.priceContext.todayHigh  = result.quoteInfo.todayHigh;
+            if (result.quoteInfo.previousClose) fresh.priceContext.previousClose = result.quoteInfo.previousClose;
+
+            // Recalculate derived market cap if YF didn't return one
+            if (!result.quoteInfo.marketCap) {
+              const derived = calculateMarketCap(fresh);
+              if (derived) fresh.fundamentals.marketCap = derived;
+            }
+
+            await StockStore.set(stock.ticker, fresh);
+
+            // Update the price cell in the list in-place without a full re-render
+            const priceMain = document.querySelector(`.stock-row[data-ticker="${stock.ticker}"] .price-main`);
+            if (priceMain) {
+              priceMain.textContent = formatCurrency(result.quoteInfo.currentPrice);
+            }
+            updated++;
+          } else {
+            failed++;
+          }
+        } catch {
+          failed++;
+        }
+      }
+
+      const summary = failed === 0
+        ? `✓ All ${updated} prices updated`
+        : `✓ ${updated} updated · ${failed} failed`;
+      progressEl.textContent = summary;
+      btn.disabled = false;
+
+      // Clear the progress message after 5 seconds
+      setTimeout(() => { progressEl.textContent = ""; }, 5000);
     });
   },
 };

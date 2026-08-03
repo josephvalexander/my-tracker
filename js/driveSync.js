@@ -29,7 +29,7 @@
  * 3. Enable the Google Drive API on that same Cloud project.
  */
 
-const DRIVE_CLIENT_ID = "REPLACE_WITH_YOUR_OAUTH_CLIENT_ID.apps.googleusercontent.com";
+const DRIVE_CLIENT_ID = "1049661262939-skq9h5qaucoqc0bf7ojqe6nuugut7so4.apps.googleusercontent.com";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
 const DRIVE_API_BASE = "https://www.googleapis.com/drive/v3";
 const DRIVE_UPLOAD_BASE = "https://www.googleapis.com/upload/drive/v3";
