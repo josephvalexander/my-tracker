@@ -78,31 +78,17 @@ async function callGemini(apiKey, prompt, withSearch) {
  * grounding enabled (surfaced by Gemini as a 400 mentioning the tool).
  */
 /**
- * Shared request logic: sends a prompt with search grounding, retries
- * with exponential backoff on rate limit (15 RPM free tier means bursting
- * 3 sequential calls can easily hit the per-minute cap), falls back to
- * non-grounded if the key lacks grounding, and extracts text + cited
- * sources from the response.
- * Used by both draftQualitativeField (free text) and draftShareholding
- * (structured JSON) below — they differ only in the prompt and how
- * the returned text gets parsed afterward.
+ * Shared request logic: single Gemini call with search grounding.
+ * No retry — if rate limited (429) the caller sees an immediate clear
+ * error and the user can try again when ready. Falls back to
+ * non-grounded if the key doesn't have grounding enabled.
  */
 async function runGroundedPrompt(apiKey, prompt) {
-  // 8s → 20s → 65s — the 65s clears the full 60-second RPM window
-  const RETRY_DELAYS = [8000, 20000, 65000];
-  let res;
-
-  for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
-    res = await callGemini(apiKey, prompt, true);
-    if (res.status !== 429) break;
-    if (attempt < RETRY_DELAYS.length) {
-      await new Promise((r) => setTimeout(r, RETRY_DELAYS[attempt]));
-    }
-  }
+  let res = await callGemini(apiKey, prompt, true);
 
   if (res.status === 429) {
     throw new GeminiError(
-      "Gemini rate limit hit — too many requests in one minute. Wait a moment and try again.",
+      "Rate limit hit (429) — Gemini free tier allows 15 requests/min. Wait a minute and try again.",
       429
     );
   }

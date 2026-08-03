@@ -211,6 +211,7 @@ function parseIndianApiResponse(data) {
   return {
     stockFundamentals,
     companyName: data.companyName || null,
+    sector: data.industry || null,
     shareholding: shareholdingHistory,
     priceContext,
     corporateActions,

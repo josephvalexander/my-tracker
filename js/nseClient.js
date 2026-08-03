@@ -57,8 +57,10 @@ async function fetchYfQuoteInfo(symbol) {
     marketCap: data.marketCap ?? null, // in ₹ Cr
     week52High: data.week52High ?? null,
     week52Low: data.week52Low ?? null,
-    todayLow: null,   // not in YF chart endpoint
+    todayLow: null,
     todayHigh: null,
+    sector: data.sector ?? null,
+    industry: data.industry ?? null,
     fetchedAt: data.fetchedAt ?? null,
     source: "yahoo_finance",
   };

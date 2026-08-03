@@ -156,6 +156,7 @@ const watchlistScreen = {
             fresh.fundamentals = fresh.fundamentals || {};
             if (result.quoteInfo.currentPrice) fresh.fundamentals.currentPrice = result.quoteInfo.currentPrice;
             if (result.quoteInfo.marketCap) fresh.fundamentals.marketCap = result.quoteInfo.marketCap;
+            if (result.quoteInfo.sector && !fresh.sector) fresh.sector = result.quoteInfo.sector;
 
             fresh.priceContext = fresh.priceContext || {};
             fresh.priceContext.source = result.quoteInfo.source;

@@ -52,6 +52,9 @@ async function applyIndianApiResult(ticker, parsed) {
   if (parsed.companyName && (!stock.name || stock.name === ticker)) {
     stock.name = parsed.companyName;
   }
+  if (parsed.sector && !stock.sector) {
+    stock.sector = parsed.sector;
+  }
 
   // Shareholding — merge with existing if already has pledging data from AI draft
   stock.shareholding = {

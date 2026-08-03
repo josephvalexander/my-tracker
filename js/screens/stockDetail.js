@@ -93,32 +93,39 @@ function priceContextStrip(stock) {
 }
 
 function nseRefreshSection(stock) {
-  const latestShareholding = stock.shareholding?.history?.slice(-1)?.[0] ?? null;
   const lastFetched = stock.priceContext?.lastUpdated;
   const fundamentalsDate = stock.fundamentals?.lastUpdated;
   const daysSinceFundamentals = fundamentalsDate
     ? Math.floor((Date.now() - new Date(fundamentalsDate)) / 86400000)
     : null;
   const fundamentalsStale = daysSinceFundamentals === null || daysSinceFundamentals > 30;
+  const hasQualitative = stock.qualitative?.business;
 
   return `
     <div class="card nse-refresh-card">
-      <div class="nse-refresh-top">
-        <div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start;">
+
+        <div style="flex:1; min-width:0;">
           <div class="nse-refresh-title">Live price</div>
-          <div class="muted" style="font-size:11px;">Yahoo Finance (primary) · BSE (fallback) · ${lastFetched ? `price last updated ${lastFetched}` : "not fetched yet"}</div>
+          <div class="muted" style="font-size:11px; margin-bottom:6px;">Yahoo Finance · ${lastFetched ? `updated ${lastFetched}` : "not fetched yet"}</div>
+          <button id="nse-fetch-btn" class="btn btn-small btn-primary-outline">↻ Fetch live price</button>
+          <div id="nse-fetch-status" class="muted" style="font-size:11px; margin-top:4px;"></div>
         </div>
+
+        <div style="flex:1; min-width:0; padding-left:12px; border-left:0.5px solid var(--color-border);">
+          <div class="nse-refresh-title">Fundamentals</div>
+          <div class="muted" style="font-size:11px; margin-bottom:6px;">indianapi.in · ${fundamentalsDate ? `updated ${fundamentalsDate}` : "not fetched yet"}${fundamentalsStale ? " · <span style='color:var(--color-warning)'>stale</span>" : ""}</div>
+          <button id="indianapi-refresh-btn" class="btn btn-small ${fundamentalsStale ? "btn-primary-outline" : ""}">↻ Refresh fundamentals</button>
+          <div id="indianapi-refresh-status" class="muted" style="font-size:11px; margin-top:4px;"></div>
+        </div>
+
       </div>
-      <button id="nse-fetch-btn" class="btn btn-small btn-primary-outline" style="margin-top:8px;">Fetch live price</button>
-      <div id="nse-fetch-status"></div>
 
       <div style="margin-top:12px; padding-top:12px; border-top:0.5px solid var(--color-border);">
-        <div class="nse-refresh-title">Fundamentals &amp; shareholding</div>
-        <div class="muted" style="font-size:11px;">indianapi.in · ${fundamentalsDate ? `last updated ${fundamentalsDate}` : "not fetched yet"} ${fundamentalsStale ? "· <span style='color:var(--color-warning)'>⚠ stale — refresh recommended</span>" : ""}</div>
-        <button id="indianapi-refresh-btn" class="btn btn-small ${fundamentalsStale ? "btn-primary-outline" : ""}" style="margin-top:8px;">
-          ${fundamentalsStale ? "Refresh fundamentals" : "Refresh fundamentals (up to date)"}
-        </button>
-        <div id="indianapi-refresh-status" class="muted" style="font-size:11px;"></div>
+        <div class="nse-refresh-title">Business · Moat · Market position</div>
+        <div class="muted" style="font-size:11px; margin-bottom:6px;">Gemini AI with web search · ${hasQualitative ? "drafted — edit on the edit screen" : "not yet drafted"}</div>
+        <button id="ai-qualitative-btn" class="btn btn-small">✨ Fetch business / competitive data</button>
+        <div id="ai-qualitative-status" class="muted" style="font-size:11px; margin-top:4px;"></div>
       </div>
     </div>`;
 }
@@ -162,16 +169,16 @@ const stockDetailScreen = {
         ${nseRefreshSection(stock)}
         ${verdictBanner(verdict)}
 
-        <div class="section-label">Business <span class="section-label-note">(manual — no free source gives this)</span></div>
+        <div class="section-label">Business <span class="section-label-note">(AI-drafted or manual — edit on the edit screen)</span></div>
         <div class="card">${stock.qualitative?.business || '<span class="muted">Not set yet — add this from the edit screen.</span>'}</div>
 
-        <div class="section-label">Competitive advantage <span class="section-label-note">(manual)</span></div>
+        <div class="section-label">Competitive advantage <span class="section-label-note">(AI-drafted or manual)</span></div>
         <div class="card">
           ${stock.qualitative?.moatDescription || '<span class="muted">Not set yet.</span>'}
           <div class="tag-row">${(stock.qualitative?.moatTags || []).map((t) => `<span class="tag">${t.replace(/_/g, " ")}</span>`).join("")}</div>
         </div>
 
-        <div class="section-label">Market position <span class="section-label-note">(manual)</span></div>
+        <div class="section-label">Market position <span class="section-label-note">(AI-drafted or manual)</span></div>
         <div class="card">${stock.qualitative?.marketPosition || '<span class="muted">Not set yet.</span>'}</div>
 
         <div class="section-label">Profitability & capital efficiency</div>
@@ -274,6 +281,34 @@ const stockDetailScreen = {
       });
     }
 
+    const aiQualitativeBtn = document.getElementById("ai-qualitative-btn");
+    if (aiQualitativeBtn) {
+      aiQualitativeBtn.addEventListener("click", async () => {
+        const statusEl = document.getElementById("ai-qualitative-status");
+        const settings = await MetaStore.getSettings();
+        if (!settings?.geminiApiKey) {
+          statusEl.textContent = "Add a Gemini API key in Settings first.";
+          return;
+        }
+        statusEl.textContent = "Fetching from Gemini...";
+        aiQualitativeBtn.disabled = true;
+        try {
+          const stock = await StockStore.get(ticker);
+          const result = await draftAllQualitative(settings.geminiApiKey, stock);
+          stock.qualitative = stock.qualitative || {};
+          stock.qualitative.business = result.business;
+          stock.qualitative.moatDescription = result.moat;
+          stock.qualitative.marketPosition = result.marketPosition;
+          await StockStore.set(ticker, stock);
+          statusEl.textContent = "✓ Drafted — review below or edit on the edit screen.";
+          setTimeout(() => navigate(`#stock/${ticker}`), 800);
+        } catch (err) {
+          statusEl.textContent = `⚠ ${err.message}`;
+        }
+        aiQualitativeBtn.disabled = false;
+      });
+    }
+
     const fetchBtn = document.getElementById("nse-fetch-btn");
     if (fetchBtn) {
       fetchBtn.addEventListener("click", async () => {
@@ -290,6 +325,7 @@ const stockDetailScreen = {
           if (result.quoteInfo.currentPrice) stock.fundamentals.currentPrice = result.quoteInfo.currentPrice;
           if (result.quoteInfo.marketCap) stock.fundamentals.marketCap = result.quoteInfo.marketCap;
           if (result.quoteInfo.name && (!stock.name || stock.name === stock.ticker)) stock.name = result.quoteInfo.name;
+          if (result.quoteInfo.sector && !stock.sector) stock.sector = result.quoteInfo.sector;
 
           // Spread existing priceContext FIRST so fields set by indianapi
           // (peTTM, week52High/Low from the fundamentals fetch) are preserved.
