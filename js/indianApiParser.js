@@ -153,7 +153,23 @@ function parseIndianApiResponse(data) {
   // since it's confirmed to have price, yhigh, ylow, marketCap, peTTM
   // all in clean numeric form (confirmed from real Tata Steel response)
   const reusable = data.stockDetailsReusableData ?? {};
-  const peTTM = parseFloat(reusable.pPerEBasicExcludingExtraordinaryItemsTTM) || null;
+  const peTTMfromField = parseFloat(reusable.pPerEBasicExcludingExtraordinaryItemsTTM) || null;
+
+  // Prefer deriving P/E ourselves from price ÷ TTM EPS, since the
+  // pre-computed field sometimes uses full-year annual EPS rather than
+  // a genuine rolling 4-quarter TTM (confirmed discrepancy on eClerx:
+  // field gives 18.4 while market consensus is ~25.6 at the same price).
+  // ePSBasicExcludingExtraordinaryItemsItrailing12Month is the genuine
+  // rolling TTM EPS, confirmed present in real data at 8.85 for Tata Steel.
+  const epsTTM = getMetric(data.keyMetrics, "ePSBasicExcludingExtraordinaryItemsItrailing12Month")
+    || getMetric(data.keyMetrics, "ePSIncludingExtraOrdinaryItemsTrailing12Month");
+  const priceForPE = parseFloat(reusable.price) || null;
+  const peTTMderived = (epsTTM && priceForPE && epsTTM > 0)
+    ? parseFloat((priceForPE / epsTTM).toFixed(2))
+    : null;
+
+  // Use derived (rolling TTM) if available; fall back to field value
+  const peTTM = peTTMderived ?? peTTMfromField;
 
   // 52-week: prefer reusable.yhigh/ylow over data.yearHigh/yearLow
   const week52High = parseFloat(reusable.yhigh) || parseFloat(data.yearHigh) || null;
