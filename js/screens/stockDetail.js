@@ -265,14 +265,21 @@ const stockDetailScreen = {
           if (result.quoteInfo.currentPrice) stock.fundamentals.currentPrice = result.quoteInfo.currentPrice;
           if (result.quoteInfo.marketCap) stock.fundamentals.marketCap = result.quoteInfo.marketCap;
           if (result.quoteInfo.name && (!stock.name || stock.name === stock.ticker)) stock.name = result.quoteInfo.name;
-          stock.priceContext = stock.priceContext || {};
-          stock.priceContext.source = result.quoteInfo.source === "bse" ? "bse_live" : "yahoo_finance";
-          stock.priceContext.lastUpdated = today;
-          if (result.quoteInfo.week52High) stock.priceContext.week52High = result.quoteInfo.week52High;
-          if (result.quoteInfo.week52Low) stock.priceContext.week52Low = result.quoteInfo.week52Low;
-          if (result.quoteInfo.todayLow) stock.priceContext.todayLow = result.quoteInfo.todayLow;
-          if (result.quoteInfo.todayHigh) stock.priceContext.todayHigh = result.quoteInfo.todayHigh;
-          if (result.quoteInfo.previousClose) stock.priceContext.previousClose = result.quoteInfo.previousClose;
+
+          // Spread existing priceContext FIRST so fields set by indianapi
+          // (peTTM, week52High/Low from the fundamentals fetch) are preserved.
+          // Previously this block rebuilt priceContext from scratch and silently
+          // dropped peTTM every time "Fetch live price" was clicked.
+          stock.priceContext = {
+            ...stock.priceContext,
+            source: result.quoteInfo.source === "bse" ? "bse_live" : "yahoo_finance",
+            lastUpdated: today,
+            ...(result.quoteInfo.week52High && { week52High: result.quoteInfo.week52High }),
+            ...(result.quoteInfo.week52Low  && { week52Low:  result.quoteInfo.week52Low  }),
+            ...(result.quoteInfo.todayLow   && { todayLow:   result.quoteInfo.todayLow   }),
+            ...(result.quoteInfo.todayHigh  && { todayHigh:  result.quoteInfo.todayHigh  }),
+            ...(result.quoteInfo.previousClose && { previousClose: result.quoteInfo.previousClose }),
+          };
           const derivedMarketCap = calculateMarketCap(stock);
           if (derivedMarketCap) stock.fundamentals.marketCap = derivedMarketCap;
         }

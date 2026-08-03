@@ -51,6 +51,7 @@ const watchlistScreen = {
         <div class="screen-header">
           <div class="screen-title">My watchlist <span id="watchlist-count" class="muted"></span></div>
           <div class="header-actions">
+            <button id="drive-push-btn" class="btn btn-small" style="display:none;" title="Save to Drive">↑ Drive</button>
             <button id="refresh-prices-btn" class="btn btn-small">↻ Prices</button>
             <button id="add-stock-btn" class="btn btn-small">+ Add</button>
           </div>
@@ -70,8 +71,35 @@ const watchlistScreen = {
 
     const settings = await MetaStore.getSettings();
     const driveLine = document.getElementById("drive-status-line");
+    const drivePushBtn = document.getElementById("drive-push-btn");
+
     if (settings?.driveConnected) {
-      driveLine.innerHTML = `<i>Drive connected · last synced ${settings.lastSyncPush ? new Date(settings.lastSyncPush).toLocaleDateString("en-IN") : "never pushed"}</i> <a href="#settings">Manage</a>`;
+      driveLine.innerHTML = `<i>Drive connected · last pushed ${settings.lastSyncPush ? new Date(settings.lastSyncPush).toLocaleDateString("en-IN") : "never"}</i> <a href="#settings">Manage</a>`;
+      drivePushBtn.style.display = "";
+
+      drivePushBtn.addEventListener("click", async () => {
+        const progressEl = document.getElementById("refresh-progress");
+        drivePushBtn.disabled = true;
+        progressEl.textContent = "Saving to Drive...";
+        try {
+          const token = await getAccessToken({ silentOnly: true });
+          if (!token) {
+            progressEl.textContent = "⚠ Drive session expired — go to Settings → Sync now to refresh.";
+            drivePushBtn.disabled = false;
+            return;
+          }
+          const localData = await exportAll();
+          await pushToDrive(token, localData);
+          settings.lastSyncPush = new Date().toISOString();
+          await MetaStore.setSettings(settings);
+          driveLine.innerHTML = `<i>Drive connected · last pushed just now</i> <a href="#settings">Manage</a>`;
+          progressEl.textContent = "✓ Saved to Drive";
+          setTimeout(() => { progressEl.textContent = ""; }, 3000);
+        } catch (err) {
+          progressEl.textContent = `⚠ Drive push failed: ${err.message}`;
+        }
+        drivePushBtn.disabled = false;
+      });
     } else {
       driveLine.innerHTML = `<i>Working from local data only</i> <a href="#settings">Connect Drive</a>`;
     }
