@@ -35,6 +35,13 @@ const settingsScreen = {
           <button id="save-thresholds-btn" class="btn btn-small">Save</button>
         </div>
 
+        <div class="section-label">Data APIs</div>
+        <div class="card">
+          <div class="muted" style="margin-bottom:8px; font-size:11px;"><strong>indianapi.in</strong> — provides fundamentals, shareholding, corporate actions, and live price for Indian stocks. Free tier: 500 requests/month. Sign up at <a href="https://indianapi.in" target="_blank">indianapi.in</a>, subscribe to the free/hobby plan, copy the API key from your dashboard.</div>
+          <input type="password" id="indian-api-key-input" placeholder="Paste your indianapi.in API key" />
+          <button id="save-indian-api-key-btn" class="btn btn-small" style="margin-top:8px;">Save key</button>
+        </div>
+
         <div class="section-label">AI draft assist</div>
         <div class="card">
           <div class="muted" style="margin-bottom:8px; font-size:11px;">Used by "Draft with AI" buttons on each stock's edit screen, for the business/moat/market-position fields. Get a free key from <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a>. Stored only on this device — never committed to your repo, never sent anywhere except Google's API.</div>
@@ -158,7 +165,14 @@ const settingsScreen = {
 
     document.getElementById("de-green-input").value = settings.deRule.green;
     document.getElementById("de-yellow-input").value = settings.deRule.yellow;
+    document.getElementById("indian-api-key-input").value = settings.indianApiKey || "";
     document.getElementById("gemini-key-input").value = settings.geminiApiKey || "";
+
+    document.getElementById("save-indian-api-key-btn").addEventListener("click", async () => {
+      settings.indianApiKey = document.getElementById("indian-api-key-input").value.trim();
+      await MetaStore.setSettings(settings);
+      alert(settings.indianApiKey ? "indianapi.in key saved." : "indianapi.in key cleared.");
+    });
 
     document.getElementById("save-gemini-key-btn").addEventListener("click", async () => {
       settings.geminiApiKey = document.getElementById("gemini-key-input").value.trim();

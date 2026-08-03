@@ -104,18 +104,33 @@ function entryZoneSection(stock) {
 function nseRefreshSection(stock) {
   const latestShareholding = stock.shareholding?.history?.slice(-1)?.[0] ?? null;
   const lastFetched = stock.priceContext?.lastUpdated;
+  const fundamentalsDate = stock.fundamentals?.lastUpdated;
+  const daysSinceFundamentals = fundamentalsDate
+    ? Math.floor((Date.now() - new Date(fundamentalsDate)) / 86400000)
+    : null;
+  const fundamentalsStale = daysSinceFundamentals === null || daysSinceFundamentals > 30;
+
   return `
     <div class="card nse-refresh-card">
       <div class="nse-refresh-top">
         <div>
-          <div class="nse-refresh-title">Price & shareholding data</div>
-          <div class="muted" style="font-size:11px;">Live price via BSE (NSE blocks this app's requests) · ${lastFetched ? `last updated ${lastFetched}` : "not fetched yet"}</div>
+          <div class="nse-refresh-title">Live price</div>
+          <div class="muted" style="font-size:11px;">Yahoo Finance (primary) · BSE (fallback) · ${lastFetched ? `price last updated ${lastFetched}` : "not fetched yet"}</div>
         </div>
       </div>
-      <button id="nse-fetch-btn" class="btn btn-small btn-primary-outline" style="margin-top:8px;">Fetch live data</button>
+      <button id="nse-fetch-btn" class="btn btn-small btn-primary-outline" style="margin-top:8px;">Fetch live price</button>
       <div id="nse-fetch-status"></div>
 
-      <button id="manual-nse-toggle-btn" class="btn btn-small" style="margin-top:10px;">Enter manually instead</button>
+      <div style="margin-top:12px; padding-top:12px; border-top:0.5px solid var(--color-border);">
+        <div class="nse-refresh-title">Fundamentals &amp; shareholding</div>
+        <div class="muted" style="font-size:11px;">indianapi.in · ${fundamentalsDate ? `last updated ${fundamentalsDate}` : "not fetched yet"} ${fundamentalsStale ? "· <span style='color:var(--color-warning)'>⚠ stale — refresh recommended</span>" : ""}</div>
+        <button id="indianapi-refresh-btn" class="btn btn-small ${fundamentalsStale ? "btn-primary-outline" : ""}" style="margin-top:8px;">
+          ${fundamentalsStale ? "Refresh fundamentals" : "Refresh fundamentals (up to date)"}
+        </button>
+        <div id="indianapi-refresh-status" class="muted" style="font-size:11px;"></div>
+      </div>
+
+      <button id="manual-nse-toggle-btn" class="btn btn-small" style="margin-top:10px;">Enter price manually instead</button>
 
       <div id="manual-nse-form" style="display:none; margin-top:10px;">
         <div class="hint-box" style="margin-bottom:10px;">Fallback if the live fetch above fails or comes back wrong — find these on Screener's company page or NSE's site directly.</div>
@@ -263,9 +278,33 @@ const stockDetailScreen = {
       });
     }
 
+    const indianapiRefreshBtn = document.getElementById("indianapi-refresh-btn");
+    if (indianapiRefreshBtn) {
+      indianapiRefreshBtn.addEventListener("click", async () => {
+        const statusEl = document.getElementById("indianapi-refresh-status");
+        const settings = await MetaStore.getSettings();
+        if (!settings?.indianApiKey) {
+          statusEl.textContent = "Add your indianapi.in key in Settings first.";
+          return;
+        }
+        statusEl.textContent = "Fetching from indianapi.in...";
+        indianapiRefreshBtn.disabled = true;
+        try {
+          const stock = await StockStore.get(ticker);
+          const searchName = stock.name && stock.name !== ticker ? stock.name : ticker;
+          const parsed = await fetchIndianApiData(searchName, settings.indianApiKey);
+          await applyIndianApiResult(ticker, parsed);
+          statusEl.textContent = "✓ Updated — refreshing page...";
+          setTimeout(() => navigate(`#stock/${ticker}`), 800);
+        } catch (err) {
+          statusEl.textContent = `⚠ Refresh failed: ${err.message}`;
+          indianapiRefreshBtn.disabled = false;
+        }
+      });
+    }
+
     const aiShareholdingBtn = document.getElementById("ai-draft-shareholding-btn");
-    if (aiShareholdingBtn) {
-      aiShareholdingBtn.addEventListener("click", async () => {
+    if (aiShareholdingBtn) {      aiShareholdingBtn.addEventListener("click", async () => {
         const statusEl = document.getElementById("shareholding-ai-status");
         const sourcesEl = document.getElementById("shareholding-ai-sources");
         const settings = await MetaStore.getSettings();
