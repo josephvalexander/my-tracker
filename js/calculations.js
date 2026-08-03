@@ -180,30 +180,46 @@ function shareCountTrend(stock, years = 5) {
  * outstanding for that year as a proxy, since most Screener exports
  * carry a per-year closing price already.
  */
-function retainedEarningsRatio(stock, years = 10) {
+/**
+ * Buffett retained earnings ratio — for every ₹1 retained over the
+ * measurement period, how much did book equity grow?
+ *
+ * Original formula used market cap change (requires priceAtYearEnd),
+ * which indianapi doesn't provide. This version uses total equity
+ * (book value) as the base instead — labelled "book value basis" in
+ * the UI to be clear it's not the full market-cap version.
+ *
+ * Returns null if we don't have enough data.
+ */
+function retainedEarningsRatio(stock, years = 6) {
   const annual = stock?.fundamentals?.annual;
-  if (!annual?.priceAtYearEnd?.length || !annual?.netProfit?.length || !annual?.sharesOutstandingHistory?.length) return null;
+  if (!annual?.netProfit?.length || !annual?.equityShareCapital?.length) return null;
+
   const n = Math.min(years, annual.netProfit.length - 1);
   if (n < 2) return null;
 
-  const startIdx = annual.netProfit.length - 1 - n;
-  const endIdx = annual.netProfit.length - 1;
+  const len = annual.netProfit.length;
+  const startIdx = len - 1 - n;
+  const endIdx = len - 1;
 
+  // Total retained = sum of (net profit - dividends paid) over the period
   let totalRetained = 0;
   for (let i = startIdx + 1; i <= endIdx; i++) {
-    const dividend = annual.dividendAmount?.[i] ?? 0;
-    totalRetained += annual.netProfit[i] - dividend;
+    const np = annual.netProfit[i] ?? 0;
+    const div = annual.dividendPaid?.[i] ?? annual.dividendAmount?.[i] ?? 0;
+    totalRetained += np - Math.abs(div); // dividendPaid may be negative in cash flow
   }
+  if (totalRetained <= 0) return null; // undefined if company consumed capital
 
-  const startMarketCap =
-    annual.priceAtYearEnd[startIdx] * annual.sharesOutstandingHistory[startIdx];
-  const endMarketCap =
-    annual.priceAtYearEnd[endIdx] * annual.sharesOutstandingHistory[endIdx];
-  if (!Number.isFinite(startMarketCap) || !Number.isFinite(endMarketCap)) return null;
-  const marketCapIncrease = (endMarketCap - startMarketCap) / RUPEES_PER_CRORE;
+  // Book equity change as proxy for value creation
+  const startEquity = annual.equityShareCapital[startIdx];
+  const endEquity = annual.equityShareCapital[endIdx];
+  if (!startEquity || !endEquity) return null;
 
-  if (marketCapIncrease <= 0) return null; // ratio undefined/meaningless if market cap fell
-  return totalRetained / marketCapIncrease;
+  const equityIncrease = endEquity - startEquity;
+  if (equityIncrease <= 0) return null;
+
+  return totalRetained / equityIncrease;
 }
 
 /**
@@ -462,11 +478,11 @@ function deriveVerdict(stock) {
   const cagr = epsCagr(stock);
   const consistency = earningsConsistencyScore(stock);
   const rer = retainedEarningsRatio(stock);
-  const pledging = stock?.shareholding?.history?.slice(-1)?.[0]?.pledged ?? null;
+  // Pledging not available from indianapi — omitted from verdict checks.
   const promoterHistory = stock?.shareholding?.history?.map((h) => h.promoter) ?? [];
   const promoterDeclining =
     promoterHistory.length >= 2 &&
-    promoterHistory[promoterHistory.length - 1] < promoterHistory[0] - 1; // >1pt drop
+    promoterHistory[promoterHistory.length - 1] < promoterHistory[0] - 1;
 
   const hardFlags = [];
   const checks = [];
@@ -481,18 +497,11 @@ function deriveVerdict(stock) {
     checks.push({ label: `D/E ${de.toFixed(2)} ${pass ? "≤" : ">"} 0.2`, pass });
     if (!pass) hardFlags.push("deAbove02");
   }
-  if (pledging !== null) {
-    const pass = pledging === 0;
-    checks.push({ label: pass ? "No pledging" : `${pledging}% pledged`, pass });
-    if (!pass) hardFlags.push("pledgingAboveZero");
-  } else {
-    checks.push({ label: "Pledging — not in indianapi data, check manually", pass: null });
-  }
   if (promoterHistory.length >= 2) {
     checks.push({ label: promoterDeclining ? "Promoter holding declining" : "Promoter holding stable/rising", pass: !promoterDeclining });
     if (promoterDeclining) hardFlags.push("promoterHoldingDeclining");
   } else {
-    checks.push({ label: "Promoter trend — not checked, needs 2+ quarters of NSE data", pass: null });
+    checks.push({ label: "Promoter trend — needs 2+ quarters of data", pass: null });
   }
 
   const softFlags = [];

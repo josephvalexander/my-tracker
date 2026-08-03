@@ -16,30 +16,11 @@ function metricChip(label, value, formatted, colorClass) {
     </div>`;
 }
 
-function entryZoneBanner(stock) {
-  const status = entryZoneStatus(stock);
-  if (!status) {
-    return `<div class="zone-banner zone-neutral"><span>No target price set — add an intrinsic value estimate or set a target manually</span></div>`;
-  }
-  const targetLabel = status.isDefaulted
-    ? `suggested target ₹${Math.round(status.target).toLocaleString("en-IN")} (15% below IV)`
-    : `target ₹${Math.round(status.target).toLocaleString("en-IN")}`;
-  if (status.inZone) {
-    return `<div class="zone-banner zone-good">
-      <span>In entry zone — ${targetLabel}, now ${Math.abs(status.pctFromTarget).toFixed(0)}% below</span>
-    </div>`;
-  }
-  return `<div class="zone-banner zone-wait">
-    <span>${status.pctFromTarget.toFixed(0)}% above ${targetLabel} — wait</span>
-  </div>`;
-}
-
 function stockRow(stock) {
   const roe = roe5yAvg(stock);
   const de = debtToEquity(stock);
   const cagr = epsCagr(stock);
   const cmp = stock.fundamentals?.currentPrice ?? null;
-  const iv = stock.intrinsicValue;
 
   const roeColor = colorForMetric(roe, DEFAULT_RULES.roe);
   const deColor = colorForMetric(de, DEFAULT_RULES.de);
@@ -57,11 +38,9 @@ function stockRow(stock) {
         ${metricChip("EPS CAGR", cagr, formatPct(cagr), cagrColor)}
         <div class="stock-price">
           <div class="price-main">${formatCurrency(cmp)}</div>
-          <div class="price-sub">${iv ? `IV ₹${iv.low.toLocaleString("en-IN")}+` : "No IV set"}</div>
         </div>
         <button class="row-menu-btn" data-menu-ticker="${stock.ticker}" aria-label="Row options">&#8942;</button>
       </div>
-      ${entryZoneBanner(stock)}
     </div>`;
 }
 

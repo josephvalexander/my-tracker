@@ -67,39 +67,6 @@ function priceContextStrip(stock) {
     </div>`;
 }
 
-function entryZoneSection(stock) {
-  const status = entryZoneStatus(stock);
-  const iv = stock.intrinsicValue;
-
-  const ivBanner = iv
-    ? `<div class="iv-banner">
-        <span>Intrinsic value (${iv.method || "manual"})</span>
-        <span class="iv-value">₹${Math.round(iv.low).toLocaleString("en-IN")} – ₹${Math.round(iv.high).toLocaleString("en-IN")}</span>
-      </div>`
-    : `<div class="iv-banner iv-banner-empty">
-        <span>No intrinsic value set</span>
-        <button class="btn btn-small" onclick="window.location.hash='#editStock/${stock.ticker}'">Add IV estimate</button>
-      </div>`;
-
-  if (!status) {
-    return `${ivBanner}<div class="zone-banner zone-neutral"><span>No target price set — add an intrinsic value estimate above, or set a target manually</span></div>`;
-  }
-
-  const targetLabel = status.isDefaulted
-    ? `suggested target ₹${Math.round(status.target).toLocaleString("en-IN")} (15% below IV)`
-    : `your target ₹${Math.round(status.target).toLocaleString("en-IN")}`;
-  const zoneCls = status.inZone ? "zone-good" : "zone-wait";
-  const zoneText = status.inZone
-    ? `In entry zone — ${targetLabel}, now ${Math.abs(status.pctFromTarget).toFixed(0)}% below`
-    : `${status.pctFromTarget.toFixed(0)}% above ${targetLabel} — wait`;
-
-  return `${ivBanner}
-    <div class="zone-banner ${zoneCls}">
-      <span>${zoneText}</span>
-      <button class="btn btn-small zone-edit-btn" onclick="window.location.hash='#editStock/${stock.ticker}'">${status.isDefaulted ? "Set my own target" : "Edit target"}</button>
-    </div>`;
-}
-
 function nseRefreshSection(stock) {
   const latestShareholding = stock.shareholding?.history?.slice(-1)?.[0] ?? null;
   const lastFetched = stock.priceContext?.lastUpdated;
@@ -208,9 +175,37 @@ const stockDetailScreen = {
 
         <div class="section-label">Corporate actions</div>
         <div class="card">
-          ${(stock.corporateActions?.actions || []).length === 0
-            ? '<span class="muted">None on record. Fetch from NSE or add manually.</span>'
-            : stock.corporateActions.actions.map((a) => `<div class="action-row">${a.type} ${a.ratio || ""} — ${a.date}</div>`).join("")}
+          ${(() => {
+            const ca = stock.corporateActions;
+            const divs = ca?.dividends || [];
+            const splits = ca?.splits || [];
+            const bonus = ca?.bonus || [];
+            const total = divs.length + splits.length + bonus.length;
+            if (total === 0) return '<span class="muted">None on record — will appear after indianapi fetch.</span>';
+            const rows = [];
+            divs.forEach((d) => rows.push(
+              `<div class="action-row">
+                <span class="action-type">Dividend</span>
+                <span>₹${d.amount} ${d.type || ""}</span>
+                <span class="muted">${d.recordDate || d.announced || ""}</span>
+              </div>`
+            ));
+            splits.forEach((s) => rows.push(
+              `<div class="action-row">
+                <span class="action-type">Split</span>
+                <span>${s.ratio || ""}</span>
+                <span class="muted">${s.recordDate || s.announced || ""}</span>
+              </div>`
+            ));
+            bonus.forEach((b) => rows.push(
+              `<div class="action-row">
+                <span class="action-type">Bonus</span>
+                <span>${b.ratio || ""}</span>
+                <span class="muted">${b.recordDate || b.announced || ""}</span>
+              </div>`
+            ));
+            return rows.join("");
+          })()}
         </div>
 
         <div class="detail-tab-row">

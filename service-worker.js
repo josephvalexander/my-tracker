@@ -28,6 +28,7 @@ const APP_SHELL = [
   "./js/screens/stockNotes.js",
   "./js/screens/editStock.js",
   "./js/screens/holdings.js",
+  "./js/screens/addHolding.js",
   "./js/screens/portfolio.js",
   "./js/screens/archived.js",
   "./js/screens/settings.js",

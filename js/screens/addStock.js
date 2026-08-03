@@ -77,21 +77,8 @@ async function applyIndianApiResult(ticker, parsed) {
     lastUpdated: new Date().toISOString().slice(0, 10),
     week52High: parsed.priceContext.week52High,
     week52Low: parsed.priceContext.week52Low,
+    peTTM: parsed.priceContext.peTTM ?? stock.priceContext?.peTTM ?? null,
   };
-
-  // Auto-compute IV from fresh OCF data
-  if (!stock.intrinsicValue || stock.intrinsicValue.method !== "manual") {
-    const defaultIv = calculateDefaultIV(stock);
-    if (defaultIv) {
-      stock.intrinsicValue = {
-        low: defaultIv.low,
-        high: defaultIv.high,
-        method: "dcf_ocf_based",
-        assumptions: defaultIv.assumptions,
-        lastCalculated: new Date().toISOString().slice(0, 10),
-      };
-    }
-  }
 
   await StockStore.set(ticker, stock);
   return stock;
@@ -296,16 +283,10 @@ const addStockScreen = {
       wireUploadZone("screener-dropzone", async (file) => {
         try {
           const buffer = await file.arrayBuffer();
-          const { stockFundamentals, companyName, warnings } = parseScreenerFile(buffer, XLSX);
+          const { stockFundamentals, companyName } = parseScreenerFile(buffer, XLSX);
           const currentStock = await StockStore.get(ticker);
           currentStock.fundamentals = stockFundamentals;
           if (companyName && (!currentStock.name || currentStock.name === ticker)) currentStock.name = companyName;
-          if (!currentStock.intrinsicValue || currentStock.intrinsicValue.method !== "manual") {
-            const defaultIv = calculateDefaultIV(currentStock);
-            if (defaultIv) {
-              currentStock.intrinsicValue = { low: defaultIv.low, high: defaultIv.high, method: "dcf_ocf_based", assumptions: defaultIv.assumptions, lastCalculated: new Date().toISOString().slice(0, 10) };
-            }
-          }
           await StockStore.set(ticker, currentStock);
           document.getElementById("screener-dropzone-status").innerHTML = `<div class="dropzone-success-text">✓ Parsed ${stockFundamentals.annual.years?.length ?? 0} years from ${file.name}</div>`;
         } catch (err) {
