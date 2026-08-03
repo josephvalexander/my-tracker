@@ -149,27 +149,33 @@ function parseIndianApiResponse(data) {
   // ── Corporate actions
   const corporateActions = parseCorporateActions(data.stockCorporateActionData);
 
-  // ── Price context
+  // ── Price context — use stockDetailsReusableData as primary source
+  // since it's confirmed to have price, yhigh, ylow, marketCap, peTTM
+  // all in clean numeric form (confirmed from real Tata Steel response)
   const reusable = data.stockDetailsReusableData ?? {};
   const peTTM = parseFloat(reusable.pPerEBasicExcludingExtraordinaryItemsTTM) || null;
+
+  // 52-week: prefer reusable.yhigh/ylow over data.yearHigh/yearLow
+  const week52High = parseFloat(reusable.yhigh) || parseFloat(data.yearHigh) || null;
+  const week52Low  = parseFloat(reusable.ylow)  || parseFloat(data.yearLow)  || null;
 
   const priceContext = {
     source: "indianapi",
     lastUpdated: new Date().toISOString().slice(0, 10),
-    week52High: parseFloat(data.yearHigh) || null,
-    week52Low: parseFloat(data.yearLow) || null,
+    week52High,
+    week52Low,
     peTTM,
   };
 
-  // Current price — prefer NSE
+  // Current price: prefer reusable.price (live intraday), fall back to currentPrice object
   const currentPrice =
+    parseFloat(reusable.price) ||
     parseFloat(data.currentPrice?.NSE) ||
     parseFloat(data.currentPrice?.BSE) ||
     null;
 
-  // Market cap from keyMetrics
-  const marketCapRaw = getMetric(data.keyMetrics, "marketCap");
-  // indianapi market cap appears to be in crores already based on Tata Steel: 236935 Cr
+  // Market cap: prefer reusable.marketCap (already in Cr), fall back to keyMetrics
+  const marketCapRaw = parseFloat(reusable.marketCap) || getMetric(data.keyMetrics, "marketCap");
   const marketCap = marketCapRaw || null;
 
   const stockFundamentals = {

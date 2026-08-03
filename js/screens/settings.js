@@ -94,8 +94,12 @@ const settingsScreen = {
     function renderDriveCard() {
       document.getElementById("drive-status-card").innerHTML = settings.driveConnected
         ? `<div>Connected · last pushed ${formatWhen(settings.lastSyncPush)} · last pulled ${formatWhen(settings.lastSyncPull)}</div>
+           <div class="muted" style="font-size:11px; margin-top:4px;">
+             "Sync now" pulls from Drive first, then pushes your local data — both directions, Drive wins on conflict.<br>
+             Auto-pull runs silently on every app open if a valid session exists.
+           </div>
            <div style="display:flex; gap:8px; margin-top:8px;">
-             <button id="sync-now-btn" class="btn btn-small">Sync now</button>
+             <button id="sync-now-btn" class="btn btn-small">Sync now (↓ pull + ↑ push)</button>
              <button id="disconnect-drive-btn" class="btn btn-small btn-danger">Disconnect</button>
            </div>
            <div id="sync-status-line" class="muted" style="margin-top:6px; font-size:11px;"></div>`

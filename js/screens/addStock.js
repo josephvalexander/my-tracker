@@ -181,7 +181,17 @@ const addStockScreen = {
       if (!ticker) { alert("Ticker is required."); return; }
 
       const existing = await StockStore.get(ticker);
-      if (existing) { alert("This stock is already on your watchlist."); return; }
+      // Only block re-add if stock is genuinely active on the watchlist.
+      // Deleted stocks should be fully gone; archived stocks (from before
+      // the delete-instead-of-archive change) should be cleaned up first.
+      if (existing) {
+        if (existing.status === "active") {
+          alert("This stock is already on your watchlist.");
+          return;
+        }
+        // Stale archived record — delete it so we can re-add cleanly
+        await deleteStockPermanently(ticker);
+      }
 
       const settings = await MetaStore.getSettings();
       const apiKey = settings?.indianApiKey;
