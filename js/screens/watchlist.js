@@ -94,9 +94,9 @@ const watchlistScreen = {
       btn.addEventListener("click", async (e) => {
         e.stopPropagation();
         const ticker = btn.dataset.menuTicker;
-        const confirmed = confirm(`Archive ${ticker}? It'll move to Archived (under Settings) — your notes and data stay intact and you can restore it anytime.`);
+        const confirmed = confirm(`Delete ${ticker}? This permanently removes all data for this stock and cannot be undone.`);
         if (confirmed) {
-          await archiveStock(ticker);
+          await deleteStockPermanently(ticker);
           navigate("#watchlist");
         }
       });

@@ -9,6 +9,22 @@
  * Push stays manual — see js/driveSync.js for why.
  */
 
+/**
+ * Applies a theme to the document. "auto" removes any explicit
+ * data-theme attribute so the CSS media query takes over.
+ * "light" or "dark" sets the attribute to override the media query.
+ * Exposed globally so settings.js can call it on toggle.
+ */
+function applyTheme(theme) {
+  if (theme === "light") {
+    document.documentElement.setAttribute("data-theme", "light");
+  } else if (theme === "dark") {
+    document.documentElement.setAttribute("data-theme", "dark");
+  } else {
+    document.documentElement.removeAttribute("data-theme");
+  }
+}
+
 async function seedDefaultsIfNeeded() {
   const existing = await MetaStore.getSettings();
   if (!existing) {
@@ -16,9 +32,10 @@ async function seedDefaultsIfNeeded() {
       driveConnected: false,
       lastSyncPush: null,
       lastSyncPull: null,
+      theme: "auto",
       deRule: { green: 0.1, yellow: 0.2 },
       verdictRules: {
-        hardFlags: ["roeBelow15", "deAbove02", "pledgingAboveZero", "marginCompression2Q", "promoterHoldingDeclining"],
+        hardFlags: ["roeBelow15", "deAbove02", "marginCompression2Q", "promoterHoldingDeclining"],
         softFlagThreshold: 2,
       },
     });
@@ -67,6 +84,8 @@ async function autoPullOnOpen() {
 
 async function init() {
   await seedDefaultsIfNeeded();
+  const settings = await MetaStore.getSettings();
+  applyTheme(settings?.theme || "auto");
   await registerServiceWorker();
   await autoPullOnOpen();
   initRouter();

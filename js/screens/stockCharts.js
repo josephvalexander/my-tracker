@@ -65,6 +65,13 @@ const stockChartsScreen = {
 
     function buildCharts() {
       destroyAll();
+
+      // Reset visibility before rebuilding — previous quarterly run may have hidden these
+      const epsSection   = document.getElementById("eps-section");
+      const roedeSection = document.getElementById("roede-section");
+      if (epsSection)   epsSection.style.display   = "";
+      if (roedeSection) roedeSection.style.display = "";
+
       const annual = stock.fundamentals.annual;
       const quarterly = stock.fundamentals.quarterly || {};
 
@@ -105,9 +112,6 @@ const stockChartsScreen = {
       });
 
       // EPS and ROE/DE only meaningful on annual data
-      const epsSection   = document.getElementById("eps-section");
-      const roedeSection = document.getElementById("roede-section");
-
       if (usingQuarterly) {
         if (epsSection)   epsSection.style.display   = "none";
         if (roedeSection) roedeSection.style.display = "none";

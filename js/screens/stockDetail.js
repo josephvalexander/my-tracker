@@ -204,7 +204,7 @@ const stockDetailScreen = {
                 <span class="muted">${b.recordDate || b.announced || ""}</span>
               </div>`
             ));
-            return rows.join("");
+            return `<div class="corporate-actions-scroll">${rows.join("")}</div>`;
           })()}
         </div>
 

@@ -35,6 +35,18 @@ const settingsScreen = {
           <button id="save-thresholds-btn" class="btn btn-small">Save</button>
         </div>
 
+        <div class="section-label">Appearance</div>
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:13px;">Theme</span>
+            <div class="theme-toggle-group" id="theme-toggle-group">
+              <button class="theme-btn" data-theme="auto">Auto</button>
+              <button class="theme-btn" data-theme="light">Light</button>
+              <button class="theme-btn" data-theme="dark">Dark</button>
+            </div>
+          </div>
+        </div>
+
         <div class="section-label">Data APIs</div>
         <div class="card">
           <div class="muted" style="margin-bottom:8px; font-size:11px;"><strong>indianapi.in</strong> — provides fundamentals, shareholding, corporate actions, and live price for Indian stocks. Free tier: 500 requests/month. Sign up at <a href="https://indianapi.in" target="_blank">indianapi.in</a>, subscribe to the free/hobby plan, copy the API key from your dashboard.</div>
@@ -47,12 +59,6 @@ const settingsScreen = {
           <div class="muted" style="margin-bottom:8px; font-size:11px;">Used by "Draft with AI" buttons on each stock's edit screen, for the business/moat/market-position fields. Get a free key from <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a>. Stored only on this device — never committed to your repo, never sent anywhere except Google's API.</div>
           <input type="password" id="gemini-key-input" placeholder="Paste your Gemini API key" />
           <button id="save-gemini-key-btn" class="btn btn-small" style="margin-top:8px;">Save key</button>
-        </div>
-
-        <div class="section-label">Archived stocks</div>
-        <div class="card">
-          <div class="muted" style="margin-bottom:8px;">Stocks you researched and passed on. Notes stay intact — restore or delete from here.</div>
-          <button id="view-archived-btn" class="btn btn-small">View archived (<span id="archived-count">0</span>)</button>
         </div>
 
         <div class="section-label">Data</div>
@@ -168,6 +174,20 @@ const settingsScreen = {
     document.getElementById("indian-api-key-input").value = settings.indianApiKey || "";
     document.getElementById("gemini-key-input").value = settings.geminiApiKey || "";
 
+    // Theme toggle
+    const currentTheme = settings.theme || "auto";
+    document.querySelectorAll(".theme-btn").forEach((btn) => {
+      if (btn.dataset.theme === currentTheme) btn.classList.add("theme-btn-active");
+      btn.addEventListener("click", async () => {
+        const chosen = btn.dataset.theme;
+        settings.theme = chosen;
+        await MetaStore.setSettings(settings);
+        applyTheme(chosen);
+        document.querySelectorAll(".theme-btn").forEach((b) => b.classList.remove("theme-btn-active"));
+        btn.classList.add("theme-btn-active");
+      });
+    });
+
     document.getElementById("save-indian-api-key-btn").addEventListener("click", async () => {
       settings.indianApiKey = document.getElementById("indian-api-key-input").value.trim();
       await MetaStore.setSettings(settings);
@@ -187,12 +207,6 @@ const settingsScreen = {
       DEFAULT_RULES.de.green = settings.deRule.green;
       DEFAULT_RULES.de.yellow = settings.deRule.yellow;
       alert("Thresholds saved.");
-    });
-
-    const archived = await StockStore.getArchived();
-    document.getElementById("archived-count").textContent = archived.length;
-    document.getElementById("view-archived-btn").addEventListener("click", () => {
-      window.location.hash = "#archived";
     });
 
     document.getElementById("export-backup-btn").addEventListener("click", async () => {
