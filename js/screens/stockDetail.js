@@ -68,26 +68,26 @@ function verdictBanner(verdict) {
 
 function priceContextStrip(stock) {
   const pc = stock.priceContext || {};
-  const hasTodayRange = pc.todayLow && pc.todayHigh;
+  const mcap = stock.fundamentals?.marketCap;
+  const has52w = pc.week52Low && pc.week52High;
+
   return `
     <div class="price-context-grid">
       <div class="price-context-box">
         <div class="price-context-label">Market cap</div>
-        <div class="price-context-value">${stock.fundamentals?.marketCap ? "₹" + Math.round(stock.fundamentals.marketCap).toLocaleString("en-IN") + " Cr" : "—"}</div>
+        <div class="price-context-value">${mcap ? "₹" + Math.round(mcap).toLocaleString("en-IN") + " Cr" : "—"}</div>
       </div>
-      ${hasTodayRange
-        ? `<div class="price-context-box">
-            <div class="price-context-label">Today's range</div>
-            <div class="price-context-value">${Math.round(pc.todayLow).toLocaleString("en-IN")}–${Math.round(pc.todayHigh).toLocaleString("en-IN")}</div>
-          </div>`
-        : ""}
       <div class="price-context-box">
         <div class="price-context-label">52w range</div>
-        <div class="price-context-value">${pc.week52Low && pc.week52High ? `${Math.round(pc.week52Low).toLocaleString("en-IN")}–${Math.round(pc.week52High).toLocaleString("en-IN")}` : "—"}</div>
+        <div class="price-context-value">${has52w ? `${Math.round(pc.week52Low).toLocaleString("en-IN")}–${Math.round(pc.week52High).toLocaleString("en-IN")}` : "—"}</div>
       </div>
       <div class="price-context-box">
         <div class="price-context-label">P/E (TTM)</div>
-        <div class="price-context-value">${pc.peTTM ? pc.peTTM.toFixed(1) : "—"}${pc.sectorPE ? `<span class="muted" style="font-size:10px;"> vs sector ${pc.sectorPE.toFixed(1)}</span>` : ""}</div>
+        <div class="price-context-value">${pc.peTTM ? pc.peTTM.toFixed(1) : "—"}</div>
+      </div>
+      <div class="price-context-box">
+        <div class="price-context-label">Sector P/E</div>
+        <div class="price-context-value">${pc.sectorPE ? pc.sectorPE.toFixed(1) : "—"}</div>
       </div>
     </div>`;
 }
@@ -108,6 +108,10 @@ function nseRefreshSection(stock) {
         <div style="flex:1; min-width:0;">
           <div class="nse-refresh-title">Live price</div>
           <div class="muted" style="font-size:11px; margin-bottom:6px;">Yahoo Finance · ${lastFetched ? `updated ${lastFetched}` : "not fetched yet"}</div>
+          <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">
+            <input type="text" id="yahoo-symbol-input" value="${stock.yahooSymbol || stock.ticker.replace(/\s+/g,'')}" style="font-size:11px; padding:4px 6px; width:110px; border:0.5px solid var(--color-border); border-radius:6px; background:var(--color-surface); color:var(--color-text);" placeholder="e.g. CLEAN" title="Yahoo Finance symbol (without .NS). Edit if fetch fails." />
+            <span class="muted" style="font-size:10px;">.NS</span>
+          </div>
           <button id="nse-fetch-btn" class="btn btn-small btn-primary-outline">↻ Fetch live price</button>
           <div id="nse-fetch-status" class="muted" style="font-size:11px; margin-top:4px;"></div>
         </div>
@@ -313,12 +317,21 @@ const stockDetailScreen = {
     if (fetchBtn) {
       fetchBtn.addEventListener("click", async () => {
         const statusEl = document.getElementById("nse-fetch-status");
-        statusEl.innerHTML = `<div class="muted" style="font-size:11px; margin-top:6px;">Fetching...</div>`;
+        statusEl.innerHTML = `<span>Fetching...</span>`;
         fetchBtn.disabled = true;
 
-        const result = await refreshStockFromNse(ticker);
+        // Read and save the Yahoo symbol override
+        const yahooInput = document.getElementById("yahoo-symbol-input");
+        const yahooSymbolValue = yahooInput?.value?.trim().toUpperCase() || null;
+
+        const result = await refreshStockFromNse(ticker, yahooSymbolValue);
         const stock = await StockStore.get(ticker);
         const today = new Date().toISOString().slice(0, 10);
+
+        // Save yahooSymbol if it differs from the default
+        if (yahooSymbolValue && yahooSymbolValue !== stock.ticker.replace(/\s+/g, "")) {
+          stock.yahooSymbol = yahooSymbolValue;
+        }
 
         if (result.quoteInfo) {
           stock.fundamentals = stock.fundamentals || {};

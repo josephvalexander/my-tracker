@@ -46,9 +46,11 @@ async function callWorker(path, symbol) {
 }
 
 /** Live price, 52-week range, market cap from Yahoo Finance (via Worker). */
-async function fetchYfQuoteInfo(symbol) {
-  // Yahoo Finance symbols cannot contain spaces — strip before appending .NS
-  const cleanSymbol = symbol.replace(/\s+/g, "");
+async function fetchYfQuoteInfo(symbol, yahooSymbol) {
+  // Use explicit Yahoo symbol if provided (overrides NSE ticker for mismatches
+  // e.g. NSE: CLEANSCIENCE → Yahoo: CLEAN.NS, NSE: VINATIORGA → Yahoo: VINATIORGA.NS)
+  // Strip spaces and append .NS if no suffix already present
+  const cleanSymbol = (yahooSymbol || symbol).replace(/\s+/g, "");
   const yfSymbol = cleanSymbol.includes(".") ? cleanSymbol : `${cleanSymbol}.NS`;
   const data = await callWorker("/yf-quote", yfSymbol);
   return {
@@ -84,10 +86,10 @@ async function fetchBseQuoteInfo(symbol) {
   };
 }
 
-/** Try Yahoo Finance first, fall back to BSE. */
-async function fetchQuoteInfo(symbol) {
+/** Try Yahoo Finance first (with optional symbol override), fall back to BSE. */
+async function fetchQuoteInfo(symbol, yahooSymbol) {
   try {
-    return await fetchYfQuoteInfo(symbol);
+    return await fetchYfQuoteInfo(symbol, yahooSymbol);
   } catch (yfErr) {
     try {
       return await fetchBseQuoteInfo(symbol);
@@ -106,20 +108,22 @@ async function fetchShareholding(symbol) {
 }
 
 /**
- * Fetch live price (and 52-week range if available) for one stock.
- * Shareholding comes from indianapi.in instead (called separately).
+ * Fetch live price for one stock.
+ * yahooSymbol overrides the default NSE-ticker-based Yahoo symbol
+ * for stocks where NSE and Yahoo use different tickers
+ * (e.g. NSE: CLEANSCIENCE → Yahoo: CLEAN.NS).
  */
-async function refreshStockFromNse(symbol) {
+async function refreshStockFromNse(symbol, yahooSymbol) {
   const result = { symbol, quoteInfo: null, shareholding: null, errors: {} };
 
   try {
-    result.quoteInfo = await fetchQuoteInfo(symbol);
+    result.quoteInfo = await fetchQuoteInfo(symbol, yahooSymbol);
   } catch (err) {
     result.errors.quoteInfo = err.message;
   }
 
   result.success = Object.keys(result.errors).length === 0;
-  result.partial = false; // shareholding now comes from indianapi, not here
+  result.partial = false;
 
   return result;
 }

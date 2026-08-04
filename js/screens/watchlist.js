@@ -148,7 +148,7 @@ const watchlistScreen = {
         progressEl.textContent = `Fetching ${stock.ticker}… (${updated + failed + 1}/${stocks.length})`;
 
         try {
-          const result = await refreshStockFromNse(stock.ticker);
+          const result = await refreshStockFromNse(stock.ticker, stock.yahooSymbol || null);
           if (result.quoteInfo) {
             const fresh = await StockStore.get(stock.ticker);
             const today = new Date().toISOString().slice(0, 10);

@@ -81,6 +81,7 @@ async function applyIndianApiResult(ticker, parsed) {
     week52High: parsed.priceContext.week52High,
     week52Low: parsed.priceContext.week52Low,
     peTTM: parsed.priceContext.peTTM ?? stock.priceContext?.peTTM ?? null,
+    sectorPE: parsed.priceContext.sectorPE ?? stock.priceContext?.sectorPE ?? null,
   };
 
   await StockStore.set(ticker, stock);
