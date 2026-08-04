@@ -272,9 +272,7 @@ const stockDetailScreen = {
         statusEl.textContent = "Fetching from indianapi.in...";
         indianapiRefreshBtn.disabled = true;
         try {
-          const stock = await StockStore.get(ticker);
-          const searchName = stock.name && stock.name !== ticker ? stock.name : ticker;
-          const parsed = await fetchIndianApiData(searchName, settings.indianApiKey);
+          const parsed = await fetchIndianApiData(ticker, settings.indianApiKey);
           await applyIndianApiResult(ticker, parsed);
           statusEl.textContent = "✓ Updated — refreshing page...";
           setTimeout(() => navigate(`#stock/${ticker}`), 800);
