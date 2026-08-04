@@ -47,8 +47,9 @@ async function callWorker(path, symbol) {
 
 /** Live price, 52-week range, market cap from Yahoo Finance (via Worker). */
 async function fetchYfQuoteInfo(symbol) {
-  // Yahoo Finance uses .NS suffix for NSE-listed stocks
-  const yfSymbol = symbol.includes(".") ? symbol : `${symbol}.NS`;
+  // Yahoo Finance symbols cannot contain spaces — strip before appending .NS
+  const cleanSymbol = symbol.replace(/\s+/g, "");
+  const yfSymbol = cleanSymbol.includes(".") ? cleanSymbol : `${cleanSymbol}.NS`;
   const data = await callWorker("/yf-quote", yfSymbol);
   return {
     name: data.companyName ?? null,
