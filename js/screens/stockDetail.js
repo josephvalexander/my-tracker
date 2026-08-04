@@ -153,7 +153,11 @@ const stockDetailScreen = {
     const shareTrend = shareCountTrend(stock);
     const consistency = earningsConsistencyScore(stock);
     const rer = retainedEarningsRatio(stock);
+    const qRevGrowth = quarterlyRevenueGrowthYoY(stock);
+    const qPATMargin = quarterlyPATMargin(stock);
 
+    const latestQ = stock.fundamentals?.quarterly;
+    const latestQPeriod = latestQ?.periods?.slice(-1)?.[0] ?? null;
     const latestShareholding = stock.shareholding?.history?.slice(-1)?.[0] ?? null;
 
     return `
@@ -190,6 +194,18 @@ const stockDetailScreen = {
           ${metricRow("ROE (5y avg)", roe, formatPct(roe), colorForMetric(roe, DEFAULT_RULES.roe))}
           ${metricRow("ROCE (5y avg)", roce, formatPct(roce), colorForMetric(roce, DEFAULT_RULES.roce))}
           ${metricRow("EPS CAGR (5y)", cagr, formatPct(cagr), colorForMetric(cagr, DEFAULT_RULES.epsCagr))}
+          ${latestQPeriod ? metricRow(
+            `Revenue growth YoY (${latestQPeriod})`,
+            qRevGrowth,
+            qRevGrowth !== null ? `${qRevGrowth >= 0 ? "+" : ""}${qRevGrowth.toFixed(1)}%` : "N/A — needs 5 quarters",
+            qRevGrowth === null ? "neutral" : qRevGrowth >= 10 ? "green" : qRevGrowth >= 0 ? "yellow" : "red"
+          ) : ""}
+          ${latestQPeriod ? metricRow(
+            `PAT margin (${latestQPeriod})`,
+            qPATMargin,
+            qPATMargin !== null ? formatPct(qPATMargin) : "N/A",
+            qPATMargin === null ? "neutral" : qPATMargin >= 15 ? "green" : qPATMargin >= 8 ? "yellow" : "red"
+          ) : ""}
         </div>
 
         <div class="section-label">Balance sheet & cash quality</div>
@@ -243,6 +259,41 @@ const stockDetailScreen = {
             return `<div class="corporate-actions-scroll">${rows.join("")}</div>`;
           })()}
         </div>
+
+        ${(() => {
+          const news = stock.recentNews;
+          if (!news?.length) return "";
+          return `
+            <div class="section-label">Recent news</div>
+            <div class="card" style="padding:0;">
+              ${news.map((n, i) => {
+                const date = n.date ? new Date(n.date).toLocaleDateString("en-IN", { day:"numeric", month:"short" }) : "";
+                const summary = n.summary ? n.summary.slice(0, 120) + (n.summary.length > 120 ? "…" : "") : "";
+                return `<a href="${n.url || "#"}" target="_blank" rel="noopener" class="news-item ${i < news.length - 1 ? "news-item-border" : ""}">
+                  <div class="news-headline">${n.headline}</div>
+                  ${summary ? `<div class="news-summary muted">${summary}</div>` : ""}
+                  <div class="news-meta muted">${date}${n.timeToRead ? ` · ${n.timeToRead} min read` : ""}</div>
+                </a>`;
+              }).join("")}
+            </div>`;
+        })()}
+
+        ${(() => {
+          const ac = stock.analystConsensus;
+          if (!ac || ac.total === 0) return "";
+          return `
+            <div class="section-label">Analyst consensus <span class="section-label-note">${ac.total} analyst${ac.total === 1 ? "" : "s"}</span></div>
+            <div class="card">
+              <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                <div style="font-size:18px; font-weight:700; color:var(--color-text);">${ac.consensusLabel || "—"}</div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                  ${(ac.ratings || []).map(r =>
+                    `<span style="font-size:12px; background:${r.color}22; color:${r.color}; border:1px solid ${r.color}44; border-radius:12px; padding:2px 10px;">${r.count} ${r.name}</span>`
+                  ).join("")}
+                </div>
+              </div>
+            </div>`;
+        })()}
 
         <div class="detail-tab-row">
           <button class="detail-tab-btn" data-go="#stockCharts/${ticker}">Charts</button>

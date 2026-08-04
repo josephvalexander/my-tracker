@@ -73,6 +73,14 @@ async function applyIndianApiResult(ticker, parsed) {
     ...parsed.corporateActions,
   };
 
+  // Recent news and analyst consensus
+  if (parsed.recentNews?.length) {
+    stock.recentNews = parsed.recentNews;
+  }
+  if (parsed.analystConsensus) {
+    stock.analystConsensus = parsed.analystConsensus;
+  }
+
   // Price context
   stock.priceContext = {
     ...stock.priceContext,
@@ -154,9 +162,9 @@ const addStockScreen = {
           <input type="text" id="ticker-input" placeholder="e.g. CAPLIPOINT" />
         </div>
         <div class="form-group">
-          <label>Company name <span class="muted">(or search term — same as you'd type on Screener.in)</span></label>
+          <label>Company name <span class="muted">(optional — for display only)</span></label>
           <input type="text" id="name-input" placeholder="e.g. Caplin Point" />
-          <div class="field-hint">Used to fetch data from indianapi.in. Leave blank to use the ticker as the search term.</div>
+          <div class="field-hint">Ticker is used to search indianapi.in. Company name is just for display.</div>
         </div>
 
         <button id="create-stock-btn" class="btn btn-primary">Add &amp; fetch data</button>
@@ -179,7 +187,9 @@ const addStockScreen = {
     document.getElementById("create-stock-btn").addEventListener("click", async () => {
       const ticker = document.getElementById("ticker-input").value.trim().toUpperCase();
       const nameInput = document.getElementById("name-input").value.trim();
-      const searchName = nameInput || ticker;
+      // Always try ticker first — more reliable than full company name
+      // indianapi's name matching can fail on long/unusual company names
+      const searchName = ticker;
       const statusEl = document.getElementById("fetch-status");
 
       if (!ticker) { alert("Ticker is required."); return; }

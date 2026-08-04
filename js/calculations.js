@@ -246,6 +246,33 @@ function retainedEarningsRatio(stock, years = 6) {
  * shares outstanding from the Screener upload), so there's no reason
  * to depend on a fragile scrape for a number this easy to compute.
  */
+/**
+ * Latest quarterly revenue growth YoY (%) — most important metric
+ * for quarterly review. Compares most recent quarter with same
+ * quarter last year. Returns null if insufficient quarterly data.
+ */
+function quarterlyRevenueGrowthYoY(stock) {
+  const q = stock?.fundamentals?.quarterly;
+  if (!q?.revenue?.length || q.revenue.length < 5) return null;
+  const latest = q.revenue[q.revenue.length - 1];
+  const sameQtrLastYear = q.revenue[q.revenue.length - 5];
+  if (!latest || !sameQtrLastYear || sameQtrLastYear === 0) return null;
+  return ((latest - sameQtrLastYear) / Math.abs(sameQtrLastYear)) * 100;
+}
+
+/**
+ * Latest quarterly PAT margin (%) — net profit as % of revenue
+ * for the most recent quarter. Helps spot margin compression early.
+ */
+function quarterlyPATMargin(stock) {
+  const q = stock?.fundamentals?.quarterly;
+  if (!q?.revenue?.length || !q?.netProfit?.length) return null;
+  const rev = q.revenue[q.revenue.length - 1];
+  const pat = q.netProfit[q.netProfit.length - 1];
+  if (!rev || rev === 0 || pat == null) return null;
+  return (pat / rev) * 100;
+}
+
 function calculateMarketCap(stock) {
   const price = stock?.fundamentals?.currentPrice;
   const shares = stock?.fundamentals?.sharesOutstanding;
@@ -568,6 +595,8 @@ const calculationsExports = {
   ocfCagr,
   calculateDefaultIV,
   dividendPayoutTrend,
+  quarterlyRevenueGrowthYoY,
+  quarterlyPATMargin,
   colorForMetric,
   deriveVerdict,
   entryZoneStatus,

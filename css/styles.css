@@ -173,7 +173,12 @@ body {
 .verdict-word { font-size: 18px; font-weight: 700; margin-right: 8px; }
 .verdict-detail { font-size: 11px; }
 .verdict-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
-.verdict-soft-note { font-size: 11px; color: var(--color-text-secondary); margin-top: 6px; font-style: italic; }
+.news-item { display: block; padding: 12px 14px; text-decoration: none; color: var(--color-text); }
+.news-item-border { border-bottom: 0.5px solid var(--color-border); }
+.news-item:active { background: var(--color-bg); }
+.news-headline { font-size: 13px; font-weight: 500; line-height: 1.4; margin-bottom: 4px; }
+.news-summary { font-size: 11px; line-height: 1.4; margin-bottom: 4px; }
+.news-meta { font-size: 10px; }
 .chip-small { font-size: 11px; background: var(--color-surface); border-radius: var(--radius-md); padding: 3px 8px; }
 .chip-small-pass { color: var(--color-green); }
 .chip-small-fail { color: var(--color-red); }

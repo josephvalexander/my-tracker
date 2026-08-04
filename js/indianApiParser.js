@@ -226,6 +226,29 @@ function parseIndianApiResponse(data) {
     quarterly,
   };
 
+  // ── Recent news — last 4, most recent first, relative Livemint URLs completed
+  const recentNews = (data.recentNews ?? [])
+    .slice(0, 4)
+    .map((n) => ({
+      headline: n.headline ?? null,
+      date: n.date ?? n.lastPublishedDate ?? null,
+      url: n.url ? (n.url.startsWith("http") ? n.url : `https://www.livemint.com${n.url}`) : null,
+      summary: n.summary ? n.summary.replace(/<[^>]+>/g, "").trim() : null,
+      timeToRead: n.timeToRead ?? null,
+    }));
+
+  // ── Analyst consensus
+  const analystRaw = data.analystView ?? [];
+  const recoBar = data.recosBar ?? {};
+  const analystConsensus = recoBar.isDataPresent ? {
+    total: recoBar.noOfRecommendations ?? 0,
+    meanValue: recoBar.meanValue ?? null,
+    ratings: (recoBar.stockAnalyst ?? [])
+      .filter((r) => parseFloat(r.numberOfAnalysts) > 0)
+      .map((r) => ({ name: r.ratingName, count: parseFloat(r.numberOfAnalysts), color: r.colorCode })),
+    consensusLabel: analystRaw.find((r) => parseFloat(r.numberOfAnalystsLatest) > 0)?.ratingName ?? null,
+  } : null;
+
   return {
     stockFundamentals,
     companyName: data.companyName || null,
@@ -233,6 +256,8 @@ function parseIndianApiResponse(data) {
     shareholding: shareholdingHistory,
     priceContext,
     corporateActions,
+    recentNews,
+    analystConsensus,
     warnings,
   };
 }
