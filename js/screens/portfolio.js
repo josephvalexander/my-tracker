@@ -45,7 +45,10 @@ const portfolioScreen = {
       const verdict = deriveVerdict(s);
       if (verdict.verdict === "Yes") passCount++;
       if (verdict.verdict === "No") {
-        triageItems.push({ ticker: s.ticker, type: "bad", text: `${verdict.hardFlags.length} hard flags · verdict: No` });
+        const parts = [];
+        if (verdict.hardFlags.length > 0) parts.push(`${verdict.hardFlags.length} hard flag${verdict.hardFlags.length === 1 ? "" : "s"}`);
+        if (verdict.softFlags.length > 0) parts.push(`${verdict.softFlags.length} soft flag${verdict.softFlags.length === 1 ? "" : "s"}`);
+        triageItems.push({ ticker: s.ticker, type: "bad", text: parts.join(" · ") + " · verdict: No" });
       }
     });
 

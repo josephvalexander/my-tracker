@@ -87,7 +87,7 @@ function priceContextStrip(stock) {
       </div>
       <div class="price-context-box">
         <div class="price-context-label">P/E (TTM)</div>
-        <div class="price-context-value">${pc.peTTM ? pc.peTTM.toFixed(1) : "—"}</div>
+        <div class="price-context-value">${pc.peTTM ? pc.peTTM.toFixed(1) : "—"}${pc.sectorPE ? `<span class="muted" style="font-size:10px;"> vs sector ${pc.sectorPE.toFixed(1)}</span>` : ""}</div>
       </div>
     </div>`;
 }

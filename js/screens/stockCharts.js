@@ -44,8 +44,11 @@ const stockChartsScreen = {
           <div class="card chart-card"><canvas id="chart-roe-de"></canvas></div>
         </div>
 
-        <div class="chart-section-label">Shareholding pattern <span class="muted">% of total shares</span></div>
-        <div class="card chart-card"><canvas id="chart-shareholding"></canvas></div>
+        <div class="chart-section-label">Shareholding pattern <span class="muted">promoter & FII trend</span></div>
+        <div class="card chart-card">
+          <div id="sh-latest-summary"></div>
+          <canvas id="chart-shareholding"></canvas>
+        </div>
         `}
       </div>`;
   },
@@ -179,35 +182,70 @@ const stockChartsScreen = {
         });
       }
 
-      // Shareholding — always quarterly regardless of toggle
-      // (indianapi returns quarterly data; there's no annual aggregate)
+      // Shareholding — always shown regardless of toggle
       const shHistory = stock.shareholding?.history || [];
       const shCanvas  = document.getElementById("chart-shareholding");
+      const shSummary = document.getElementById("sh-latest-summary");
+
       if (shHistory.length > 0) {
+        // Latest snapshot as readable summary
+        const latest = shHistory[shHistory.length - 1];
+        if (shSummary) {
+          shSummary.innerHTML = `
+            <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+              ${[
+                { label: "Promoter", value: latest.promoter, color: "#534AB7" },
+                { label: "FII",      value: latest.fii,      color: "#378ADD" },
+                { label: "DII/MF",  value: latest.dii,      color: "#1D9E75" },
+                { label: "Public",  value: latest.public,   color: "#B4B2A9" },
+              ].filter(d => d.value != null).map(d => `
+                <div style="display:flex; align-items:center; gap:4px; font-size:12px;">
+                  <span style="width:10px;height:10px;border-radius:50%;background:${d.color};display:inline-block;flex-shrink:0;"></span>
+                  <span class="muted">${d.label}</span>
+                  <strong>${d.value.toFixed(1)}%</strong>
+                </div>`).join("")}
+              <span class="muted" style="font-size:11px; align-self:center;">as of ${latest.quarter}</span>
+            </div>`;
+        }
+
+        // Promoter trend line — the signal that matters most
         charts.shareholding = new Chart(shCanvas, {
-          type: "bar",
+          type: "line",
           data: {
             labels: shHistory.map((h) => h.quarter),
             datasets: [
-              { label: "Promoter", data: shHistory.map((h) => h.promoter), backgroundColor: "#534AB7", stack: "s" },
-              { label: "FII",      data: shHistory.map((h) => h.fii),      backgroundColor: "#378ADD", stack: "s" },
-              { label: "DII/MF",  data: shHistory.map((h) => h.dii),      backgroundColor: "#1D9E75", stack: "s" },
-              { label: "Public",  data: shHistory.map((h) => h.public),   backgroundColor: "#B4B2A9", stack: "s" },
+              {
+                label: "Promoter %",
+                data: shHistory.map((h) => h.promoter),
+                borderColor: "#534AB7", backgroundColor: "rgba(83,74,183,0.1)",
+                tension: 0.3, fill: true, pointRadius: 4,
+                pointBackgroundColor: "#534AB7", borderWidth: 2,
+                yAxisID: "y",
+              },
+              {
+                label: "FII %",
+                data: shHistory.map((h) => h.fii),
+                borderColor: "#378ADD", backgroundColor: "transparent",
+                tension: 0.3, pointRadius: 3, borderWidth: 1.5,
+                borderDash: [4, 3], yAxisID: "y",
+              },
             ],
           },
           options: {
             responsive: true, maintainAspectRatio: false,
             plugins: {
               legend: { position: "bottom", labels: { font: baseFont, boxWidth: 12, boxHeight: 12, usePointStyle: true, pointStyle: "circle" } },
-              tooltip: { backgroundColor: "#2c2c2a", titleFont: baseFont, bodyFont: baseFont, padding: 10, cornerRadius: 6, callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(1)}%` } },
+              tooltip: { backgroundColor: "#2c2c2a", titleFont: baseFont, bodyFont: baseFont, padding: 10, cornerRadius: 6,
+                callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(1)}%` } },
             },
             scales: {
-              x: { stacked: true, grid: { display: false }, ticks: tickStyle },
-              y: { stacked: true, max: 100, grid: gridStyle, ticks: { ...tickStyle, callback: (v) => v + "%" } },
+              x: { grid: { display: false }, ticks: { ...tickStyle, maxRotation: 45, minRotation: 45 } },
+              y: { grid: gridStyle, ticks: { ...tickStyle, callback: (v) => v + "%" }, suggestedMin: 0, suggestedMax: 80 },
             },
           },
         });
       } else {
+        if (shSummary) shSummary.innerHTML = "";
         shCanvas.closest(".card").innerHTML = '<span class="muted">No shareholding data yet — will appear after indianapi fetch.</span>';
       }
     }

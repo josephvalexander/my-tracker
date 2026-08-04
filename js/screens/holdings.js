@@ -49,7 +49,8 @@ function holdingRow(row, allocationColor) {
         <div class="allocation-bar-fill" style="width:${row.allocationPct ?? 0}%; background:${allocationColor}"></div>
       </div>
       <div class="holding-row-bottom">
-        <span>${formatCurrencyShort(row.currentValue)} current value</span>
+        <span>${formatCurrencyShort(row.invested)} invested</span>
+        <span>${formatCurrencyShort(row.currentValue)} current</span>
         <span>${row.allocationPct !== null ? row.allocationPct.toFixed(0) : "—"}% of portfolio</span>
       </div>
     </div>`;

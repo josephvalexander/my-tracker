@@ -1,7 +1,7 @@
 {
-  "name": "Portfolio Tracker",
-  "short_name": "Portfolio",
-  "description": "Buffett-style long-term stock analysis and portfolio tracker",
+  "name": "Buffett Compos",
+  "short_name": "BCompos",
+  "description": "Buffett-style compounder screening and tracking for Indian equities",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

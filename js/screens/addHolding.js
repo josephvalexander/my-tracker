@@ -92,7 +92,7 @@ const addHoldingScreen = {
       if (!price || price <= 0) { statusEl.textContent = "Enter a valid buy price."; return; }
 
       await HoldingStore.set(ticker, { ticker, quantity: qty, avgBuyPrice: price });
-      navigate("#holdings");
+      window.location.hash = "#holdings";
     });
   },
 };

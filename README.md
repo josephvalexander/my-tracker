@@ -1,4 +1,4 @@
-# Portfolio Tracker
+# Buffett Compos
 
 A Buffett-checklist-based PWA for tracking and analyzing long-term Indian
 equity positions. Local-first storage (IndexedDB), manual sync to Google

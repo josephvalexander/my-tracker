@@ -154,6 +154,7 @@ function parseIndianApiResponse(data) {
   // all in clean numeric form (confirmed from real Tata Steel response)
   const reusable = data.stockDetailsReusableData ?? {};
   const peTTMfromField = parseFloat(reusable.pPerEBasicExcludingExtraordinaryItemsTTM) || null;
+  const sectorPE = parseFloat(reusable.sectorPriceToEarningsValueRatio) || null;
 
   // Prefer deriving P/E ourselves from price ÷ TTM EPS, since the
   // pre-computed field sometimes uses full-year annual EPS rather than
@@ -181,6 +182,7 @@ function parseIndianApiResponse(data) {
     week52High,
     week52Low,
     peTTM,
+    sectorPE,
   };
 
   // Current price: prefer reusable.price (live intraday), fall back to currentPrice object

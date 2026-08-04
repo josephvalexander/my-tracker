@@ -35,7 +35,7 @@ function stockRow(stock) {
         </div>
         ${metricChip("ROE", roe, formatPct(roe), roeColor)}
         ${metricChip("D/E", de, formatRatio(de), deColor)}
-        ${metricChip("EPS CAGR", cagr, formatPct(cagr), cagrColor)}
+        ${metricChip("EPS", cagr, formatPct(cagr), cagrColor)}
         <div class="stock-price">
           <div class="price-main">${formatCurrency(cmp)}</div>
         </div>
