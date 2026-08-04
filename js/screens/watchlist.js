@@ -167,8 +167,8 @@ const watchlistScreen = {
             if (result.quoteInfo.todayHigh)  fresh.priceContext.todayHigh  = result.quoteInfo.todayHigh;
             if (result.quoteInfo.previousClose) fresh.priceContext.previousClose = result.quoteInfo.previousClose;
 
-            // Recalculate derived market cap if YF didn't return one
-            if (!result.quoteInfo.marketCap) {
+            // Only derive market cap if neither YF nor indianapi has set one
+            if (!result.quoteInfo.marketCap && !fresh.fundamentals.marketCap) {
               const derived = calculateMarketCap(fresh);
               if (derived) fresh.fundamentals.marketCap = derived;
             }

@@ -403,8 +403,14 @@ const stockDetailScreen = {
             ...(result.quoteInfo.todayHigh  && { todayHigh:  result.quoteInfo.todayHigh  }),
             ...(result.quoteInfo.previousClose && { previousClose: result.quoteInfo.previousClose }),
           };
-          const derivedMarketCap = calculateMarketCap(stock);
-          if (derivedMarketCap) stock.fundamentals.marketCap = derivedMarketCap;
+          // Only derive market cap if we don't already have one from indianapi.
+          // calculateMarketCap uses sharesOutstanding which has inconsistent units
+          // in indianapi across stocks — the reusable.marketCap from indianapi is
+          // always correct, so preserve it when it exists.
+          if (!stock.fundamentals.marketCap) {
+            const derivedMarketCap = calculateMarketCap(stock);
+            if (derivedMarketCap) stock.fundamentals.marketCap = derivedMarketCap;
+          }
         }
 
         await StockStore.set(ticker, stock);

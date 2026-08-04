@@ -94,8 +94,10 @@ function parseIndianApiResponse(data) {
   const totalEquity     = buildArray("TotalEquity");
   const retainedEarnings = buildArray("RetainedEarnings(AccumulatedDeficit)");
   const sharesRaw       = buildArray("TotalCommonSharesOutstanding");
-  // indianapi returns shares in millions (e.g. 1247.18 for ~1.25 billion shares)
-  // calculations.js expects raw share count
+  // Note: TotalCommonSharesOutstanding units are inconsistent across stocks
+  // in indianapi (some stocks report in millions, others in crores).
+  // Do not use shares × price to derive market cap — use reusable.marketCap
+  // directly (confirmed correct in Cr for all tested stocks).
   const sharesOutstandingHistory = sharesRaw.map((v) =>
     v !== null ? Math.round(v * 1_000_000) : null
   );
