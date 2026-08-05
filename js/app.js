@@ -46,6 +46,15 @@ async function registerServiceWorker() {
   if ("serviceWorker" in navigator) {
     try {
       await navigator.serviceWorker.register("./service-worker.js");
+
+      // Listen for the SW_UPDATED message sent by the new service worker
+      // when it activates. Reload immediately so the user gets the new
+      // files without needing to manually refresh or reinstall the PWA.
+      navigator.serviceWorker.addEventListener("message", (event) => {
+        if (event.data?.type === "SW_UPDATED") {
+          window.location.reload();
+        }
+      });
     } catch (err) {
       console.warn("Service worker registration failed:", err);
     }

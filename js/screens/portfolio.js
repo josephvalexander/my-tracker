@@ -90,7 +90,12 @@ const portfolioScreen = {
       </div>`;
 
     const valuations = stocks
-      .map((s) => ({ ticker: s.ticker, name: s.name || s.ticker, pe: s.priceContext?.peTTM ?? null }))
+      .map((s) => ({
+        ticker: s.ticker,
+        name: s.name || s.ticker,
+        pe: s.priceContext?.peTTM ?? null,
+        sectorPE: s.priceContext?.sectorPE ?? null,
+      }))
       .filter((v) => v.pe !== null)
       .sort((a, b) => a.pe - b.pe);
 
@@ -98,11 +103,29 @@ const portfolioScreen = {
       valuations.length === 0
         ? `<span class="muted">No P/E data yet — will appear after indianapi fetch for each stock.</span>`
         : `<table style="width:100%; border-collapse:collapse;">
-            <thead><tr><td class="muted" style="font-size:11px; padding-bottom:6px;">Stock</td><td class="muted" style="font-size:11px; text-align:right;">P/E (TTM)</td></tr></thead>
+            <thead>
+              <tr>
+                <td class="muted" style="font-size:11px; padding-bottom:6px;">Stock</td>
+                <td class="muted" style="font-size:11px; text-align:right;">P/E (TTM)</td>
+                <td class="muted" style="font-size:11px; text-align:right;">Sector P/E</td>
+                <td class="muted" style="font-size:11px; text-align:right;">vs Sector</td>
+              </tr>
+            </thead>
             <tbody>
               ${valuations.map((v) => {
-                const cls = v.pe < 15 ? "text-good" : v.pe < 30 ? "" : "text-warning";
-                return `<tr><td style="padding:3px 0;">${v.ticker}</td><td class="${cls}" style="text-align:right;">${v.pe.toFixed(1)}x</td></tr>`;
+                const peCls = v.pe < 15 ? "text-good" : v.pe < 30 ? "" : "text-warning";
+                const diff = (v.pe != null && v.sectorPE != null)
+                  ? ((v.pe - v.sectorPE) / v.sectorPE * 100)
+                  : null;
+                const diffStr = diff !== null
+                  ? `<span style="color:${diff > 20 ? "var(--color-red)" : diff < -10 ? "var(--color-green)" : "var(--color-text-secondary)"}">${diff >= 0 ? "+" : ""}${diff.toFixed(0)}%</span>`
+                  : `<span class="muted">—</span>`;
+                return `<tr style="border-bottom:0.5px solid var(--color-border);">
+                  <td style="padding:5px 0; font-size:13px;">${v.ticker}</td>
+                  <td class="${peCls}" style="text-align:right; font-size:13px;">${v.pe.toFixed(1)}x</td>
+                  <td class="muted" style="text-align:right; font-size:13px;">${v.sectorPE ? v.sectorPE.toFixed(1) + "x" : "—"}</td>
+                  <td style="text-align:right; font-size:13px;">${diffStr}</td>
+                </tr>`;
               }).join("")}
             </tbody>
           </table>`;

@@ -48,7 +48,15 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
+    ).then(() => {
+      // Tell all open tabs to reload so they pick up the new files.
+      // Without this, skipWaiting() activates the new SW but the page
+      // keeps serving from the already-loaded old scripts until a manual
+      // refresh. This postMessage triggers the reload in app.js.
+      return self.clients.matchAll({ type: "window" }).then((clients) => {
+        clients.forEach((client) => client.postMessage({ type: "SW_UPDATED" }));
+      });
+    })
   );
   self.clients.claim();
 });
