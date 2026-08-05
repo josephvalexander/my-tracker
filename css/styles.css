@@ -302,6 +302,10 @@ body {
 .ai-source-link { font-size: 10px; color: var(--color-text-tertiary); text-decoration: underline; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .iv-computed-box { background: var(--color-green-bg); border-radius: var(--radius-md); padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--color-green); }
 
+.index-bar { display: flex; align-items: center; gap: 8px; padding: 6px 0 10px; font-size: 12px; flex-wrap: wrap; }
+.index-item { display: inline-flex; align-items: center; gap: 2px; }
+.index-divider { color: var(--color-text-tertiary); }
+.index-refresh-time { font-size: 10px; margin-left: auto; color: var(--color-text-tertiary); }
 .action-row { padding: 6px 0; font-size: 13px; border-bottom: 0.5px solid var(--color-border); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .action-row:last-child { border-bottom: none; }
 .action-type { font-size: 10px; font-weight: 600; text-transform: uppercase; color: var(--color-text-secondary); background: var(--color-bg); border-radius: 4px; padding: 2px 5px; flex-shrink: 0; }

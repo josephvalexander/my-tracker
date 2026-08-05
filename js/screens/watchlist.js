@@ -48,6 +48,12 @@ const watchlistScreen = {
   async render() {
     return `
       <div class="screen-padding">
+        <div id="index-bar" class="index-bar">
+          <span class="index-item muted" id="idx-sensex">SENSEX —</span>
+          <span class="index-divider">·</span>
+          <span class="index-item muted" id="idx-nifty">NIFTY —</span>
+          <span class="index-refresh-time muted" id="idx-time"></span>
+        </div>
         <div class="screen-header">
           <div class="screen-title">My watchlist <span id="watchlist-count" class="muted"></span></div>
           <div class="header-actions">
@@ -65,6 +71,49 @@ const watchlistScreen = {
   },
 
   async afterRender() {
+    // ── Market index bar ────────────────────────────────────────────────────
+    const WORKER = "https://portfolio-tracker-nse-proxy.josephv-mec.workers.dev";
+
+    function renderIndex(elId, label, data) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      if (!data || data.current === null) {
+        el.innerHTML = `<span class="muted">${label} —</span>`;
+        return;
+      }
+      const up = data.changePct !== null && data.changePct >= 0;
+      const color = up ? "var(--color-green)" : "var(--color-red)";
+      const arrow = up ? "▲" : "▼";
+      el.innerHTML = `
+        <span style="font-weight:600;">${label}</span>
+        <span style="margin-left:4px;">${data.current.toLocaleString("en-IN")}</span>
+        <span style="color:${color}; margin-left:5px;">${arrow} ${data.changePct !== null ? Math.abs(data.changePct).toFixed(2) + "%" : ""}</span>`;
+    }
+
+    async function fetchIndices() {
+      try {
+        const [sensex, nifty] = await Promise.all([
+          fetch(`${WORKER}/yf-index?symbol=%5EBSESN`).then(r => r.json()).catch(() => null),
+          fetch(`${WORKER}/yf-index?symbol=%5ENSEI`).then(r => r.json()).catch(() => null),
+        ]);
+        renderIndex("idx-sensex", "SENSEX", sensex);
+        renderIndex("idx-nifty", "NIFTY", nifty);
+        const timeEl = document.getElementById("idx-time");
+        if (timeEl) {
+          const now = new Date();
+          timeEl.textContent = `${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}`;
+        }
+      } catch {
+        // Silent — index bar is non-critical
+      }
+    }
+
+    fetchIndices();
+    // Auto-refresh every 5 minutes while the watchlist is open
+    const indexRefreshTimer = setInterval(fetchIndices, 5 * 60 * 1000);
+    // Clean up timer when navigating away (the router re-renders on hash change)
+    window.addEventListener("hashchange", () => clearInterval(indexRefreshTimer), { once: true });
+
     const stocks = await StockStore.getActive();
     const countEl = document.getElementById("watchlist-count");
     countEl.textContent = `· ${stocks.length} stock${stocks.length === 1 ? "" : "s"}`;
