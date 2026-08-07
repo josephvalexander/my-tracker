@@ -21,10 +21,25 @@ function stockRow(stock) {
   const de = debtToEquity(stock);
   const cagr = epsCagr(stock);
   const cmp = stock.fundamentals?.currentPrice ?? null;
+  const dayChangePct = stock.priceContext?.dayChangePct ?? null;
+  const watchlistPrice = stock.watchlistPrice ?? null;
+  const sinceAdded = (cmp && watchlistPrice)
+    ? ((cmp - watchlistPrice) / watchlistPrice) * 100
+    : null;
 
-  const roeColor = colorForMetric(roe, DEFAULT_RULES.roe);
-  const deColor = colorForMetric(de, DEFAULT_RULES.de);
+  const roeColor  = colorForMetric(roe,  DEFAULT_RULES.roe);
+  const deColor   = colorForMetric(de,   DEFAULT_RULES.de);
   const cagrColor = colorForMetric(cagr, DEFAULT_RULES.epsCagr);
+
+  // Day change — shown inline with price
+  const dayHtml = dayChangePct != null
+    ? `<div class="price-day-change" style="font-size:11px; color:var(${dayChangePct >= 0 ? "--color-green" : "--color-red"});">${dayChangePct >= 0 ? "▲" : "▼"}${Math.abs(dayChangePct).toFixed(2)}%</div>`
+    : `<div class="price-day-change" style="font-size:11px; color:var(--color-text-tertiary);">—</div>`;
+
+  // Since added — shown below day change
+  const sinceHtml = sinceAdded != null
+    ? `<div style="font-size:10px; color:var(${sinceAdded >= 0 ? "--color-green" : "--color-red"});">${sinceAdded >= 0 ? "+" : ""}${sinceAdded.toFixed(1)}%</div>`
+    : `<div style="font-size:10px; color:var(--color-text-tertiary);">—</div>`;
 
   return `
     <div class="stock-row" data-ticker="${stock.ticker}">
@@ -38,6 +53,8 @@ function stockRow(stock) {
         ${metricChip("EPS", cagr, formatPct(cagr), cagrColor)}
         <div class="stock-price">
           <div class="price-main">${formatCurrency(cmp)}</div>
+          ${dayHtml}
+          ${sinceHtml}
         </div>
         <button class="row-menu-btn" data-menu-ticker="${stock.ticker}" aria-label="Row options">&#8942;</button>
       </div>
@@ -215,6 +232,12 @@ const watchlistScreen = {
             if (result.quoteInfo.todayLow)   fresh.priceContext.todayLow   = result.quoteInfo.todayLow;
             if (result.quoteInfo.todayHigh)  fresh.priceContext.todayHigh  = result.quoteInfo.todayHigh;
             if (result.quoteInfo.previousClose) fresh.priceContext.previousClose = result.quoteInfo.previousClose;
+            if (result.quoteInfo.dayChangePct != null) fresh.priceContext.dayChangePct = result.quoteInfo.dayChangePct;
+
+            // Set watchlistPrice on first fetch if not already stored
+            if (!fresh.watchlistPrice && result.quoteInfo.currentPrice) {
+              fresh.watchlistPrice = result.quoteInfo.currentPrice;
+            }
 
             // Only derive market cap if neither YF nor indianapi has set one
             if (!result.quoteInfo.marketCap && !fresh.fundamentals.marketCap) {
@@ -224,10 +247,14 @@ const watchlistScreen = {
 
             await StockStore.set(stock.ticker, fresh);
 
-            // Update the price cell in the list in-place without a full re-render
+            // Update price and day change in-place without full re-render
             const priceMain = document.querySelector(`.stock-row[data-ticker="${stock.ticker}"] .price-main`);
-            if (priceMain) {
-              priceMain.textContent = formatCurrency(result.quoteInfo.currentPrice);
+            if (priceMain) priceMain.textContent = formatCurrency(result.quoteInfo.currentPrice);
+            const dayEl = document.querySelector(`.stock-row[data-ticker="${stock.ticker}"] .price-day-change`);
+            if (dayEl && result.quoteInfo.dayChangePct != null) {
+              const up = result.quoteInfo.dayChangePct >= 0;
+              dayEl.textContent = `${up ? "▲" : "▼"}${Math.abs(result.quoteInfo.dayChangePct).toFixed(2)}%`;
+              dayEl.style.color = `var(${up ? "--color-green" : "--color-red"})`;
             }
             updated++;
           } else {

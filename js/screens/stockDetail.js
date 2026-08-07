@@ -402,7 +402,12 @@ const stockDetailScreen = {
             ...(result.quoteInfo.todayLow   && { todayLow:   result.quoteInfo.todayLow   }),
             ...(result.quoteInfo.todayHigh  && { todayHigh:  result.quoteInfo.todayHigh  }),
             ...(result.quoteInfo.previousClose && { previousClose: result.quoteInfo.previousClose }),
+            ...(result.quoteInfo.dayChangePct != null && { dayChangePct: result.quoteInfo.dayChangePct }),
           };
+          // Set watchlistPrice on first ever fetch if not already stored
+          if (!stock.watchlistPrice && result.quoteInfo.currentPrice) {
+            stock.watchlistPrice = result.quoteInfo.currentPrice;
+          }
           // Only derive market cap if we don't already have one from indianapi.
           // calculateMarketCap uses sharesOutstanding which has inconsistent units
           // in indianapi across stocks — the reusable.marketCap from indianapi is

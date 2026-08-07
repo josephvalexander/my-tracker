@@ -240,6 +240,12 @@ const addStockScreen = {
         const parsed = await fetchIndianApiData(searchName, apiKey);
         const updatedStock = await applyIndianApiResult(ticker, parsed);
 
+        // Store the price at time of adding as the watchlist baseline
+        if (parsed.stockFundamentals.currentPrice && !updatedStock.watchlistPrice) {
+          updatedStock.watchlistPrice = parsed.stockFundamentals.currentPrice;
+          await StockStore.set(ticker, updatedStock);
+        }
+
         const roe = roe5yAvg(updatedStock);
         const de = debtToEquity(updatedStock);
         const cagr = epsCagr(updatedStock);

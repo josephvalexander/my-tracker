@@ -91,8 +91,26 @@ async function autoPullOnOpen() {
   }
 }
 
+async function migrateWatchlistPrice() {
+  // One-time migration: set watchlistPrice = currentPrice for any active
+  // stock that doesn't have it yet. Runs silently on every startup but
+  // only does work on stocks missing the field — effectively runs once.
+  try {
+    const stocks = await StockStore.getActive();
+    for (const stock of stocks) {
+      if (!stock.watchlistPrice && stock.fundamentals?.currentPrice) {
+        stock.watchlistPrice = stock.fundamentals.currentPrice;
+        await StockStore.set(stock.ticker, stock);
+      }
+    }
+  } catch (err) {
+    console.warn("watchlistPrice migration failed:", err);
+  }
+}
+
 async function init() {
   await seedDefaultsIfNeeded();
+  await migrateWatchlistPrice();
   const settings = await MetaStore.getSettings();
   applyTheme(settings?.theme || "auto");
   await registerServiceWorker();

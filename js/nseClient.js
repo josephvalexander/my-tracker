@@ -57,7 +57,8 @@ async function fetchYfQuoteInfo(symbol, yahooSymbol) {
     name: data.companyName ?? null,
     currentPrice: data.currentPrice ?? null,
     previousClose: data.previousClose ?? null,
-    marketCap: data.marketCap ?? null, // in ₹ Cr
+    dayChangePct: data.dayChangePct ?? null,
+    marketCap: data.marketCap ?? null,
     week52High: data.week52High ?? null,
     week52Low: data.week52Low ?? null,
     todayLow: null,
