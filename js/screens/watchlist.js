@@ -132,6 +132,15 @@ const watchlistScreen = {
     window.addEventListener("hashchange", () => clearInterval(indexRefreshTimer), { once: true });
 
     const stocks = await StockStore.getActive();
+
+    // Safety net: set watchlistPrice for any stock still missing it
+    // (in case the app.js migration was missed due to service worker caching)
+    for (const stock of stocks) {
+      if (!stock.watchlistPrice && stock.fundamentals?.currentPrice) {
+        stock.watchlistPrice = stock.fundamentals.currentPrice;
+        await StockStore.set(stock.ticker, stock);
+      }
+    }
     const countEl = document.getElementById("watchlist-count");
     countEl.textContent = `· ${stocks.length} stock${stocks.length === 1 ? "" : "s"}`;
 
