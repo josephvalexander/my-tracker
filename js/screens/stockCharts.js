@@ -210,37 +210,28 @@ const stockChartsScreen = {
 
         // Promoter trend line — the signal that matters most
         charts.shareholding = new Chart(shCanvas, {
-          type: "line",
+          type: "bar",
           data: {
             labels: shHistory.map((h) => h.quarter),
             datasets: [
-              {
-                label: "Promoter %",
-                data: shHistory.map((h) => h.promoter),
-                borderColor: "#534AB7", backgroundColor: "rgba(83,74,183,0.1)",
-                tension: 0.3, fill: true, pointRadius: 4,
-                pointBackgroundColor: "#534AB7", borderWidth: 2,
-                yAxisID: "y",
-              },
-              {
-                label: "FII %",
-                data: shHistory.map((h) => h.fii),
-                borderColor: "#378ADD", backgroundColor: "transparent",
-                tension: 0.3, pointRadius: 3, borderWidth: 1.5,
-                borderDash: [4, 3], yAxisID: "y",
-              },
+              { label: "Promoter", data: shHistory.map((h) => h.promoter), backgroundColor: "#534AB7", stack: "s", borderRadius: 2 },
+              { label: "FII",      data: shHistory.map((h) => h.fii),      backgroundColor: "#378ADD", stack: "s", borderRadius: 0 },
+              { label: "DII/MF",  data: shHistory.map((h) => h.dii),      backgroundColor: "#1D9E75", stack: "s", borderRadius: 0 },
+              { label: "Public",  data: shHistory.map((h) => h.public),   backgroundColor: "#B4B2A9", stack: "s", borderRadius: 0 },
             ],
           },
           options: {
             responsive: true, maintainAspectRatio: false,
             plugins: {
               legend: { position: "bottom", labels: { font: baseFont, boxWidth: 12, boxHeight: 12, usePointStyle: true, pointStyle: "circle" } },
-              tooltip: { backgroundColor: "#2c2c2a", titleFont: baseFont, bodyFont: baseFont, padding: 10, cornerRadius: 6,
-                callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(1)}%` } },
+              tooltip: {
+                backgroundColor: "#2c2c2a", titleFont: baseFont, bodyFont: baseFont, padding: 10, cornerRadius: 6,
+                callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(1)}%` },
+              },
             },
             scales: {
-              x: { grid: { display: false }, ticks: { ...tickStyle, maxRotation: 45, minRotation: 45 } },
-              y: { grid: gridStyle, ticks: { ...tickStyle, callback: (v) => v + "%" }, suggestedMin: 0, suggestedMax: 80 },
+              x: { stacked: true, grid: { display: false }, ticks: { ...tickStyle, maxRotation: 45, minRotation: 45 } },
+              y: { stacked: true, max: 100, grid: gridStyle, ticks: { ...tickStyle, callback: (v) => v + "%" } },
             },
           },
         });

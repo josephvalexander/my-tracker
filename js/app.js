@@ -110,11 +110,11 @@ async function migrateWatchlistPrice() {
 
 async function init() {
   await seedDefaultsIfNeeded();
-  await migrateWatchlistPrice();
   const settings = await MetaStore.getSettings();
   applyTheme(settings?.theme || "auto");
   await registerServiceWorker();
   await autoPullOnOpen();
+  await migrateWatchlistPrice(); // must run AFTER pull so Drive doesn't overwrite it
   initRouter();
 }
 

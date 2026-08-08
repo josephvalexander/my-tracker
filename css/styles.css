@@ -330,7 +330,8 @@ body {
 .holding-row-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; gap: 8px; }
 .holding-row-right { text-align: right; flex-shrink: 0; }
 .holding-row-actions { display: flex; gap: 4px; flex-shrink: 0; align-items: center; }
-.icon-btn { background: none; border: 0.5px solid var(--color-border); border-radius: 6px; padding: 4px 8px; font-size: 13px; cursor: pointer; color: var(--color-text-secondary); line-height: 1; }
+.icon-btn { background: none; border: 0.5px solid var(--color-border); border-radius: 6px; padding: 4px 8px; font-size: 13px; cursor: pointer; color: var(--color-text-secondary); line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+.icon-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .icon-btn:hover { background: var(--color-bg); }
 .icon-btn-danger { color: var(--color-red); border-color: var(--color-red-bg); }
 .icon-btn-danger:hover { background: var(--color-red-bg); }

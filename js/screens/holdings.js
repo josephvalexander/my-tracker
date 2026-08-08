@@ -22,7 +22,7 @@ function holdingRow(row, allocationColor) {
           <div class="${profitClass}">${profitText}</div>
         </div>
         <div class="holding-row-actions">
-          <button class="holding-edit-btn icon-btn" data-ticker="${row.ticker}" title="Edit">✏</button>
+          <button class="holding-edit-btn icon-btn" data-ticker="${row.ticker}" title="Edit"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
           <button class="holding-remove-btn icon-btn icon-btn-danger" data-ticker="${row.ticker}" title="Remove">✕</button>
         </div>
       </div>
@@ -108,10 +108,11 @@ const holdingsScreen = {
         const row = btn.closest(".holding-row");
         const form = row.querySelector(".holding-edit-form");
         const meta = row.querySelector(".holding-display-meta");
+        const PENCIL = `<svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
         const isOpen = form.style.display !== "none";
         form.style.display = isOpen ? "none" : "block";
         meta.style.display = isOpen ? "" : "none";
-        btn.textContent = isOpen ? "✏" : "✕";
+        btn.innerHTML = isOpen ? PENCIL : "✕";
         btn.title = isOpen ? "Edit" : "Cancel edit";
       });
     });
@@ -125,7 +126,7 @@ const holdingsScreen = {
         const editBtn = row.querySelector(".holding-edit-btn");
         form.style.display = "none";
         meta.style.display = "";
-        editBtn.textContent = "✏";
+        editBtn.innerHTML = `<svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
         editBtn.title = "Edit";
       });
     });
