@@ -132,8 +132,121 @@ const holdingsScreen = {
       <div class="metric-card-box"><div class="metric-card-label">Invested</div><div class="metric-card-value">${formatCurrencyShort(summary.totalInvested)}</div></div>
       <div class="metric-card-box"><div class="metric-card-label">Current</div><div class="metric-card-value">${formatCurrencyShort(summary.totalCurrentValue)}</div></div>
       <div class="metric-card-box"><div class="metric-card-label">Overall</div><div class="metric-card-value ${(summary.overallProfitPct ?? 0) >= 0 ? "text-good" : "text-bad"}">${summary.overallProfitPct !== null ? (summary.overallProfitPct >= 0 ? "+" : "") + summary.overallProfitPct.toFixed(1) + "%" : "—"}</div></div>
-      <div class="metric-card-box"><div class="metric-card-label">Dividends</div><div class="metric-card-value">${formatCurrencyShort(summary.totalDividends)}</div></div>
+      <div class="metric-card-box" id="div-summary-card" style="cursor:pointer;" title="Tap to see dividend breakdown">
+        <div class="metric-card-label">Dividends ↗</div>
+        <div class="metric-card-value">${formatCurrencyShort(summary.totalDividends)}</div>
+      </div>
     `;
+
+    // ── Dividend detail modal ─────────────────────────────────────────
+    // Build data: for each holding, for each lot, for each dividend — collect eligible entries
+    const divEntries = []; // { ticker, lotDate, divDate, divFY, amount, qty, total }
+    for (const h of holdings) {
+      const divs = divMap[h.ticker] ?? [];
+      const lots = h.lots?.length ? h.lots : [{ purchaseDate: null, quantity: h.quantity ?? 0, buyPrice: h.avgBuyPrice ?? 0 }];
+      for (const div of divs) {
+        if (!div.amount) continue;
+        const recordDate = div.recordDate ? new Date(div.recordDate) : null;
+        // Indian FY: Apr 1 – Mar 31. FY2026 = Apr 2025 – Mar 2026.
+        const fy = recordDate
+          ? (recordDate.getMonth() >= 3 ? recordDate.getFullYear() + 1 : recordDate.getFullYear())
+          : null;
+        for (const lot of lots) {
+          const lotDate = lot.purchaseDate ? new Date(lot.purchaseDate) : null;
+          const eligible = !lotDate || !recordDate || lotDate <= recordDate;
+          if (eligible && lot.quantity > 0) {
+            divEntries.push({
+              ticker: h.ticker,
+              lotDate: lot.purchaseDate || "—",
+              divDate: div.recordDate || "—",
+              divFY: fy ? `FY${fy}` : "Unknown",
+              amountPerShare: div.amount,
+              qty: lot.quantity,
+              total: lot.quantity * div.amount,
+            });
+          }
+        }
+      }
+    }
+
+    // Get unique FYs for the filter
+    const allFYs = [...new Set(divEntries.map(e => e.divFY))].sort().reverse();
+
+    // Inject modal HTML
+    const modalHtml = `
+      <div id="div-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:200; overflow-y:auto; padding:20px;">
+        <div style="background:var(--color-surface); border-radius:var(--radius-lg); max-width:520px; margin:0 auto; padding:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <div style="font-size:15px; font-weight:600;">Dividend breakdown</div>
+            <button id="div-modal-close" class="btn btn-small">✕ Close</button>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; align-items:center;">
+            <span class="muted" style="font-size:12px;">Filter by FY:</span>
+            <button class="fy-filter-btn btn btn-small ${allFYs.length === 0 ? "" : ""}" data-fy="all" style="background:var(--color-text); color:var(--color-surface);">All</button>
+            ${allFYs.map(fy => `<button class="fy-filter-btn btn btn-small" data-fy="${fy}">${fy}</button>`).join("")}
+          </div>
+          <div id="div-modal-total" style="font-size:13px; font-weight:600; margin-bottom:8px;"></div>
+          <div id="div-modal-table" style="overflow-x:auto;"></div>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML("beforeend", modalHtml);
+
+    function renderDivTable(fyFilter) {
+      const filtered = fyFilter === "all" ? divEntries : divEntries.filter(e => e.divFY === fyFilter);
+      // Group by ticker
+      const byTicker = {};
+      filtered.forEach(e => {
+        if (!byTicker[e.ticker]) byTicker[e.ticker] = { total: 0, entries: [] };
+        byTicker[e.ticker].total += e.total;
+        byTicker[e.ticker].entries.push(e);
+      });
+      const grandTotal = filtered.reduce((s, e) => s + e.total, 0);
+      document.getElementById("div-modal-total").textContent =
+        `Total: ₹${Math.round(grandTotal).toLocaleString("en-IN")}`;
+
+      if (filtered.length === 0) {
+        document.getElementById("div-modal-table").innerHTML = `<div class="muted" style="font-size:13px;">No dividends for this period.</div>`;
+        return;
+      }
+      const rows = Object.entries(byTicker)
+        .sort((a, b) => b[1].total - a[1].total)
+        .map(([ticker, data]) => `
+          <div style="margin-bottom:12px;">
+            <div style="font-size:13px; font-weight:600; padding:4px 0; border-bottom:0.5px solid var(--color-border);">
+              ${ticker} — ₹${Math.round(data.total).toLocaleString("en-IN")} total
+            </div>
+            ${data.entries.map(e => `
+              <div style="display:flex; justify-content:space-between; font-size:12px; padding:3px 0; border-bottom:0.5px solid var(--color-border); gap:8px; flex-wrap:wrap;">
+                <span class="muted">${e.divDate} (${e.divFY})</span>
+                <span>${e.qty.toLocaleString()} × ₹${e.amountPerShare}</span>
+                <span style="font-weight:500;">₹${Math.round(e.total).toLocaleString("en-IN")}</span>
+              </div>`).join("")}
+          </div>`).join("");
+      document.getElementById("div-modal-table").innerHTML = rows;
+    }
+
+    document.getElementById("div-summary-card").addEventListener("click", () => {
+      renderDivTable("all");
+      document.getElementById("div-modal-overlay").style.display = "block";
+    });
+    document.getElementById("div-modal-close").addEventListener("click", () => {
+      document.getElementById("div-modal-overlay").style.display = "none";
+    });
+    document.getElementById("div-modal-overlay").addEventListener("click", (e) => {
+      if (e.target.id === "div-modal-overlay") {
+        document.getElementById("div-modal-overlay").style.display = "none";
+      }
+    });
+    document.querySelectorAll(".fy-filter-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".fy-filter-btn").forEach(b => {
+          b.style.background = ""; b.style.color = "";
+        });
+        btn.style.background = "var(--color-text)";
+        btn.style.color = "var(--color-surface)";
+        renderDivTable(btn.dataset.fy);
+      });
+    });
 
     document.getElementById("holdings-list").innerHTML = summary.rows
       .map((row, i) => holdingRow(row, PALETTE[i % PALETTE.length]))
