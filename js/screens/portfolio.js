@@ -81,13 +81,53 @@ const portfolioScreen = {
     });
 
     const breakdown = sectorBreakdown(stocks);
-    document.getElementById("sector-chart").innerHTML = `
-      <div class="sector-bar">
-        ${breakdown.map((b, i) => `<div style="width:${b.pct}%; background:${SECTOR_PALETTE[i % SECTOR_PALETTE.length]}"></div>`).join("")}
-      </div>
-      <div class="sector-legend">
-        ${breakdown.map((b, i) => `<span><span class="legend-dot" style="background:${SECTOR_PALETTE[i % SECTOR_PALETTE.length]}"></span>${b.sector} · ${b.pct.toFixed(0)}%</span>`).join("")}
-      </div>`;
+    const sectorEl  = document.getElementById("sector-chart");
+
+    if (breakdown.length === 0) {
+      sectorEl.innerHTML = `<span class="muted">No sector data yet.</span>`;
+    } else {
+      sectorEl.innerHTML = `
+        <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+          <div style="width:150px; height:150px; flex-shrink:0;">
+            <canvas id="sector-doughnut"></canvas>
+          </div>
+          <div style="flex:1; min-width:140px;">
+            ${breakdown.map((b, i) => `
+              <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px; font-size:12px;">
+                <span style="width:10px;height:10px;border-radius:50%;background:${SECTOR_PALETTE[i % SECTOR_PALETTE.length]};flex-shrink:0;display:inline-block;"></span>
+                <span style="flex:1;">${b.sector}</span>
+                <span class="muted">${b.pct.toFixed(0)}%</span>
+              </div>`).join("")}
+          </div>
+        </div>`;
+
+      new Chart(document.getElementById("sector-doughnut"), {
+        type: "doughnut",
+        data: {
+          labels: breakdown.map(b => b.sector),
+          datasets: [{
+            data: breakdown.map(b => b.pct),
+            backgroundColor: breakdown.map((_, i) => SECTOR_PALETTE[i % SECTOR_PALETTE.length]),
+            borderWidth: 2,
+            borderColor: "var(--color-surface)",
+            hoverOffset: 4,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          cutout: "60%",
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => ` ${ctx.label}: ${ctx.parsed.toFixed(0)}%`,
+              },
+            },
+          },
+        },
+      });
+    }
 
     const valuations = stocks
       .map((s) => ({

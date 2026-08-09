@@ -73,6 +73,56 @@ async function applyIndianApiResult(ticker, parsed) {
     ...parsed.corporateActions,
   };
 
+  // Auto-apply any unprocessed splits or bonus issues
+  // Uses processedCorporateActions[] to track which record dates have
+  // already been applied — prevents double-applying on subsequent refreshes.
+  stock.processedCorporateActions = stock.processedCorporateActions || [];
+  const processed = new Set(stock.processedCorporateActions);
+
+  const allActions = [
+    ...(parsed.corporateActions.splits || []).map(a => ({ ...a, _type: "split" })),
+    ...(parsed.corporateActions.bonus  || []).map(a => ({ ...a, _type: "bonus" })),
+  ].sort((a, b) => new Date(a.recordDate) - new Date(b.recordDate)); // oldest first
+
+  for (const action of allActions) {
+    const key = `${action._type}_${action.recordDate}`;
+    if (processed.has(key)) continue; // already applied
+
+    let multiplier = null;
+    if (action._type === "split")  multiplier = splitMultiplier(action);
+    if (action._type === "bonus")  multiplier = bonusMultiplier(action);
+    if (!multiplier || multiplier === 1) { processed.add(key); continue; }
+
+    const recordDate = action.recordDate;
+
+    // Adjust watchlistPrice
+    if (stock.watchlistPrice) {
+      stock.watchlistPrice = stock.watchlistPrice / multiplier;
+    }
+
+    // Adjust holding lots
+    const holding = await HoldingStore.get(ticker);
+    if (holding) {
+      if (holding.lots?.length) {
+        // Adjust only lots purchased before the record date
+        for (const lot of holding.lots) {
+          if (!lot.purchaseDate || lot.purchaseDate < recordDate) {
+            lot.quantity = Math.round(lot.quantity * multiplier);
+            lot.buyPrice = lot.buyPrice / multiplier;
+          }
+        }
+      } else if (holding.quantity) {
+        // Legacy single-lot format
+        holding.quantity = Math.round(holding.quantity * multiplier);
+        holding.avgBuyPrice = holding.avgBuyPrice / multiplier;
+      }
+      await HoldingStore.set(ticker, holding);
+    }
+
+    processed.add(key);
+  }
+  stock.processedCorporateActions = [...processed];
+
   // Recent news and analyst consensus
   if (parsed.recentNews?.length) {
     stock.recentNews = parsed.recentNews;

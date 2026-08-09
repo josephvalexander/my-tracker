@@ -1,62 +1,94 @@
 /**
  * screens/holdings.js
  *
- * My Holdings tab. Shows all positions with current value, P&L,
- * and allocation. Each row has inline edit (pencil icon expands
- * qty/price inputs) and a remove button.
+ * Holdings tab. Each holding uses a tax-lot model (lots array).
+ * Tap a holding row to expand/collapse its lot list.
+ * Summary row shows: invested, current value, P&L, total dividends.
  */
 
-function holdingRow(row, allocationColor) {
-  const profitClass = row.profitPct === null ? "muted" : row.profitPct >= 0 ? "text-good" : "text-bad";
-  const profitText  = row.profitPct === null ? "—" : `${row.profitPct >= 0 ? "+" : ""}${row.profitPct.toFixed(1)}%`;
+const PENCIL_SVG = `<svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+const TRASH_SVG  = `<svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
+
+function lotRows(row) {
+  if (!row.lots?.length) return `<div class="lot-empty muted">No lots recorded.</div>`;
+  return row.lots.map((lot, i) => `
+    <div class="lot-row" data-lot-idx="${i}">
+      <div class="lot-display">
+        <span class="muted" style="font-size:11px;">${lot.purchaseDate || "Date unknown"}</span>
+        <span>${lot.quantity} shares @ ₹${lot.buyPrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+        <div class="lot-actions">
+          <button class="lot-edit-btn icon-btn" data-ticker="${row.ticker}" data-lot-idx="${i}" title="Edit lot">${PENCIL_SVG}</button>
+          <button class="lot-delete-btn icon-btn icon-btn-danger" data-ticker="${row.ticker}" data-lot-idx="${i}" title="Delete lot">${TRASH_SVG}</button>
+        </div>
+      </div>
+      <div class="lot-edit-form" style="display:none;">
+        <div style="display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;">
+          <input type="date" class="lot-date-input" value="${lot.purchaseDate || ""}" style="flex:1; min-width:120px;" />
+          <input type="number" class="lot-qty-input" value="${lot.quantity}" min="1" step="1" placeholder="Qty" style="flex:0.6; min-width:70px;" />
+          <input type="number" class="lot-price-input" value="${lot.buyPrice}" step="0.01" placeholder="Price" style="flex:0.8; min-width:90px;" />
+        </div>
+        <div style="display:flex; gap:6px; margin-top:6px;">
+          <button class="btn btn-small btn-primary lot-save-btn" data-ticker="${row.ticker}" data-lot-idx="${i}">Save</button>
+          <button class="btn btn-small lot-cancel-btn" data-ticker="${row.ticker}" data-lot-idx="${i}">Cancel</button>
+        </div>
+      </div>
+    </div>`).join("");
+}
+
+function holdingRow(row, color) {
+  const pClass = row.profitPct === null ? "muted" : row.profitPct >= 0 ? "text-good" : "text-bad";
+  const pText  = row.profitPct === null ? "—" : `${row.profitPct >= 0 ? "+" : ""}${row.profitPct.toFixed(1)}%`;
+  const divText = row.dividends > 0 ? `₹${Math.round(row.dividends).toLocaleString("en-IN")}` : "—";
 
   return `
     <div class="holding-row" data-ticker="${row.ticker}">
-      <div class="holding-row-top">
+      <div class="holding-row-top holding-row-tap" data-ticker="${row.ticker}" style="cursor:pointer;">
         <div>
           <div class="stock-name">${row.ticker}</div>
-          <div class="stock-meta holding-display-meta">${row.quantity} shares · avg ₹${row.avgBuyPrice.toLocaleString("en-IN")}</div>
+          <div class="stock-meta">${row.quantity.toLocaleString()} shares · avg ₹${row.avgBuyPrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
         </div>
         <div class="holding-row-right">
           <div class="price-main">${formatCurrency(row.currentPrice)}</div>
-          <div class="${profitClass}">${profitText}</div>
+          <div class="${pClass}">${pText}</div>
         </div>
         <div class="holding-row-actions">
-          <button class="holding-edit-btn icon-btn" data-ticker="${row.ticker}" title="Edit"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-          <button class="holding-remove-btn icon-btn icon-btn-danger" data-ticker="${row.ticker}" title="Remove">✕</button>
-        </div>
-      </div>
-
-      <!-- Inline edit form — hidden by default -->
-      <div class="holding-edit-form" style="display:none;">
-        <div style="display:flex; gap:8px; margin-top:8px;">
-          <div class="form-group" style="flex:1; margin-bottom:0;">
-            <label style="font-size:11px;">Quantity</label>
-            <input type="number" class="holding-qty-edit" min="1" step="1" value="${row.quantity}" />
-          </div>
-          <div class="form-group" style="flex:1; margin-bottom:0;">
-            <label style="font-size:11px;">Avg buy price (₹)</label>
-            <input type="number" class="holding-price-edit" step="0.01" value="${row.avgBuyPrice}" />
-          </div>
-        </div>
-        <div style="display:flex; gap:8px; margin-top:8px;">
-          <button class="btn btn-small btn-primary holding-save-edit" data-ticker="${row.ticker}">Save</button>
-          <button class="btn btn-small holding-cancel-edit" data-ticker="${row.ticker}">Cancel</button>
+          <button class="holding-remove-btn icon-btn icon-btn-danger" data-ticker="${row.ticker}" title="Remove holding">${TRASH_SVG}</button>
         </div>
       </div>
 
       <div class="allocation-bar-track">
-        <div class="allocation-bar-fill" style="width:${row.allocationPct ?? 0}%; background:${allocationColor}"></div>
+        <div class="allocation-bar-fill" style="width:${row.allocationPct ?? 0}%; background:${color}"></div>
       </div>
       <div class="holding-row-bottom">
         <span>${formatCurrencyShort(row.invested)} invested</span>
         <span>${formatCurrencyShort(row.currentValue)} current</span>
+        <span class="muted">Div: ${divText}</span>
         <span>${row.allocationPct !== null ? row.allocationPct.toFixed(0) : "—"}% of portfolio</span>
+      </div>
+
+      <!-- Accordion: lots + add lot — hidden by default -->
+      <div class="lot-accordion" style="display:none;">
+        <div class="lot-header">
+          <span class="section-label" style="margin:0;">Tax lots</span>
+          <button class="btn btn-small add-lot-btn" data-ticker="${row.ticker}">+ Add lot</button>
+        </div>
+        <div class="lot-add-form" style="display:none;">
+          <div style="display:flex; gap:6px; margin:8px 0; flex-wrap:wrap;">
+            <input type="date" class="new-lot-date" style="flex:1; min-width:120px;" />
+            <input type="number" class="new-lot-qty" min="1" step="1" placeholder="Qty" style="flex:0.6; min-width:70px;" />
+            <input type="number" class="new-lot-price" step="0.01" placeholder="Buy price ₹" style="flex:0.8; min-width:90px;" />
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button class="btn btn-small btn-primary save-new-lot-btn" data-ticker="${row.ticker}">Save lot</button>
+            <button class="btn btn-small cancel-new-lot-btn" data-ticker="${row.ticker}">Cancel</button>
+          </div>
+        </div>
+        <div class="lot-list">${lotRows(row)}</div>
       </div>
     </div>`;
 }
 
-const PALETTE = ["#534AB7", "#378ADD", "#1D9E75", "#D85A30", "#D4537E", "#BA7517"];
+const PALETTE = ["#534AB7","#378ADD","#1D9E75","#D85A30","#D4537E","#BA7517"];
 
 const holdingsScreen = {
   async render() {
@@ -66,16 +98,20 @@ const holdingsScreen = {
           <div class="screen-title">My holdings <span id="holdings-count" class="muted"></span></div>
           <button id="add-holding-btn" class="btn btn-small">+ Add position</button>
         </div>
-        <div id="holdings-summary" class="metric-grid-3"></div>
+        <div id="holdings-summary" class="metric-grid-4"></div>
         <div id="holdings-list" class="stock-list"></div>
       </div>`;
   },
 
   async afterRender() {
-    const holdings = await HoldingStore.getAll();
+    const holdings  = await HoldingStore.getAll();
     const allStocks = await StockStore.getAll();
-    const priceMap = {};
-    allStocks.forEach((s) => { priceMap[s.ticker] = s.fundamentals?.currentPrice ?? null; });
+    const priceMap  = {};
+    const divMap    = {};
+    allStocks.forEach((s) => {
+      priceMap[s.ticker] = s.fundamentals?.currentPrice ?? null;
+      divMap[s.ticker]   = s.corporateActions?.dividends ?? [];
+    });
 
     document.getElementById("holdings-count").textContent =
       `· ${holdings.length} position${holdings.length === 1 ? "" : "s"}`;
@@ -90,70 +126,119 @@ const holdingsScreen = {
       return;
     }
 
-    const summary = buildHoldingsSummary(holdings, priceMap);
+    const summary = buildHoldingsSummary(holdings, priceMap, divMap);
 
     document.getElementById("holdings-summary").innerHTML = `
       <div class="metric-card-box"><div class="metric-card-label">Invested</div><div class="metric-card-value">${formatCurrencyShort(summary.totalInvested)}</div></div>
-      <div class="metric-card-box"><div class="metric-card-label">Current value</div><div class="metric-card-value">${formatCurrencyShort(summary.totalCurrentValue)}</div></div>
-      <div class="metric-card-box"><div class="metric-card-label">Overall</div><div class="metric-card-value ${summary.overallProfitPct >= 0 ? "text-good" : "text-bad"}">${summary.overallProfitPct !== null ? (summary.overallProfitPct >= 0 ? "+" : "") + summary.overallProfitPct.toFixed(1) + "%" : "—"}</div></div>
+      <div class="metric-card-box"><div class="metric-card-label">Current</div><div class="metric-card-value">${formatCurrencyShort(summary.totalCurrentValue)}</div></div>
+      <div class="metric-card-box"><div class="metric-card-label">Overall</div><div class="metric-card-value ${(summary.overallProfitPct ?? 0) >= 0 ? "text-good" : "text-bad"}">${summary.overallProfitPct !== null ? (summary.overallProfitPct >= 0 ? "+" : "") + summary.overallProfitPct.toFixed(1) + "%" : "—"}</div></div>
+      <div class="metric-card-box"><div class="metric-card-label">Dividends</div><div class="metric-card-value">${formatCurrencyShort(summary.totalDividends)}</div></div>
     `;
 
     document.getElementById("holdings-list").innerHTML = summary.rows
       .map((row, i) => holdingRow(row, PALETTE[i % PALETTE.length]))
       .join("");
 
-    // ── Edit button — toggle inline form ──────────────────────────────
-    document.querySelectorAll(".holding-edit-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const row = btn.closest(".holding-row");
-        const form = row.querySelector(".holding-edit-form");
-        const meta = row.querySelector(".holding-display-meta");
-        const PENCIL = `<svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
-        const isOpen = form.style.display !== "none";
-        form.style.display = isOpen ? "none" : "block";
-        meta.style.display = isOpen ? "" : "none";
-        btn.innerHTML = isOpen ? PENCIL : "✕";
-        btn.title = isOpen ? "Edit" : "Cancel edit";
+    // ── Accordion toggle on tap ───────────────────────────────────────
+    document.querySelectorAll(".holding-row-tap").forEach((tap) => {
+      tap.addEventListener("click", (e) => {
+        if (e.target.closest("button")) return; // don't toggle when tapping buttons
+        const holdingRow = tap.closest(".holding-row");
+        const accordion  = holdingRow.querySelector(".lot-accordion");
+        const isOpen = accordion.style.display !== "none";
+        accordion.style.display = isOpen ? "none" : "block";
       });
     });
 
-    // ── Cancel edit ───────────────────────────────────────────────────
-    document.querySelectorAll(".holding-cancel-edit").forEach((btn) => {
+    // ── Add lot — show form ───────────────────────────────────────────
+    document.querySelectorAll(".add-lot-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
-        const row = btn.closest(".holding-row");
-        const form = row.querySelector(".holding-edit-form");
-        const meta = row.querySelector(".holding-display-meta");
-        const editBtn = row.querySelector(".holding-edit-btn");
-        form.style.display = "none";
-        meta.style.display = "";
-        editBtn.innerHTML = `<svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
-        editBtn.title = "Edit";
+        const form = btn.closest(".lot-accordion").querySelector(".lot-add-form");
+        form.style.display = form.style.display === "none" ? "block" : "none";
       });
     });
 
-    // ── Save inline edit ──────────────────────────────────────────────
-    document.querySelectorAll(".holding-save-edit").forEach((btn) => {
+    document.querySelectorAll(".cancel-new-lot-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        btn.closest(".lot-add-form").style.display = "none";
+      });
+    });
+
+    document.querySelectorAll(".save-new-lot-btn").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const ticker = btn.dataset.ticker;
-        const row = btn.closest(".holding-row");
-        const qty   = parseFloat(row.querySelector(".holding-qty-edit").value);
-        const price = parseFloat(row.querySelector(".holding-price-edit").value);
-
-        if (!qty || qty <= 0 || !price || price <= 0) {
-          alert("Enter valid quantity and price.");
-          return;
-        }
-
-        await HoldingStore.set(ticker, { ticker, quantity: qty, avgBuyPrice: price });
+        const form   = btn.closest(".lot-add-form");
+        const date   = form.querySelector(".new-lot-date").value || null;
+        const qty    = parseFloat(form.querySelector(".new-lot-qty").value);
+        const price  = parseFloat(form.querySelector(".new-lot-price").value);
+        if (!qty || !price) { alert("Enter quantity and price."); return; }
+        const holding = await HoldingStore.get(ticker);
+        holding.lots  = holding.lots || [];
+        holding.lots.push({ id: `lot_${Date.now()}`, purchaseDate: date, quantity: qty, buyPrice: price });
+        await HoldingStore.set(ticker, holding);
         navigate("#holdings");
       });
     });
 
-    // ── Remove position ───────────────────────────────────────────────
-    document.querySelectorAll(".holding-remove-btn").forEach((btn) => {
+    // ── Edit lot ─────────────────────────────────────────────────────
+    document.querySelectorAll(".lot-edit-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const lotRow  = btn.closest(".lot-row");
+        const display = lotRow.querySelector(".lot-display");
+        const form    = lotRow.querySelector(".lot-edit-form");
+        const isOpen  = form.style.display !== "none";
+        form.style.display    = isOpen ? "none" : "block";
+        display.style.display = isOpen ? ""     : "none";
+      });
+    });
+
+    document.querySelectorAll(".lot-cancel-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const lotRow  = btn.closest(".lot-row");
+        lotRow.querySelector(".lot-edit-form").style.display = "none";
+        lotRow.querySelector(".lot-display").style.display   = "";
+      });
+    });
+
+    document.querySelectorAll(".lot-save-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const ticker  = btn.dataset.ticker;
+        const idx     = parseInt(btn.dataset.lotIdx);
+        const lotRow  = btn.closest(".lot-row");
+        const date    = lotRow.querySelector(".lot-date-input").value  || null;
+        const qty     = parseFloat(lotRow.querySelector(".lot-qty-input").value);
+        const price   = parseFloat(lotRow.querySelector(".lot-price-input").value);
+        if (!qty || !price) { alert("Enter quantity and price."); return; }
+        const holding = await HoldingStore.get(ticker);
+        holding.lots[idx] = { ...holding.lots[idx], purchaseDate: date, quantity: qty, buyPrice: price };
+        await HoldingStore.set(ticker, holding);
+        navigate("#holdings");
+      });
+    });
+
+    // ── Delete lot ───────────────────────────────────────────────────
+    document.querySelectorAll(".lot-delete-btn").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const ticker = btn.dataset.ticker;
-        if (!confirm(`Remove ${ticker} from your holdings? This only removes the position — the stock stays on your watchlist.`)) return;
+        const idx    = parseInt(btn.dataset.lotIdx);
+        const holding = await HoldingStore.get(ticker);
+        if (holding.lots.length === 1) {
+          if (!confirm("Deleting the last lot will remove this holding entirely.")) return;
+          await HoldingStore.remove(ticker);
+        } else {
+          holding.lots.splice(idx, 1);
+          await HoldingStore.set(ticker, holding);
+        }
+        navigate("#holdings");
+      });
+    });
+
+    // ── Remove entire holding ─────────────────────────────────────────
+    document.querySelectorAll(".holding-remove-btn").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const ticker = btn.dataset.ticker;
+        if (!confirm(`Remove ${ticker} from your holdings? The stock stays on your watchlist.`)) return;
         await HoldingStore.remove(ticker);
         navigate("#holdings");
       });

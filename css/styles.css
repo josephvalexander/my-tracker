@@ -319,6 +319,16 @@ body {
 
 /* Holdings */
 .metric-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+.metric-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 12px; }
+@media (max-width: 420px) { .metric-grid-4 { grid-template-columns: repeat(2, 1fr); } }
+.lot-accordion { border-top: 0.5px solid var(--color-border); margin-top: 8px; padding-top: 8px; }
+.lot-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.lot-row { padding: 6px 0; border-bottom: 0.5px solid var(--color-border); }
+.lot-row:last-child { border-bottom: none; }
+.lot-display { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }
+.lot-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.lot-empty { font-size: 12px; padding: 6px 0; }
+.lot-edit-form input { font-size: 12px; padding: 4px 6px; border: 0.5px solid var(--color-border); border-radius: 6px; background: var(--color-bg); color: var(--color-text); width: 100%; box-sizing: border-box; }
 .metric-card-box { background: var(--color-surface); border-radius: var(--radius-md); padding: 10px 12px; }
 .metric-card-label { font-size: 10px; color: var(--color-text-tertiary); }
 .metric-card-value { font-size: 17px; font-weight: 600; }
