@@ -102,7 +102,7 @@ const portfolioScreen = {
         </div>`;
 
       new Chart(document.getElementById("sector-doughnut"), {
-        type: "doughnut",
+        type: "pie",
         data: {
           labels: breakdown.map(b => b.sector),
           datasets: [{
@@ -116,7 +116,6 @@ const portfolioScreen = {
         options: {
           responsive: true,
           maintainAspectRatio: true,
-          cutout: "60%",
           plugins: {
             legend: { display: false },
             tooltip: {
