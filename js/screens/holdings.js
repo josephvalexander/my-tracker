@@ -60,10 +60,10 @@ function holdingRow(row, color) {
         <div class="allocation-bar-fill" style="width:${row.allocationPct ?? 0}%; background:${color}"></div>
       </div>
       <div class="holding-row-bottom">
-        <span>${formatCurrencyShort(row.invested)} invested</span>
-        <span>${formatCurrencyShort(row.currentValue)} current</span>
-        <span class="muted">Div: ${divText}</span>
-        <span>${row.allocationPct !== null ? row.allocationPct.toFixed(0) : "—"}% of portfolio</span>
+        <span>${formatCurrencyShort(row.invested)} inv</span>
+        <span>${formatCurrencyShort(row.currentValue)} cur</span>
+        <span>div ${divText}</span>
+        <span>${row.allocationPct !== null ? row.allocationPct.toFixed(0) : "—"}% alloc</span>
       </div>
 
       <!-- Accordion: lots + add lot — hidden by default -->
@@ -145,6 +145,7 @@ const holdingsScreen = {
     // position (summed) per dividend to avoid duplicates when multiple legacy
     // lots all have null dates.
     const divEntries = [];
+    const modalToday = new Date(); modalToday.setHours(23, 59, 59, 0);
     for (const h of holdings) {
       const divs = divMap[h.ticker] ?? [];
       const lots = h.lots?.length ? h.lots : [{ purchaseDate: null, quantity: h.quantity ?? 0, buyPrice: h.avgBuyPrice ?? 0 }];
@@ -154,6 +155,7 @@ const holdingsScreen = {
         // Use recordDate first, fall back to announced date
         const dateStr = div.recordDate || div.announced || null;
         const recordDate = dateStr ? new Date(dateStr) : null;
+        if (recordDate && recordDate > modalToday) continue; // future — not yet paid
         // Indian FY: Apr–Mar. Date in May 2026 → FY2027, Jan 2026 → FY2026
         const fy = recordDate
           ? (recordDate.getMonth() >= 3 ? recordDate.getFullYear() + 1 : recordDate.getFullYear())

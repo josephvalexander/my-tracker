@@ -577,6 +577,27 @@ function entryZoneStatus(stock) {
   };
 }
 
+const SECTOR_MAP = {
+  "Biotechnology & Drugs": "Healthcare", "Healthcare Facilities": "Healthcare",
+  "Medical Equipment & Supplies": "Healthcare", "Pharmaceuticals": "Healthcare",
+  "Computer Services": "Technology", "Software & Programming": "Technology",
+  "Electronic Instr. & Controls": "Technology", "Semiconductors": "Technology",
+  "Apparel/Accessories": "Consumer", "Retail (Apparel)": "Consumer",
+  "Beverages (Nonalcoholic)": "Consumer", "Beverages (Alcoholic)": "Consumer",
+  "Food Processing": "Consumer", "Consumer Cyclical": "Consumer", "Consumer Defensive": "Consumer",
+  "Investment Services": "Financials", "Banks": "Financials",
+  "Insurance (Life)": "Financials", "Financial": "Financials",
+  "Construction Services": "Industrials", "Industrial Goods": "Industrials",
+  "Aerospace & Defense": "Industrials",
+  "Chemical Manufacturing": "Materials", "Iron & Steel": "Materials", "Basic Materials": "Materials",
+  "Motion Pictures": "Media", "Broadcasting & Cable TV": "Media", "Entertainment": "Media",
+};
+
+function normalizeSector(raw) {
+  if (!raw) return "Sector not set";
+  return SECTOR_MAP[raw] || raw;
+}
+
 const calculationsExports = {
   roe5yAvg,
   roce5yAvg,
@@ -605,6 +626,7 @@ const calculationsExports = {
   roeHistory,
   equityHistory,
   lastValidIndex,
+  normalizeSector,
 };
 
 if (typeof module !== "undefined" && module.exports) {

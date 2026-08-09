@@ -27,7 +27,7 @@ function formatCurrencyShort(v) {
   if (v === null || v === undefined || Number.isNaN(v)) return "—";
   if (v >= 10000000) return `₹${(v / 10000000).toFixed(2)}Cr`;
   if (v >= 100000)   return `₹${(v / 100000).toFixed(2)}L`;
-  if (v >= 10000)    return `₹${(v / 1000).toFixed(1)}K`;
+  if (v >= 1000)     return `₹${(v / 1000).toFixed(1)}K`;
   return `₹${Math.round(v).toLocaleString("en-IN")}`;
 }
 

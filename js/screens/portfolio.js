@@ -6,57 +6,35 @@
  * aggregation over data already in StockStore — no new data sources.
  */
 
-// Maps Yahoo Finance's granular industry names to broader sector groups.
-// Yahoo returns things like "Biotechnology & Drugs", "Chemical Manufacturing" etc.
-// These are already reasonably broad — we just clean up the display names
-// and group the truly similar ones.
-const SECTOR_MAP = {
-  // Healthcare
-  "Biotechnology & Drugs": "Healthcare",
-  "Healthcare Facilities": "Healthcare",
-  "Medical Equipment & Supplies": "Healthcare",
-  "Pharmaceuticals": "Healthcare",
-  "Healthcare": "Healthcare",
-  // Technology
-  "Computer Services": "Technology",
-  "Software & Programming": "Technology",
-  "Electronic Instr. & Controls": "Technology",
-  "Semiconductors": "Technology",
-  "Technology": "Technology",
-  // Consumer
-  "Apparel/Accessories": "Consumer",
-  "Retail (Apparel)": "Consumer",
-  "Beverages (Nonalcoholic)": "Consumer",
-  "Beverages (Alcoholic)": "Consumer",
-  "Food Processing": "Consumer",
-  "Consumer Cyclical": "Consumer",
-  "Consumer Defensive": "Consumer",
-  // Financials
-  "Investment Services": "Financials",
-  "Banks": "Financials",
-  "Insurance (Life)": "Financials",
-  "Financial": "Financials",
-  "Financials": "Financials",
-  // Industrials
-  "Construction Services": "Industrials",
-  "Industrial Goods": "Industrials",
-  "Aerospace & Defense": "Industrials",
-  "Industrials": "Industrials",
-  // Materials / Chemicals
-  "Chemical Manufacturing": "Materials",
-  "Iron & Steel": "Materials",
-  "Basic Materials": "Materials",
-  "Materials": "Materials",
-  // Media / Entertainment
-  "Motion Pictures": "Media",
-  "Broadcasting & Cable TV": "Media",
-  "Entertainment": "Media",
-};
-
-function normalizeSector(raw) {
-  if (!raw) return "Other";
-  return SECTOR_MAP[raw] || raw;
+// SEBI approximation by market cap in Cr:
+// Large cap ≥ ₹20,000 Cr, Mid cap ₹5,000–₹20,000 Cr, Small cap < ₹5,000 Cr
+function capCategory(stock) {
+  const mc = stock.fundamentals?.marketCap;
+  if (!mc) return "Unknown";
+  if (mc >= 20000) return "Large cap";
+  if (mc >= 5000)  return "Mid cap";
+  return "Small cap";
 }
+
+function capBreakdown(stocks) {
+  const totals = {};
+  stocks.forEach((s) => {
+    const cat = capCategory(s);
+    totals[cat] = (totals[cat] || 0) + 1;
+  });
+  const total = stocks.length;
+  const ORDER = ["Large cap", "Mid cap", "Small cap", "Unknown"];
+  return ORDER
+    .filter(c => totals[c])
+    .map(c => ({ cat: c, pct: (totals[c] / total) * 100 }));
+}
+
+const CAP_PALETTE = {
+  "Large cap":  "#534AB7",
+  "Mid cap":    "#378ADD",
+  "Small cap":  "#1D9E75",
+  "Unknown":    "#B4B2A9",
+};
 
 function sectorBreakdown(stocks) {
   const totals = {};
@@ -94,6 +72,8 @@ const portfolioScreen = {
         <div id="triage-list" class="stock-list"></div>
         <div class="section-label">Sector concentration</div>
         <div id="sector-chart" class="card"></div>
+        <div class="section-label">Market cap mix</div>
+        <div id="cap-chart" class="card"></div>
         <div class="section-label">Valuation snapshot</div>
         <div id="valuation-snapshot" class="card"></div>
       </div>`;
@@ -187,6 +167,50 @@ const portfolioScreen = {
                 label: (ctx) => ` ${ctx.label}: ${ctx.parsed.toFixed(0)}%`,
               },
             },
+          },
+        },
+      });
+    }
+
+    // ── Market cap mix ───────────────────────────────────────────────
+    const caps    = capBreakdown(stocks);
+    const capEl   = document.getElementById("cap-chart");
+    if (caps.length === 0 || caps.every(c => c.cat === "Unknown")) {
+      capEl.innerHTML = `<span class="muted">No market cap data yet — will appear after fetching prices.</span>`;
+    } else {
+      capEl.innerHTML = `
+        <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+          <div style="width:130px; height:130px; flex-shrink:0;">
+            <canvas id="cap-pie"></canvas>
+          </div>
+          <div style="flex:1; min-width:120px;">
+            ${caps.map(c => `
+              <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px; font-size:13px;">
+                <span style="width:10px;height:10px;border-radius:50%;background:${CAP_PALETTE[c.cat]};flex-shrink:0;display:inline-block;"></span>
+                <span style="flex:1;">${c.cat}</span>
+                <span class="muted">${c.pct.toFixed(0)}%</span>
+              </div>`).join("")}
+          </div>
+        </div>`;
+
+      new Chart(document.getElementById("cap-pie"), {
+        type: "pie",
+        data: {
+          labels: caps.map(c => c.cat),
+          datasets: [{
+            data: caps.map(c => c.pct),
+            backgroundColor: caps.map(c => CAP_PALETTE[c.cat]),
+            borderWidth: 2,
+            borderColor: "var(--color-surface)",
+            hoverOffset: 4,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: (ctx) => ` ${ctx.label}: ${ctx.parsed.toFixed(0)}%` } },
           },
         },
       });
