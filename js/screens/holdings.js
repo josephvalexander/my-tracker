@@ -38,7 +38,7 @@ function lotRows(row) {
 function holdingRow(row, color) {
   const pClass = row.profitPct === null ? "muted" : row.profitPct >= 0 ? "text-good" : "text-bad";
   const pText  = row.profitPct === null ? "—" : `${row.profitPct >= 0 ? "+" : ""}${row.profitPct.toFixed(1)}%`;
-  const divText = row.dividends > 0 ? `₹${Math.round(row.dividends).toLocaleString("en-IN")}` : "—";
+  const divText = row.dividends > 0 ? formatCurrencyShort(row.dividends) : "—";
 
   return `
     <div class="holding-row" data-ticker="${row.ticker}">
@@ -140,31 +140,43 @@ const holdingsScreen = {
 
     // ── Dividend detail modal ─────────────────────────────────────────
     // Build data: for each holding, for each lot, for each dividend — collect eligible entries
-    const divEntries = []; // { ticker, lotDate, divDate, divFY, amount, qty, total }
+    // Build dividend entries per holding per dividend
+    // Key insight: lots with no purchaseDate are treated as a single combined
+    // position (summed) per dividend to avoid duplicates when multiple legacy
+    // lots all have null dates.
+    const divEntries = [];
     for (const h of holdings) {
       const divs = divMap[h.ticker] ?? [];
       const lots = h.lots?.length ? h.lots : [{ purchaseDate: null, quantity: h.quantity ?? 0, buyPrice: h.avgBuyPrice ?? 0 }];
+
       for (const div of divs) {
         if (!div.amount) continue;
-        const recordDate = div.recordDate ? new Date(div.recordDate) : null;
-        // Indian FY: Apr 1 – Mar 31. FY2026 = Apr 2025 – Mar 2026.
+        // Use recordDate first, fall back to announced date
+        const dateStr = div.recordDate || div.announced || null;
+        const recordDate = dateStr ? new Date(dateStr) : null;
+        // Indian FY: Apr–Mar. Date in May 2026 → FY2027, Jan 2026 → FY2026
         const fy = recordDate
           ? (recordDate.getMonth() >= 3 ? recordDate.getFullYear() + 1 : recordDate.getFullYear())
           : null;
-        for (const lot of lots) {
-          const lotDate = lot.purchaseDate ? new Date(lot.purchaseDate) : null;
-          const eligible = !lotDate || !recordDate || lotDate <= recordDate;
-          if (eligible && lot.quantity > 0) {
-            divEntries.push({
-              ticker: h.ticker,
-              lotDate: lot.purchaseDate || "—",
-              divDate: div.recordDate || "—",
-              divFY: fy ? `FY${fy}` : "Unknown",
-              amountPerShare: div.amount,
-              qty: lot.quantity,
-              total: lot.quantity * div.amount,
-            });
+        const divDate = dateStr || "—";
+        const divFY   = fy ? `FY${fy}` : "Unknown";
+
+        // Separate dated and undated lots
+        const datedLots   = lots.filter(l => l.purchaseDate);
+        const undatedTotal = lots.filter(l => !l.purchaseDate).reduce((s, l) => s + (l.quantity || 0), 0);
+
+        // Credit dated lots individually (only if purchased on or before record date)
+        for (const lot of datedLots) {
+          const lotDate = new Date(lot.purchaseDate);
+          if (!recordDate || lotDate <= recordDate) {
+            divEntries.push({ ticker: h.ticker, lotDate: lot.purchaseDate, divDate, divFY,
+              amountPerShare: div.amount, qty: lot.quantity, total: lot.quantity * div.amount });
           }
+        }
+        // Credit all undated shares as one combined entry (avoids duplicates)
+        if (undatedTotal > 0) {
+          divEntries.push({ ticker: h.ticker, lotDate: "—", divDate, divFY,
+            amountPerShare: div.amount, qty: undatedTotal, total: undatedTotal * div.amount });
         }
       }
     }

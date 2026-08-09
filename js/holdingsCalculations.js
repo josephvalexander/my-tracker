@@ -89,21 +89,28 @@ function profitPct(holding, currentPrice) {
 function totalDividendsReceived(holding, dividends) {
   if (!dividends?.length) return 0;
   if (!holding?.lots?.length) {
-    // Legacy single-lot holding — credit all dividends to full qty
+    // Legacy single-lot — credit all dividends
     return dividends.reduce((s, d) => s + (d.amount || 0) * (holding?.quantity || 0), 0);
   }
 
   let total = 0;
   for (const dividend of dividends) {
-    const recordDate = dividend.recordDate ? new Date(dividend.recordDate) : null;
-    for (const lot of holding.lots) {
-      const lotDate = lot.purchaseDate ? new Date(lot.purchaseDate) : null;
-      // Credit if: no lot date (unknown — assume eligible) OR lot date ≤ record date
-      const eligible = !lotDate || !recordDate || lotDate <= recordDate;
-      if (eligible) {
-        total += (lot.quantity || 0) * (dividend.amount || 0);
+    if (!dividend.amount) continue;
+    const dateStr    = dividend.recordDate || dividend.announced || null;
+    const recordDate = dateStr ? new Date(dateStr) : null;
+
+    // Dated lots: credit only if purchased on or before record date
+    const datedLots = holding.lots.filter(l => l.purchaseDate);
+    for (const lot of datedLots) {
+      if (!recordDate || new Date(lot.purchaseDate) <= recordDate) {
+        total += (lot.quantity || 0) * dividend.amount;
       }
     }
+    // Undated lots: sum as one position, credit for all dividends
+    const undatedQty = holding.lots
+      .filter(l => !l.purchaseDate)
+      .reduce((s, l) => s + (l.quantity || 0), 0);
+    total += undatedQty * dividend.amount;
   }
   return total;
 }
