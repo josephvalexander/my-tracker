@@ -6,10 +6,62 @@
  * aggregation over data already in StockStore — no new data sources.
  */
 
+// Maps Yahoo Finance's granular industry names to broader sector groups.
+// Yahoo returns things like "Biotechnology & Drugs", "Chemical Manufacturing" etc.
+// These are already reasonably broad — we just clean up the display names
+// and group the truly similar ones.
+const SECTOR_MAP = {
+  // Healthcare
+  "Biotechnology & Drugs": "Healthcare",
+  "Healthcare Facilities": "Healthcare",
+  "Medical Equipment & Supplies": "Healthcare",
+  "Pharmaceuticals": "Healthcare",
+  "Healthcare": "Healthcare",
+  // Technology
+  "Computer Services": "Technology",
+  "Software & Programming": "Technology",
+  "Electronic Instr. & Controls": "Technology",
+  "Semiconductors": "Technology",
+  "Technology": "Technology",
+  // Consumer
+  "Apparel/Accessories": "Consumer",
+  "Retail (Apparel)": "Consumer",
+  "Beverages (Nonalcoholic)": "Consumer",
+  "Beverages (Alcoholic)": "Consumer",
+  "Food Processing": "Consumer",
+  "Consumer Cyclical": "Consumer",
+  "Consumer Defensive": "Consumer",
+  // Financials
+  "Investment Services": "Financials",
+  "Banks": "Financials",
+  "Insurance (Life)": "Financials",
+  "Financial": "Financials",
+  "Financials": "Financials",
+  // Industrials
+  "Construction Services": "Industrials",
+  "Industrial Goods": "Industrials",
+  "Aerospace & Defense": "Industrials",
+  "Industrials": "Industrials",
+  // Materials / Chemicals
+  "Chemical Manufacturing": "Materials",
+  "Iron & Steel": "Materials",
+  "Basic Materials": "Materials",
+  "Materials": "Materials",
+  // Media / Entertainment
+  "Motion Pictures": "Media",
+  "Broadcasting & Cable TV": "Media",
+  "Entertainment": "Media",
+};
+
+function normalizeSector(raw) {
+  if (!raw) return "Other";
+  return SECTOR_MAP[raw] || raw;
+}
+
 function sectorBreakdown(stocks) {
   const totals = {};
   stocks.forEach((s) => {
-    const sector = s.sector || "Other";
+    const sector = normalizeSector(s.sector);
     totals[sector] = (totals[sector] || 0) + 1;
   });
   const total = stocks.length;
@@ -18,7 +70,19 @@ function sectorBreakdown(stocks) {
     .sort((a, b) => b.pct - a.pct);
 }
 
-const SECTOR_PALETTE = ["#85B7EB", "#5DCAA5", "#F0997B", "#B4B2A9", "#D4537E", "#FAC775"];
+// Palette: warm, desaturated tones that complement the app's #f1efe8 background.
+// Each colour is distinct and readable without being garish.
+const SECTOR_PALETTE = [
+  "#534AB7", // purple  — Technology / primary
+  "#378ADD", // blue    — Healthcare / secondary
+  "#1D9E75", // green   — Materials
+  "#D85A30", // terracotta — Industrials
+  "#BA7517", // amber   — Financials
+  "#D4537E", // rose    — Consumer
+  "#5DCAA5", // teal    — Media
+  "#8B7EC8", // lavender — other
+  "#6BA3D6", // sky     — other
+];
 
 const portfolioScreen = {
   async render() {
