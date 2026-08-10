@@ -43,19 +43,25 @@ function stockRow(stock) {
     ? ((cmp - watchlistPrice) / watchlistPrice) * 100
     : null;
 
+  const sinceAddedColor = sinceAdded === null ? "--color-text-tertiary"
+    : sinceAdded >= 0 ? "--color-green" : "--color-red";
+  const sinceAddedText = sinceAdded !== null
+    ? `${sinceAdded >= 0 ? "+" : ""}${sinceAdded.toFixed(1)}%`
+    : "—";
+  const addedDateText = stock.addedDate
+    ? new Date(stock.addedDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    : null;
+
+  const sinceRow = `
+    <div class="since-added-row">
+      <span class="muted">Since listed</span>
+      <span style="color:var(${sinceAddedColor}); font-weight:500;">${sinceAddedText}</span>
+      ${addedDateText ? `<span class="muted">· added ${addedDateText}</span>` : ""}
+    </div>`;
+
   const roeColor  = colorForMetric(roe,  DEFAULT_RULES.roe);
   const deColor   = colorForMetric(de,   DEFAULT_RULES.de);
   const cagrColor = colorForMetric(cagr, DEFAULT_RULES.epsCagr);
-
-  // Day change — shown inline with price
-  const dayHtml = dayChangePct != null
-    ? `<div class="price-day-change" style="font-size:11px; color:var(${dayChangePct >= 0 ? "--color-green" : "--color-red"});">${dayChangePct >= 0 ? "▲" : "▼"}${Math.abs(dayChangePct).toFixed(2)}%</div>`
-    : `<div class="price-day-change" style="font-size:11px; color:var(--color-text-tertiary);">—</div>`;
-
-  // Since added — shown below day change
-  const sinceHtml = sinceAdded != null
-    ? `<div style="font-size:10px; color:var(${sinceAdded >= 0 ? "--color-green" : "--color-red"});">${sinceAdded >= 0 ? "+" : ""}${sinceAdded.toFixed(1)}%</div>`
-    : `<div style="font-size:10px; color:var(--color-text-tertiary);">—</div>`;
 
   return `
     <div class="stock-row" data-ticker="${stock.ticker}">
@@ -69,11 +75,10 @@ function stockRow(stock) {
         ${metricChip("EPS", cagr, formatPct(cagr), cagrColor)}
         <div class="stock-price">
           <div class="price-main">${formatCurrency(cmp)}</div>
-          ${dayHtml}
-          ${sinceHtml}
         </div>
         <button class="row-menu-btn" data-menu-ticker="${stock.ticker}" aria-label="Row options">&#8942;</button>
       </div>
+      ${sinceRow}
     </div>`;
 }
 
