@@ -50,17 +50,19 @@ async function callWorker(path, symbol) {
 // Applied only for Yahoo Finance calls — indianapi still receives the NSE ticker.
 // Add entries here when Yahoo uses a different symbol than the NSE ticker.
 const DEFAULT_YAHOO_OVERRIDES = {
-  "CLEAN SCIENCE": "CLEAN",  // Yahoo: CLEAN.NS ≠ NSE: CLEANSCIENCE
-  "CLEANSCIENCE":  "CLEAN",  // also match the stripped version
+  "CLEAN SCIENCE": "CLEAN",   // Yahoo: CLEAN.NS ≠ NSE: CLEANSCIENCE
+  "CLEANSCIENCE":  "CLEAN",   // also match stripped version
+  "VINATIORGA":    "VINATIORGA", // explicit — overrides any stored yahooSymbol
+  "VINATI":        "VINATIORGA", // if stock was added with ticker VINATI, fix it
 };
 
 async function fetchYfQuoteInfo(symbol, yahooSymbol) {
-  // Use explicit per-stock override first, then check the default map,
-  // then fall back to stripping spaces from the NSE ticker
-  const resolved = yahooSymbol
-    || DEFAULT_YAHOO_OVERRIDES[symbol]
-    || DEFAULT_YAHOO_OVERRIDES[symbol.replace(/\s+/g, "")]
-    || symbol;
+  // DEFAULT_YAHOO_OVERRIDES takes priority over any stored yahooSymbol —
+  // this ensures known corrections (VINATIORGA, CLEAN) are always used
+  // even if the user previously set a wrong manual override.
+  const mapOverride = DEFAULT_YAHOO_OVERRIDES[symbol]
+    || DEFAULT_YAHOO_OVERRIDES[symbol.replace(/\s+/g, "")];
+  const resolved = mapOverride || yahooSymbol || symbol;
   const cleanSymbol = resolved.replace(/\s+/g, "");
   const yfSymbol = cleanSymbol.includes(".") ? cleanSymbol : `${cleanSymbol}.NS`;
   const data = await callWorker("/yf-quote", yfSymbol);

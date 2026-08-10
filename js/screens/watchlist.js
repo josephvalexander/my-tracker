@@ -256,16 +256,6 @@ const watchlistScreen = {
             }
 
             await StockStore.set(stock.ticker, fresh);
-
-            // Update price and day change in-place without full re-render
-            const priceMain = document.querySelector(`.stock-row[data-ticker="${stock.ticker}"] .price-main`);
-            if (priceMain) priceMain.textContent = formatCurrency(result.quoteInfo.currentPrice);
-            const dayEl = document.querySelector(`.stock-row[data-ticker="${stock.ticker}"] .price-day-change`);
-            if (dayEl && result.quoteInfo.dayChangePct != null) {
-              const up = result.quoteInfo.dayChangePct >= 0;
-              dayEl.textContent = `${up ? "▲" : "▼"}${Math.abs(result.quoteInfo.dayChangePct).toFixed(2)}%`;
-              dayEl.style.color = `var(${up ? "--color-green" : "--color-red"})`;
-            }
             updated++;
           } else {
             failed++;
@@ -280,9 +270,30 @@ const watchlistScreen = {
         : `✓ ${updated} updated · ${failed} failed`;
       progressEl.textContent = summary;
       btn.disabled = false;
-
-      // Clear the progress message after 5 seconds
       setTimeout(() => { progressEl.textContent = ""; }, 5000);
+
+      // Full re-render so watchlistPrice/sinceAdded and day% all reflect fresh data
+      const freshStocks = await StockStore.getActive();
+      document.getElementById("watchlist-list").innerHTML =
+        freshStocks.map(stockRow).join("");
+
+      // Re-wire row click handlers after re-render
+      document.querySelectorAll(".stock-row").forEach((row) => {
+        row.addEventListener("click", (e) => {
+          if (e.target.closest(".row-menu-btn")) return;
+          window.location.hash = `#stock/${encodeURIComponent(row.dataset.ticker)}`;
+        });
+      });
+      document.querySelectorAll(".row-menu-btn").forEach((btn2) => {
+        btn2.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const ticker = btn2.dataset.menuTicker;
+          if (confirm(`Delete ${ticker}? This permanently removes all data for this stock.`)) {
+            await deleteStockPermanently(ticker);
+            navigate("#watchlist");
+          }
+        });
+      });
     });
   },
 };
