@@ -46,11 +46,22 @@ async function callWorker(path, symbol) {
 }
 
 /** Live price, 52-week range, market cap from Yahoo Finance (via Worker). */
+// Known NSE ticker → Yahoo Finance symbol overrides.
+// Applied only for Yahoo Finance calls — indianapi still receives the NSE ticker.
+// Add entries here when Yahoo uses a different symbol than the NSE ticker.
+const DEFAULT_YAHOO_OVERRIDES = {
+  "CLEAN SCIENCE": "CLEAN",  // Yahoo: CLEAN.NS ≠ NSE: CLEANSCIENCE
+  "CLEANSCIENCE":  "CLEAN",  // also match the stripped version
+};
+
 async function fetchYfQuoteInfo(symbol, yahooSymbol) {
-  // Use explicit Yahoo symbol if provided (overrides NSE ticker for mismatches
-  // e.g. NSE: CLEANSCIENCE → Yahoo: CLEAN.NS, NSE: VINATIORGA → Yahoo: VINATIORGA.NS)
-  // Strip spaces and append .NS if no suffix already present
-  const cleanSymbol = (yahooSymbol || symbol).replace(/\s+/g, "");
+  // Use explicit per-stock override first, then check the default map,
+  // then fall back to stripping spaces from the NSE ticker
+  const resolved = yahooSymbol
+    || DEFAULT_YAHOO_OVERRIDES[symbol]
+    || DEFAULT_YAHOO_OVERRIDES[symbol.replace(/\s+/g, "")]
+    || symbol;
+  const cleanSymbol = resolved.replace(/\s+/g, "");
   const yfSymbol = cleanSymbol.includes(".") ? cleanSymbol : `${cleanSymbol}.NS`;
   const data = await callWorker("/yf-quote", yfSymbol);
   return {

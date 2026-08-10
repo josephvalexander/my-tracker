@@ -229,7 +229,15 @@ function parseIndianApiResponse(data) {
   };
 
   // ── Recent news — last 4, most recent first, relative Livemint URLs completed
+  const threeMonthsAgo = new Date();
+  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
   const recentNews = (data.recentNews ?? [])
+    .filter((n) => {
+      const dateStr = n.date ?? n.lastPublishedDate ?? null;
+      if (!dateStr) return false;
+      return new Date(dateStr) >= threeMonthsAgo;
+    })
     .slice(0, 4)
     .map((n) => ({
       headline: n.headline ?? null,
