@@ -22,7 +22,23 @@ function stockRow(stock) {
   const cagr = epsCagr(stock);
   const cmp = stock.fundamentals?.currentPrice ?? null;
   const dayChangePct = stock.priceContext?.dayChangePct ?? null;
-  const watchlistPrice = stock.watchlistPrice ?? null;
+
+  // If watchlistPrice is missing but we have currentPrice, use currentPrice
+  // as the baseline (shows +0.0%) and save it in the background.
+  // This fires every render until saved, but is idempotent — once saved
+  // it stops firing.
+  let watchlistPrice = stock.watchlistPrice ?? null;
+  if (!watchlistPrice && cmp) {
+    watchlistPrice = cmp;
+    // Save in background — don't await, don't block render
+    StockStore.get(stock.ticker).then(fresh => {
+      if (fresh && !fresh.watchlistPrice) {
+        fresh.watchlistPrice = cmp;
+        StockStore.set(stock.ticker, fresh);
+      }
+    });
+  }
+
   const sinceAdded = (cmp && watchlistPrice)
     ? ((cmp - watchlistPrice) / watchlistPrice) * 100
     : null;
