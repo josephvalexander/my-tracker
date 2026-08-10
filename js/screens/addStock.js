@@ -124,9 +124,8 @@ async function applyIndianApiResult(ticker, parsed) {
   stock.processedCorporateActions = [...processed];
 
   // Recent news and analyst consensus
-  if (parsed.recentNews?.length) {
-    stock.recentNews = parsed.recentNews;
-  }
+  // Always overwrite recentNews — even empty array clears old stale news
+  stock.recentNews = parsed.recentNews ?? [];
   if (parsed.analystConsensus) {
     stock.analystConsensus = parsed.analystConsensus;
   }

@@ -134,13 +134,29 @@ const watchlistScreen = {
     const stocks = await StockStore.getActive();
 
     // Safety net: set watchlistPrice for any stock still missing it.
-    // Also updates the in-memory objects so stockRow renders correctly
-    // without needing a second DB fetch.
+    // Use currentPrice if available — sets baseline to today so sinceAdded shows 0%
+    // then grows from here. Saves immediately so it persists.
+    let migrationHappened = false;
     for (const stock of stocks) {
       if (!stock.watchlistPrice && stock.fundamentals?.currentPrice) {
         stock.watchlistPrice = stock.fundamentals.currentPrice;
         await StockStore.set(stock.ticker, stock);
+        migrationHappened = true;
       }
+    }
+
+    // If migration set any watchlistPrice, push to Drive immediately so the
+    // next Drive pull won't wipe them out again.
+    if (migrationHappened && settings?.driveConnected) {
+      try {
+        const token = await getAccessToken({ silentOnly: true });
+        if (token) {
+          const localData = await exportAll();
+          await pushToDrive(token, localData);
+          settings.lastSyncPush = new Date().toISOString();
+          await MetaStore.setSettings(settings);
+        }
+      } catch { /* non-critical — migration values still in IndexedDB */ }
     }
     const countEl = document.getElementById("watchlist-count");
     countEl.textContent = `· ${stocks.length} stock${stocks.length === 1 ? "" : "s"}`;
