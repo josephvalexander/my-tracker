@@ -54,7 +54,7 @@ function stockRow(stock) {
 
   const sinceRow = `
     <div class="since-added-row">
-      <span class="muted">Since listed</span>
+      <span class="muted">Since watchlisted</span>
       <span style="color:var(${sinceAddedColor}); font-weight:500;">${sinceAddedText}</span>
       ${addedDateText ? `<span class="muted">· added ${addedDateText}</span>` : ""}
     </div>`;
