@@ -132,10 +132,9 @@ const watchlistScreen = {
     window.addEventListener("hashchange", () => clearInterval(indexRefreshTimer), { once: true });
 
     const stocks = await StockStore.getActive();
+    const settings = await MetaStore.getSettings();
 
     // Safety net: set watchlistPrice for any stock still missing it.
-    // Use currentPrice if available — sets baseline to today so sinceAdded shows 0%
-    // then grows from here. Saves immediately so it persists.
     let migrationHappened = false;
     for (const stock of stocks) {
       if (!stock.watchlistPrice && stock.fundamentals?.currentPrice) {
@@ -145,8 +144,7 @@ const watchlistScreen = {
       }
     }
 
-    // If migration set any watchlistPrice, push to Drive immediately so the
-    // next Drive pull won't wipe them out again.
+    // Push to Drive immediately after migration so the next pull includes watchlistPrice
     if (migrationHappened && settings?.driveConnected) {
       try {
         const token = await getAccessToken({ silentOnly: true });
@@ -156,12 +154,11 @@ const watchlistScreen = {
           settings.lastSyncPush = new Date().toISOString();
           await MetaStore.setSettings(settings);
         }
-      } catch { /* non-critical — migration values still in IndexedDB */ }
+      } catch { /* non-critical */ }
     }
+
     const countEl = document.getElementById("watchlist-count");
     countEl.textContent = `· ${stocks.length} stock${stocks.length === 1 ? "" : "s"}`;
-
-    const settings = await MetaStore.getSettings();
     const driveLine = document.getElementById("drive-status-line");
     const drivePushBtn = document.getElementById("drive-push-btn");
 
