@@ -35,6 +35,22 @@ const editStockScreen = {
           </div>
         </div>
 
+        <div class="section-label">Position & price targets</div>
+        <div class="card">
+          <div style="display:flex; gap:12px; flex-wrap:wrap;">
+            <div class="form-group" style="flex:1; min-width:120px; margin-bottom:0;">
+              <label>Target allocation (%)</label>
+              <input type="number" id="target-alloc-input" min="0" max="100" step="0.5" placeholder="e.g. 10" value="${stock.targetAllocation ?? ""}" />
+              <div class="field-hint">% of total portfolio you want in this stock</div>
+            </div>
+            <div class="form-group" style="flex:1; min-width:120px; margin-bottom:0;">
+              <label>Alert below price (₹)</label>
+              <input type="number" id="alert-price-input" min="0" step="0.5" placeholder="e.g. 1600" value="${stock.alertPrice ?? ""}" />
+              <div class="field-hint">Shows a badge when price drops below this</div>
+            </div>
+          </div>
+        </div>
+
         <div class="section-label">Business</div>
         <div class="card">
           <div class="muted" style="font-size:11px; margin-bottom:6px;">Drafted with AI during add — edit freely.</div>
@@ -68,6 +84,10 @@ const editStockScreen = {
     document.getElementById("save-edit-btn").addEventListener("click", async () => {
       const current = await StockStore.get(ticker);
       current.board = document.querySelector('input[name="edit-board"]:checked')?.value || "mainboard";
+      const allocVal = parseFloat(document.getElementById("target-alloc-input").value);
+      current.targetAllocation = !isNaN(allocVal) ? allocVal : null;
+      const alertVal = parseFloat(document.getElementById("alert-price-input").value);
+      current.alertPrice = !isNaN(alertVal) ? alertVal : null;
       current.qualitative = current.qualitative || {};
       current.qualitative.business = document.getElementById("business-textarea").value.trim();
       current.qualitative.moatDescription = document.getElementById("moat-textarea").value.trim();

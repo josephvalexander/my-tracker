@@ -42,10 +42,22 @@ const portfolioScreen = {
   async render() {
     return `
       <div class="screen-padding">
-        <div class="screen-title">Analytics</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <div class="screen-title" style="margin:0;">Analytics</div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-small" onclick="window.location.hash='#compare'">⇄ Compare</button>
+            <button class="btn btn-small" onclick="window.location.hash='#calendar'">📅 Calendar</button>
+          </div>
+        </div>
         <div class="section-label">Buffett checklist — held stocks</div>
         <div id="portfolio-summary" class="metric-grid-3"></div>
         <div id="needs-attention" class="card" style="margin-bottom:14px;"></div>
+        <div class="section-label">Portfolio growth</div>
+        <div id="portfolio-growth" class="card"></div>
+        <div class="section-label">Position sizing <span class="muted" style="font-size:11px;">actual vs target</span></div>
+        <div id="position-sizing" class="card"></div>
+        <div class="section-label">Earnings season <span class="muted" style="font-size:11px;">last updated</span></div>
+        <div id="earnings-season" class="card"></div>
         <div class="section-label">Sector concentration <span class="muted" style="font-size:11px;">value-weighted</span></div>
         <div id="sector-chart" class="card"></div>
         <div class="section-label">Market cap mix <span class="muted" style="font-size:11px;">value-weighted</span></div>
@@ -76,7 +88,113 @@ const portfolioScreen = {
 
     const heldStocks = heldStocksWithValues.map(h => h.stock);
 
-    // ── Buffett checklist summary ─────────────────────────────────
+    // ── Portfolio growth YoY / QoQ ────────────────────────────────
+    const growthEl = document.getElementById("portfolio-growth");
+    const totalCurrentValue = heldStocksWithValues.reduce((s, h) => s + h.value, 0);
+    const totalInvested     = holdings.reduce((s, h) => s + investedValue(h), 0);
+    const overallReturn     = totalInvested > 0 ? ((totalCurrentValue - totalInvested) / totalInvested * 100) : null;
+
+    // QoQ/YoY: derived from quarterly revenue of held stocks (weighted by portfolio value)
+    // Sum latest quarter revenue vs previous quarter and vs same quarter last year
+    let totalRevQ  = 0, totalRevPrevQ = 0, totalRevYoY = 0, revenueCount = 0;
+    for (const { stock } of heldStocksWithValues) {
+      const q = stock.fundamentals?.quarterly;
+      if (!q?.revenue?.length || q.revenue.length < 2) continue;
+      const latest = q.revenue[q.revenue.length - 1];
+      const prevQ  = q.revenue[q.revenue.length - 2];
+      const sameQLastYear = q.revenue.length >= 5 ? q.revenue[q.revenue.length - 5] : null;
+      if (latest != null && prevQ != null) {
+        totalRevQ += latest; totalRevPrevQ += prevQ; revenueCount++;
+      }
+      if (latest != null && sameQLastYear != null) totalRevYoY += sameQLastYear;
+    }
+    const qoq = revenueCount > 0 && totalRevPrevQ > 0 ? ((totalRevQ - totalRevPrevQ) / totalRevPrevQ * 100) : null;
+    const yoy = revenueCount > 0 && totalRevYoY > 0  ? ((totalRevQ - totalRevYoY)  / totalRevYoY  * 100) : null;
+
+    growthEl.innerHTML = `
+      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:100px;">
+          <div class="muted" style="font-size:11px;">Portfolio P&L</div>
+          <div style="font-size:16px; font-weight:600; color:var(${overallReturn>=0?"--color-green":"--color-red"});">${overallReturn!==null?(overallReturn>=0?"+":"")+overallReturn.toFixed(1)+"%":"—"}</div>
+          <div class="muted" style="font-size:10px;">vs cost basis</div>
+        </div>
+        <div style="flex:1; min-width:100px;">
+          <div class="muted" style="font-size:11px;">Revenue QoQ</div>
+          <div style="font-size:16px; font-weight:600; color:var(${qoq>=0?"--color-green":"--color-red"});">${qoq!==null?(qoq>=0?"+":"")+qoq.toFixed(1)+"%":"—"}</div>
+          <div class="muted" style="font-size:10px;">aggregate held stocks</div>
+        </div>
+        <div style="flex:1; min-width:100px;">
+          <div class="muted" style="font-size:11px;">Revenue YoY</div>
+          <div style="font-size:16px; font-weight:600; color:var(${yoy>=0?"--color-green":"--color-red"});">${yoy!==null?(yoy>=0?"+":"")+yoy.toFixed(1)+"%":"—"}</div>
+          <div class="muted" style="font-size:10px;">aggregate held stocks</div>
+        </div>
+      </div>`;
+
+    // ── Position sizing ───────────────────────────────────────────────
+    const sizingEl = document.getElementById("position-sizing");
+    const sizingRows = heldStocksWithValues
+      .map(({ stock, value }) => {
+        const pct    = totalCurrentValue > 0 ? (value / totalCurrentValue * 100) : 0;
+        const target = stock.targetAllocation ?? null;
+        const diff   = target !== null ? pct - target : null;
+        return { name: stock.name || stock.ticker, ticker: stock.ticker, pct, target, diff };
+      })
+      .sort((a, b) => b.pct - a.pct);
+
+    if (sizingRows.length === 0) {
+      sizingEl.innerHTML = `<span class="muted">No holdings yet.</span>`;
+    } else {
+      const hasTargets = sizingRows.some(r => r.target !== null);
+      sizingEl.innerHTML = `
+        <table style="width:100%; border-collapse:collapse; font-size:12px;">
+          <thead><tr style="border-bottom:0.5px solid var(--color-border);">
+            <td class="muted" style="padding:5px 0; font-size:10px;">Stock</td>
+            <td class="muted" style="text-align:right; font-size:10px;">Actual</td>
+            ${hasTargets ? `<td class="muted" style="text-align:right; font-size:10px;">Target</td><td class="muted" style="text-align:right; font-size:10px;">Diff</td>` : ""}
+          </tr></thead>
+          <tbody>${sizingRows.map(r => `
+            <tr style="border-bottom:0.5px solid var(--color-border); cursor:pointer;" onclick="window.location.hash='#stock/${encodeURIComponent(r.ticker)}'">
+              <td style="padding:5px 0;">${r.name}</td>
+              <td style="text-align:right;">${r.pct.toFixed(1)}%</td>
+              ${hasTargets ? `
+                <td style="text-align:right; color:var(--color-text-tertiary);">${r.target !== null ? r.target+"%" : "—"}</td>
+                <td style="text-align:right; color:var(${r.diff===null?"--color-text-tertiary":Math.abs(r.diff)>5?"--color-red":"--color-green"});">${r.diff!==null?(r.diff>=0?"+":"")+r.diff.toFixed(1)+"%":"—"}</td>` : ""}
+            </tr>`).join("")}
+          </tbody>
+        </table>
+        ${!hasTargets ? `<div class="muted" style="font-size:11px; margin-top:8px;">Set target allocations in each stock's edit screen to see over/underweight analysis.</div>` : ""}`;
+    }
+
+    // ── Earnings season ───────────────────────────────────────────────
+    const earningsEl = document.getElementById("earnings-season");
+    const earningsRows = heldStocksWithValues
+      .map(({ stock }) => ({
+        name: stock.name || stock.ticker,
+        ticker: stock.ticker,
+        lastUpdated: stock.fundamentals?.lastUpdated ?? null,
+      }))
+      .sort((a, b) => {
+        if (!a.lastUpdated) return 1;
+        if (!b.lastUpdated) return -1;
+        return new Date(b.lastUpdated) - new Date(a.lastUpdated);
+      });
+
+    earningsEl.innerHTML = earningsRows.length === 0
+      ? `<span class="muted">No holdings.</span>`
+      : `<table style="width:100%; border-collapse:collapse; font-size:12px;">
+          <tbody>${earningsRows.map(r => {
+            const days = r.lastUpdated ? Math.floor((Date.now() - new Date(r.lastUpdated)) / 86400000) : null;
+            const stale = days === null || days > 45;
+            return `<tr style="border-bottom:0.5px solid var(--color-border); cursor:pointer;" onclick="window.location.hash='#stock/${encodeURIComponent(r.ticker)}'">
+              <td style="padding:5px 0;">${r.name}</td>
+              <td style="text-align:right; color:var(${stale?"--color-red":"--color-text-tertiary"});">${r.lastUpdated ? r.lastUpdated : "Never fetched"}</td>
+              <td style="text-align:right; color:var(${stale?"--color-red":"--color-text-tertiary"}); font-size:11px;">${days!==null?days+"d ago":""}</td>
+            </tr>`;
+          }).join("")}
+          </tbody>
+        </table>`;
+
+
     let passCount = 0;
     const triageItems = [];
     heldStocks.forEach(s => {

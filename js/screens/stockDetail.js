@@ -70,15 +70,27 @@ function priceContextStrip(stock) {
   const pc = stock.priceContext || {};
   const mcap = stock.fundamentals?.marketCap;
   const has52w = pc.week52Low && pc.week52High;
+  const cmp = stock.fundamentals?.currentPrice;
+
+  // Entry zone: where current price sits in the 52w range (0% = at 52w low, 100% = at 52w high)
+  const entryZonePct = (has52w && cmp)
+    ? Math.round(((cmp - pc.week52Low) / (pc.week52High - pc.week52Low)) * 100)
+    : null;
+
+  // Alert badge
+  const alertBadge = (stock.alertPrice && cmp && cmp < stock.alertPrice)
+    ? `<div style="background:var(--color-red); color:#fff; font-size:10px; padding:2px 8px; border-radius:10px; margin-bottom:6px; display:inline-block;">⚠ Below alert ₹${stock.alertPrice.toLocaleString("en-IN")}</div>`
+    : "";
 
   return `
+    ${alertBadge}
     <div class="price-context-grid">
       <div class="price-context-box">
         <div class="price-context-label">Market cap</div>
         <div class="price-context-value">${mcap ? "₹" + Math.round(mcap).toLocaleString("en-IN") + " Cr" : "—"}</div>
       </div>
       <div class="price-context-box">
-        <div class="price-context-label">52w range</div>
+        <div class="price-context-label">52w range${entryZonePct !== null ? ` <span class="muted" style="font-size:9px;">(${entryZonePct}% of range)</span>` : ""}</div>
         <div class="price-context-value">${has52w ? `${Math.round(pc.week52Low).toLocaleString("en-IN")}–${Math.round(pc.week52High).toLocaleString("en-IN")}` : "—"}</div>
       </div>
       <div class="price-context-box">
@@ -206,6 +218,47 @@ const stockDetailScreen = {
             qPATMargin !== null ? formatPct(qPATMargin) : "N/A",
             qPATMargin === null ? "neutral" : qPATMargin >= 15 ? "green" : qPATMargin >= 8 ? "yellow" : "red"
           ) : ""}
+        </div>
+
+        <div class="section-label">Quarterly results <span class="muted" style="font-size:10px;">last 4 quarters</span></div>
+        <div class="card" style="padding:0; overflow-x:auto;">
+          ${(() => {
+            const q = stock.fundamentals?.quarterly;
+            if (!q?.periods?.length) return `<div class="muted" style="padding:10px 12px; font-size:12px;">No quarterly data yet.</div>`;
+            const n = Math.min(4, q.periods.length);
+            const periods = q.periods.slice(-n);
+            const revs    = (q.revenue   || []).slice(-n);
+            const pats    = (q.netProfit || []).slice(-n);
+            const margins = revs.map((r, i) => (r && pats[i] != null) ? ((pats[i]/r)*100).toFixed(1)+"%" : "—");
+            // YoY growth for latest quarter
+            const yoyGrowth = q.revenue?.length > 4
+              ? ((q.revenue.slice(-1)[0] - q.revenue.slice(-5)[0]) / Math.abs(q.revenue.slice(-5)[0]) * 100).toFixed(1)
+              : null;
+            return `
+              <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                <thead>
+                  <tr style="border-bottom:1px solid var(--color-border);">
+                    <td class="muted" style="padding:7px 12px; font-size:10px;">Quarter</td>
+                    ${periods.map(p => `<td style="padding:7px 6px; text-align:right; font-size:10px; color:var(--color-text-tertiary);">${p}</td>`).join("")}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style="border-bottom:0.5px solid var(--color-border);">
+                    <td class="muted" style="padding:6px 12px;">Revenue (Cr)</td>
+                    ${revs.map(v => `<td style="padding:6px 6px; text-align:right;">${v != null ? Math.round(v).toLocaleString("en-IN") : "—"}</td>`).join("")}
+                  </tr>
+                  <tr style="border-bottom:0.5px solid var(--color-border);">
+                    <td class="muted" style="padding:6px 12px;">Net profit (Cr)</td>
+                    ${pats.map(v => `<td style="padding:6px 6px; text-align:right; color:${v >= 0 ? "inherit" : "var(--color-red)"};">${v != null ? Math.round(v).toLocaleString("en-IN") : "—"}</td>`).join("")}
+                  </tr>
+                  <tr>
+                    <td class="muted" style="padding:6px 12px;">PAT margin</td>
+                    ${margins.map(v => `<td style="padding:6px 6px; text-align:right;">${v}</td>`).join("")}
+                  </tr>
+                </tbody>
+              </table>
+              ${yoyGrowth !== null ? `<div style="padding:6px 12px; font-size:11px; color:var(--color-text-secondary); border-top:0.5px solid var(--color-border);">Revenue YoY (latest): <span style="color:${parseFloat(yoyGrowth)>=0?'var(--color-green)':'var(--color-red)'}; font-weight:500;">${parseFloat(yoyGrowth)>=0?"+":""}${yoyGrowth}%</span></div>` : ""}`;
+          })()}
         </div>
 
         <div class="section-label">Balance sheet & cash quality</div>

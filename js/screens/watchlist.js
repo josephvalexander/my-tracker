@@ -51,11 +51,15 @@ function stockRow(stock) {
     ? new Date(stock.addedDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
     : null;
 
+  const alertBadge = (stock.alertPrice && cmp && cmp < stock.alertPrice)
+    ? `<span style="font-size:9px; padding:1px 5px; border-radius:8px; background:var(--color-red); color:#fff; margin-left:4px;">⚠ alert</span>`
+    : "";
+
   return `
     <div class="stock-row" data-ticker="${stock.ticker}">
       <div class="stock-row-grid">
         <div class="stock-identity">
-          <div class="stock-name">${stock.name || stock.ticker}</div>
+          <div class="stock-name">${stock.name || stock.ticker}${alertBadge}</div>
           <div class="stock-meta">${capCategory(stock)} · ${normalizeSector(stock.sector)}</div>
         </div>
         ${metricChip("ROE", roe, formatPct(roe), roeColor)}

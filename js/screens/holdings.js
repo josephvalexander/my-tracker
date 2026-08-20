@@ -302,8 +302,8 @@ const holdingsScreen = {
           <button id="add-holding-btn" class="btn btn-small">+ Add position</button>
         </div>
         <div class="toggle-row" style="margin-bottom:8px;">
-          <button id="filter-all"       class="toggle-btn toggle-btn-active">All</button>
-          <button id="filter-mainboard" class="toggle-btn">Mainboard</button>
+          <button id="filter-all"       class="toggle-btn">All</button>
+          <button id="filter-mainboard" class="toggle-btn toggle-btn-active">Mainboard</button>
           <button id="filter-sme"       class="toggle-btn">SME / Microcap</button>
         </div>
         <div id="holdings-summary" class="metric-grid-4"></div>
@@ -324,7 +324,7 @@ const holdingsScreen = {
       `· ${holdings.length} position${holdings.length===1?"":"s"}`;
     document.getElementById("add-holding-btn").addEventListener("click", () => { window.location.hash="#addHolding"; });
 
-    let activeFilter = "all";
+    let activeFilter = "mainboard";
 
     function filterHoldings() {
       if (activeFilter==="all") return holdings;

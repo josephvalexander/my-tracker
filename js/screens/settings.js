@@ -35,6 +35,16 @@ const settingsScreen = {
           </div>
         </div>
 
+        <div class="section-label">Export data</div>
+        <div class="card">
+          <div class="muted" style="font-size:11px; margin-bottom:10px;">Download your holdings and watchlist as CSV for use in Excel or with your CA.</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button id="export-holdings-csv" class="btn btn-small">↓ Holdings CSV</button>
+            <button id="export-watchlist-csv" class="btn btn-small">↓ Watchlist CSV</button>
+          </div>
+          <div id="export-status" class="muted" style="font-size:11px; margin-top:6px;"></div>
+        </div>
+
         <div class="section-label">Buffett rule thresholds</div>
         <div class="card">
           <div class="metric-row">
@@ -90,6 +100,52 @@ const settingsScreen = {
       driveConnected: false, lastSyncPush: null, lastSyncPull: null,
       deRule: { green: 0.1, yellow: 0.2 },
     };
+
+    // ── CSV Export ──────────────────────────────────────────────────────
+    function downloadCSV(filename, rows) {
+      const csv = rows.map(r => r.map(c => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: filename });
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    }
+
+    document.getElementById("export-holdings-csv").addEventListener("click", async () => {
+      const holdings = await HoldingStore.getAll();
+      const stocks   = await StockStore.getAll();
+      const sMap = {}; stocks.forEach(s => { sMap[s.ticker] = s; });
+      const rows = [["Ticker","Name","Lot","Purchase Date","Quantity","Buy Price","Current Price","Invested","Current Value","P&L%"]];
+      for (const h of holdings) {
+        const s = sMap[h.ticker];
+        const cmp = s?.fundamentals?.currentPrice ?? "";
+        const lots = h.lots?.length ? h.lots : [{ purchaseDate:"", quantity:h.quantity??0, buyPrice:h.avgBuyPrice??0 }];
+        lots.forEach((l, i) => {
+          const invested = l.quantity * l.buyPrice;
+          const current  = cmp ? l.quantity * cmp : "";
+          const pnl      = (cmp && invested) ? ((l.quantity*cmp - invested)/invested*100).toFixed(2)+"%" : "";
+          rows.push([h.ticker, s?.name||h.ticker, i+1, l.purchaseDate||"", l.quantity, l.buyPrice, cmp, invested, current, pnl]);
+        });
+      }
+      downloadCSV("buffett-compos-holdings.csv", rows);
+      document.getElementById("export-status").textContent = `✓ Downloaded (${holdings.length} positions)`;
+      setTimeout(() => { document.getElementById("export-status").textContent=""; }, 3000);
+    });
+
+    document.getElementById("export-watchlist-csv").addEventListener("click", async () => {
+      const stocks = await StockStore.getActive();
+      const rows = [["Ticker","Name","Sector","Cap Category","Board","ROE 5y%","D/E","EPS CAGR 5y%","P/E TTM","Market Cap Cr","Current Price","Verdict","Added Date"]];
+      for (const s of stocks) {
+        rows.push([
+          s.ticker, s.name||s.ticker, normalizeSector(s.sector), capCategory(s), s.board||"mainboard",
+          roe5yAvg(s)?.toFixed(1)??"", debtToEquity(s)?.toFixed(2)??"", epsCagr(s)?.toFixed(1)??"",
+          s.priceContext?.peTTM?.toFixed(1)??"", s.fundamentals?.marketCap?.toFixed(0)??"",
+          s.fundamentals?.currentPrice??"", deriveVerdict(s).verdict, s.addedDate??""
+        ]);
+      }
+      downloadCSV("buffett-compos-watchlist.csv", rows);
+      document.getElementById("export-status").textContent = `✓ Downloaded (${stocks.length} stocks)`;
+      setTimeout(() => { document.getElementById("export-status").textContent=""; }, 3000);
+    });
 
     // ── Board classification — expand/collapse, re-reads DB on expand ──
     async function renderBoardList() {
