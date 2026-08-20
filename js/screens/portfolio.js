@@ -102,7 +102,7 @@ const portfolioScreen = {
     } else {
       needsEl.innerHTML = triageItems.map(item => `
         <div class="triage-row" onclick="window.location.hash='#stock/${encodeURIComponent(item.ticker)}'">
-          <span class="verdict-dot verdict-no">●</span>
+          <span style="color:var(--color-red); font-size:10px; flex-shrink:0;">●</span>
           <div>
             <div class="stock-name">${item.name}</div>
             <div class="muted" style="font-size:11px;">${item.text}</div>

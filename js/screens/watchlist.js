@@ -310,10 +310,20 @@ const watchlistScreen = {
       btn.disabled = false;
       setTimeout(() => { progressEl.textContent = ""; }, 5000);
 
-      // Full re-render so watchlistPrice/sinceAdded and day% all reflect fresh data
+      // Full re-render respecting board grouping
       const freshStocks = await StockStore.getActive();
-      document.getElementById("watchlist-list").innerHTML =
-        freshStocks.map(stockRow).join("");
+      const mainboard = freshStocks.filter(s => !s.board || s.board === "mainboard");
+      const satellite = freshStocks.filter(s => s.board === "sme" || s.board === "microcap");
+      let html = "";
+      if (mainboard.length > 0) {
+        html += `<div class="watchlist-group-header">Mainboard <span class="muted">${mainboard.length}</span></div>`;
+        html += mainboard.map(stockRow).join("");
+      }
+      if (satellite.length > 0) {
+        html += `<div class="watchlist-group-header" style="margin-top:12px;">SME / Microcap <span class="muted">${satellite.length}</span></div>`;
+        html += satellite.map(stockRow).join("");
+      }
+      document.getElementById("watchlist-list").innerHTML = html;
 
       // Re-wire row click handlers after re-render
       document.querySelectorAll(".stock-row").forEach((row) => {

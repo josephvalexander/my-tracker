@@ -22,12 +22,17 @@ const settingsScreen = {
         <div class="section-label">Google Drive</div>
         <div class="card" id="drive-status-card">Loading...</div>
 
-        <div class="section-label">Stock board classification</div>
-        <div class="card">
-          <div class="muted" style="font-size:11px; margin-bottom:8px;">Set each stock's board — Mainboard, SME, or Microcap. Affects watchlist grouping and analytics.</div>
-          <div id="board-classification-list"></div>
-          <button id="save-board-classification-btn" class="btn btn-small" style="margin-top:10px;">Save classifications</button>
-          <div id="board-save-status" class="muted" style="font-size:11px; margin-top:4px;"></div>
+        <div class="section-label" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" id="board-class-header">
+          Stock board classification
+          <span id="board-class-chevron" style="font-size:11px; color:var(--color-text-tertiary);">▶ expand</span>
+        </div>
+        <div id="board-class-panel" style="display:none;">
+          <div class="card">
+            <div class="muted" style="font-size:11px; margin-bottom:8px;">Set each stock's board — Mainboard, SME, or Microcap. Affects watchlist grouping and analytics.</div>
+            <div id="board-classification-list"></div>
+            <button id="save-board-classification-btn" class="btn btn-small" style="margin-top:10px;">Save classifications</button>
+            <div id="board-save-status" class="muted" style="font-size:11px; margin-top:4px;"></div>
+          </div>
         </div>
 
         <div class="section-label">Buffett rule thresholds</div>
@@ -86,13 +91,15 @@ const settingsScreen = {
       deRule: { green: 0.1, yellow: 0.2 },
     };
 
-    // ── Board classification ──────────────────────────────────────
-    const allStocks = await StockStore.getActive();
-    const classEl   = document.getElementById("board-classification-list");
-    if (allStocks.length === 0) {
-      classEl.innerHTML = `<span class="muted">No stocks on watchlist yet.</span>`;
-    } else {
-      classEl.innerHTML = allStocks.map(s => `
+    // ── Board classification — expand/collapse, re-reads DB on expand ──
+    async function renderBoardList() {
+      const stocks = await StockStore.getActive();
+      const classEl = document.getElementById("board-classification-list");
+      if (stocks.length === 0) {
+        classEl.innerHTML = `<span class="muted">No stocks on watchlist yet.</span>`;
+        return;
+      }
+      classEl.innerHTML = stocks.map(s => `
         <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:0.5px solid var(--color-border); gap:8px;">
           <span style="font-size:13px; flex:1;">${s.name || s.ticker}</span>
           <div style="display:flex; gap:10px;">
@@ -103,23 +110,35 @@ const settingsScreen = {
               </label>`).join("")}
           </div>
         </div>`).join("");
-    }
 
-    document.getElementById("save-board-classification-btn").addEventListener("click", async () => {
-      const statusEl = document.getElementById("board-save-status");
-      statusEl.textContent = "Saving...";
-      for (const s of allStocks) {
-        const selected = document.querySelector(`input[name="board-${CSS.escape(s.ticker)}"]:checked`);
-        if (selected) {
-          const fresh = await StockStore.get(s.ticker);
-          if (fresh && fresh.board !== selected.value) {
-            fresh.board = selected.value;
-            await StockStore.set(s.ticker, fresh);
+      document.getElementById("save-board-classification-btn").onclick = async () => {
+        const statusEl = document.getElementById("board-save-status");
+        statusEl.textContent = "Saving...";
+        const freshStocks = await StockStore.getActive();
+        for (const s of freshStocks) {
+          const selected = document.querySelector(`input[name="board-${CSS.escape(s.ticker)}"]:checked`);
+          if (selected) {
+            const fresh = await StockStore.get(s.ticker);
+            if (fresh && fresh.board !== selected.value) {
+              fresh.board = selected.value;
+              await StockStore.set(s.ticker, fresh);
+            }
           }
         }
-      }
-      statusEl.textContent = "✓ Saved";
-      setTimeout(() => { statusEl.textContent = ""; }, 2000);
+        statusEl.textContent = "✓ Saved";
+        setTimeout(() => { statusEl.textContent = ""; }, 2000);
+      };
+    }
+
+    const boardHeader = document.getElementById("board-class-header");
+    const boardPanel  = document.getElementById("board-class-panel");
+    const boardChev   = document.getElementById("board-class-chevron");
+    let boardOpen = false;
+    boardHeader.addEventListener("click", async () => {
+      boardOpen = !boardOpen;
+      boardPanel.style.display = boardOpen ? "block" : "none";
+      boardChev.textContent = boardOpen ? "▼ collapse" : "▶ expand";
+      if (boardOpen) await renderBoardList(); // re-reads from DB every time
     });
 
     function formatWhen(iso) {

@@ -230,14 +230,14 @@ function buildDivEntries(filteredHoldings, divMap) {
       const fy = recordDate ? (recordDate.getMonth()>=3 ? recordDate.getFullYear()+1 : recordDate.getFullYear()) : null;
       const divDate = dateStr || "—";
       const divFY   = fy ? `FY${fy}` : "Unknown";
-      const datedLots = lots.filter(l => l.purchaseDate);
-      const undatedQty = lots.filter(l => !l.purchaseDate).reduce((s,l) => s+(l.quantity||0),0);
-      for (const lot of datedLots) {
-        if (!recordDate || new Date(lot.purchaseDate) <= recordDate)
-          entries.push({ ticker:h.ticker, lotDate:lot.purchaseDate, divDate, divFY, amountPerShare:div.amount, qty:lot.quantity, total:lot.quantity*div.amount });
-      }
-      if (undatedQty > 0)
-        entries.push({ ticker:h.ticker, lotDate:"—", divDate, divFY, amountPerShare:div.amount, qty:undatedQty, total:undatedQty*div.amount });
+      // Total quantity eligible at this dividend date — one row per dividend per holding
+      const eligibleQty = lots.reduce((sum, lot) => {
+        if (!lot.purchaseDate) return sum + (lot.quantity || 0); // undated = assume eligible
+        if (!recordDate || new Date(lot.purchaseDate) <= recordDate) return sum + (lot.quantity || 0);
+        return sum;
+      }, 0);
+      if (eligibleQty > 0)
+        entries.push({ ticker:h.ticker, divDate, divFY, amountPerShare:div.amount, qty:eligibleQty, total:eligibleQty*div.amount });
     }
   }
   return entries;
