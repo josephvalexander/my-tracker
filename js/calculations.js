@@ -605,6 +605,28 @@ function normalizeSector(raw) {
   return SECTOR_MAP[raw] || raw;
 }
 
+/** Returns display category for a stock, board-aware. */
+function capCategory(stock) {
+  const board = stock?.board || "mainboard";
+  if (board === "sme")      return "SME";
+  if (board === "microcap") return "Microcap";
+  const mc = stock?.fundamentals?.marketCap;
+  if (!mc) return "Unknown";
+  if (mc >= 20000) return "Large cap";
+  if (mc >= 5000)  return "Mid cap";
+  return "Small cap";
+}
+
+function isMainboard(stock) {
+  return !stock?.board || stock.board === "mainboard";
+}
+
+function boardLabel(board) {
+  if (board === "sme")      return "SME";
+  if (board === "microcap") return "Microcap";
+  return "Mainboard";
+}
+
 const calculationsExports = {
   roe5yAvg,
   roce5yAvg,
@@ -634,6 +656,9 @@ const calculationsExports = {
   equityHistory,
   lastValidIndex,
   normalizeSector,
+  capCategory,
+  isMainboard,
+  boardLabel,
 };
 
 if (typeof module !== "undefined" && module.exports) {

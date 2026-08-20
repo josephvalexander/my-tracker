@@ -22,6 +22,14 @@ const settingsScreen = {
         <div class="section-label">Google Drive</div>
         <div class="card" id="drive-status-card">Loading...</div>
 
+        <div class="section-label">Stock board classification</div>
+        <div class="card">
+          <div class="muted" style="font-size:11px; margin-bottom:8px;">Set each stock's board — Mainboard, SME, or Microcap. Affects watchlist grouping and analytics.</div>
+          <div id="board-classification-list"></div>
+          <button id="save-board-classification-btn" class="btn btn-small" style="margin-top:10px;">Save classifications</button>
+          <div id="board-save-status" class="muted" style="font-size:11px; margin-top:4px;"></div>
+        </div>
+
         <div class="section-label">Buffett rule thresholds</div>
         <div class="card">
           <div class="metric-row">
@@ -74,11 +82,45 @@ const settingsScreen = {
 
   async afterRender() {
     const settings = (await MetaStore.getSettings()) || {
-      driveConnected: false,
-      lastSyncPush: null,
-      lastSyncPull: null,
+      driveConnected: false, lastSyncPush: null, lastSyncPull: null,
       deRule: { green: 0.1, yellow: 0.2 },
     };
+
+    // ── Board classification ──────────────────────────────────────
+    const allStocks = await StockStore.getActive();
+    const classEl   = document.getElementById("board-classification-list");
+    if (allStocks.length === 0) {
+      classEl.innerHTML = `<span class="muted">No stocks on watchlist yet.</span>`;
+    } else {
+      classEl.innerHTML = allStocks.map(s => `
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:0.5px solid var(--color-border); gap:8px;">
+          <span style="font-size:13px; flex:1;">${s.name || s.ticker}</span>
+          <div style="display:flex; gap:10px;">
+            ${["mainboard","sme","microcap"].map(b => `
+              <label style="display:flex; align-items:center; gap:3px; font-size:11px;">
+                <input type="radio" name="board-${s.ticker}" value="${b}" ${(!s.board && b==="mainboard") || s.board===b ? "checked" : ""}/>
+                ${b==="mainboard"?"Main":b==="sme"?"SME":"μCap"}
+              </label>`).join("")}
+          </div>
+        </div>`).join("");
+    }
+
+    document.getElementById("save-board-classification-btn").addEventListener("click", async () => {
+      const statusEl = document.getElementById("board-save-status");
+      statusEl.textContent = "Saving...";
+      for (const s of allStocks) {
+        const selected = document.querySelector(`input[name="board-${CSS.escape(s.ticker)}"]:checked`);
+        if (selected) {
+          const fresh = await StockStore.get(s.ticker);
+          if (fresh && fresh.board !== selected.value) {
+            fresh.board = selected.value;
+            await StockStore.set(s.ticker, fresh);
+          }
+        }
+      }
+      statusEl.textContent = "✓ Saved";
+      setTimeout(() => { statusEl.textContent = ""; }, 2000);
+    });
 
     function formatWhen(iso) {
       if (!iso) return "never";

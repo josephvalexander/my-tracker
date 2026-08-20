@@ -26,6 +26,15 @@ const editStockScreen = {
           <div class="detail-title"><div class="detail-name">Edit — ${stock.name || ticker}</div></div>
         </div>
 
+        <div class="section-label">Board</div>
+        <div class="card">
+          <div style="display:flex; gap:20px;">
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="edit-board" value="mainboard" ${(!stock.board || stock.board==="mainboard") ? "checked" : ""}/> Mainboard</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="edit-board" value="sme" ${stock.board==="sme" ? "checked" : ""}/> SME</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="edit-board" value="microcap" ${stock.board==="microcap" ? "checked" : ""}/> Microcap</label>
+          </div>
+        </div>
+
         <div class="section-label">Business</div>
         <div class="card">
           <div class="muted" style="font-size:11px; margin-bottom:6px;">Drafted with AI during add — edit freely.</div>
@@ -58,6 +67,7 @@ const editStockScreen = {
 
     document.getElementById("save-edit-btn").addEventListener("click", async () => {
       const current = await StockStore.get(ticker);
+      current.board = document.querySelector('input[name="edit-board"]:checked')?.value || "mainboard";
       current.qualitative = current.qualitative || {};
       current.qualitative.business = document.getElementById("business-textarea").value.trim();
       current.qualitative.moatDescription = document.getElementById("moat-textarea").value.trim();

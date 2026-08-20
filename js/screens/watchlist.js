@@ -21,16 +21,11 @@ function stockRow(stock) {
   const de = debtToEquity(stock);
   const cagr = epsCagr(stock);
   const cmp = stock.fundamentals?.currentPrice ?? null;
-  const dayChangePct = stock.priceContext?.dayChangePct ?? null;
 
-  // If watchlistPrice is missing but we have currentPrice, use currentPrice
-  // as the baseline (shows +0.0%) and save it in the background.
-  // This fires every render until saved, but is idempotent — once saved
-  // it stops firing.
+  // Self-heal: if watchlistPrice missing but currentPrice exists, set it in background
   let watchlistPrice = stock.watchlistPrice ?? null;
   if (!watchlistPrice && cmp) {
     watchlistPrice = cmp;
-    // Save in background — don't await, don't block render
     StockStore.get(stock.ticker).then(fresh => {
       if (fresh && !fresh.watchlistPrice) {
         fresh.watchlistPrice = cmp;
@@ -47,15 +42,14 @@ function stockRow(stock) {
   const deColor   = colorForMetric(de,   DEFAULT_RULES.de);
   const cagrColor = colorForMetric(cagr, DEFAULT_RULES.epsCagr);
 
-  // Day change — shown inline with price
-  const dayHtml = dayChangePct != null
-    ? `<div class="price-day-change" style="font-size:11px; color:var(${dayChangePct >= 0 ? "--color-green" : "--color-red"});">${dayChangePct >= 0 ? "▲" : "▼"}${Math.abs(dayChangePct).toFixed(2)}%</div>`
-    : `<div class="price-day-change" style="font-size:11px; color:var(--color-text-tertiary);">—</div>`;
-
-  // Since added — shown below day change
-  const sinceHtml = sinceAdded != null
-    ? `<div style="font-size:10px; color:var(${sinceAdded >= 0 ? "--color-green" : "--color-red"});">${sinceAdded >= 0 ? "+" : ""}${sinceAdded.toFixed(1)}%</div>`
-    : `<div style="font-size:10px; color:var(--color-text-tertiary);">—</div>`;
+  const sinceColor = sinceAdded === null ? "--color-text-tertiary"
+    : sinceAdded >= 0 ? "--color-green" : "--color-red";
+  const sinceText = sinceAdded !== null
+    ? `${sinceAdded >= 0 ? "+" : ""}${sinceAdded.toFixed(1)}%`
+    : "—";
+  const addedDateText = stock.addedDate
+    ? new Date(stock.addedDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    : null;
 
   return `
     <div class="stock-row" data-ticker="${stock.ticker}">
@@ -69,10 +63,13 @@ function stockRow(stock) {
         ${metricChip("EPS", cagr, formatPct(cagr), cagrColor)}
         <div class="stock-price">
           <div class="price-main">${formatCurrency(cmp)}</div>
-          ${dayHtml}
-          ${sinceHtml}
         </div>
         <button class="row-menu-btn" data-menu-ticker="${stock.ticker}" aria-label="Row options">&#8942;</button>
+      </div>
+      <div class="since-added-row">
+        <span class="muted">Since watchlisted</span>
+        <span style="color:var(${sinceColor}); font-weight:500;">${sinceText}</span>
+        ${addedDateText ? `<span class="muted">· added ${addedDateText}</span>` : ""}
       </div>
     </div>`;
 }
@@ -213,7 +210,19 @@ const watchlistScreen = {
     if (stocks.length === 0) {
       listEl.innerHTML = `<div class="empty-state">No stocks yet. Tap "+ Add" to start tracking one.</div>`;
     } else {
-      listEl.innerHTML = stocks.map(stockRow).join("");
+      const mainboard = stocks.filter(s => !s.board || s.board === "mainboard");
+      const satellite = stocks.filter(s => s.board === "sme" || s.board === "microcap");
+
+      let html = "";
+      if (mainboard.length > 0) {
+        html += `<div class="watchlist-group-header">Mainboard <span class="muted">${mainboard.length}</span></div>`;
+        html += mainboard.map(stockRow).join("");
+      }
+      if (satellite.length > 0) {
+        html += `<div class="watchlist-group-header" style="margin-top:12px;">SME / Microcap <span class="muted">${satellite.length}</span></div>`;
+        html += satellite.map(stockRow).join("");
+      }
+      listEl.innerHTML = html;
     }
 
     listEl.querySelectorAll(".stock-row").forEach((row) => {

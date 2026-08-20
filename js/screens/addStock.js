@@ -219,6 +219,15 @@ const addStockScreen = {
           <div class="field-hint">Ticker is used to search indianapi.in. Company name is just for display.</div>
         </div>
 
+        <div class="form-group">
+          <label>Board</label>
+          <div style="display:flex; gap:16px; margin-top:4px;">
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="board" value="mainboard" checked /> Mainboard</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="board" value="sme" /> SME</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="board" value="microcap" /> Microcap</label>
+          </div>
+        </div>
+
         <button id="create-stock-btn" class="btn btn-primary">Add &amp; fetch data</button>
         <div id="fetch-status" class="muted" style="font-size:12px; margin-top:8px;"></div>
 
@@ -237,11 +246,10 @@ const addStockScreen = {
 
   async afterRender() {
     document.getElementById("create-stock-btn").addEventListener("click", async () => {
-      const ticker = document.getElementById("ticker-input").value.trim().toUpperCase();
+      const ticker    = document.getElementById("ticker-input").value.trim().toUpperCase();
       const nameInput = document.getElementById("name-input").value.trim();
-      // Always try ticker first — more reliable than full company name
-      // indianapi's name matching can fail on long/unusual company names
       const searchName = ticker;
+      const board     = document.querySelector('input[name="board"]:checked')?.value || "mainboard";
       const statusEl = document.getElementById("fetch-status");
 
       if (!ticker) { alert("Ticker is required."); return; }
@@ -264,7 +272,7 @@ const addStockScreen = {
 
       // Create the stock record immediately
       const stock = {
-        ticker, name: nameInput || ticker, sector: null, status: "active",
+        ticker, name: nameInput || ticker, sector: null, board, status: "active",
         addedDate: new Date().toISOString().slice(0, 10),
         archivedDate: null, archiveReason: null,
         qualitative: { business: "", moatDescription: "", moatTags: [], marketPosition: "", marketPositionTag: "" },
