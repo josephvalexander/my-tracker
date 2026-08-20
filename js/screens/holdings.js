@@ -131,12 +131,62 @@ const holdingsScreen = {
     document.getElementById("holdings-summary").innerHTML = `
       <div class="metric-card-box"><div class="metric-card-label">Invested</div><div class="metric-card-value">${formatCurrencyShort(summary.totalInvested)}</div></div>
       <div class="metric-card-box"><div class="metric-card-label">Current</div><div class="metric-card-value">${formatCurrencyShort(summary.totalCurrentValue)}</div></div>
-      <div class="metric-card-box"><div class="metric-card-label">Overall</div><div class="metric-card-value ${(summary.overallProfitPct ?? 0) >= 0 ? "text-good" : "text-bad"}">${summary.overallProfitPct !== null ? (summary.overallProfitPct >= 0 ? "+" : "") + summary.overallProfitPct.toFixed(1) + "%" : "—"}</div></div>
+      <div class="metric-card-box" id="overall-metric-box" style="cursor:default;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
+          <span class="metric-card-label" id="overall-mode-label">Overall</span>
+          ${summary.xirrPct !== null ? `
+            <div style="display:flex; border:0.5px solid var(--color-border); border-radius:4px; overflow:hidden; font-size:9px;">
+              <button id="toggle-abs" style="padding:1px 5px; background:var(--color-text); color:var(--color-surface); border:none; cursor:pointer; font-size:9px;">Abs</button>
+              <button id="toggle-xirr" style="padding:1px 5px; background:none; color:var(--color-text-secondary); border:none; cursor:pointer; font-size:9px;">XIRR</button>
+            </div>` : ""}
+        </div>
+        <div class="metric-card-value ${(summary.overallProfitPct ?? 0) >= 0 ? "text-good" : "text-bad"}" id="overall-value">
+          ${summary.overallProfitPct !== null ? (summary.overallProfitPct >= 0 ? "+" : "") + summary.overallProfitPct.toFixed(1) + "%" : "—"}
+        </div>
+      </div>
       <div class="metric-card-box" id="div-summary-card" style="cursor:pointer;" title="Tap to see dividend breakdown">
         <div class="metric-card-label">Dividends ↗</div>
         <div class="metric-card-value">${formatCurrencyShort(summary.totalDividends)}</div>
       </div>
     `;
+
+    // ── Abs / XIRR toggle ────────────────────────────────────────────
+    const toggleAbs  = document.getElementById("toggle-abs");
+    const toggleXirr = document.getElementById("toggle-xirr");
+    const overallVal = document.getElementById("overall-value");
+    const overallLbl = document.getElementById("overall-mode-label");
+
+    if (toggleAbs && toggleXirr && overallVal) {
+      const absText  = summary.overallProfitPct !== null
+        ? `${summary.overallProfitPct >= 0 ? "+" : ""}${summary.overallProfitPct.toFixed(1)}%` : "—";
+      const xirrText = summary.xirrPct !== null
+        ? `${summary.xirrPct >= 0 ? "+" : ""}${summary.xirrPct.toFixed(1)}%` : "—";
+      const absCls  = (summary.overallProfitPct ?? 0) >= 0 ? "text-good" : "text-bad";
+      const xirrCls = (summary.xirrPct ?? 0) >= 0 ? "text-good" : "text-bad";
+
+      function setMode(mode) {
+        if (mode === "abs") {
+          overallVal.textContent = absText;
+          overallVal.className = `metric-card-value ${absCls}`;
+          overallLbl.textContent = "Overall (Abs)";
+          toggleAbs.style.background  = "var(--color-text)";
+          toggleAbs.style.color       = "var(--color-surface)";
+          toggleXirr.style.background = "none";
+          toggleXirr.style.color      = "var(--color-text-secondary)";
+        } else {
+          overallVal.textContent = xirrText;
+          overallVal.className = `metric-card-value ${xirrCls}`;
+          overallLbl.textContent = "Overall (XIRR)";
+          toggleXirr.style.background = "var(--color-text)";
+          toggleXirr.style.color      = "var(--color-surface)";
+          toggleAbs.style.background  = "none";
+          toggleAbs.style.color       = "var(--color-text-secondary)";
+        }
+      }
+
+      toggleAbs.addEventListener("click",  (e) => { e.stopPropagation(); setMode("abs"); });
+      toggleXirr.addEventListener("click", (e) => { e.stopPropagation(); setMode("xirr"); });
+    }
 
     // ── Dividend detail modal ─────────────────────────────────────────
     // Build data: for each holding, for each lot, for each dividend — collect eligible entries

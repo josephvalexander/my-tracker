@@ -122,6 +122,87 @@ function totalDividendsReceived(holding, dividends) {
   return total;
 }
 
+/**
+ * XIRR — Extended Internal Rate of Return.
+ * Uses Newton-Raphson iteration to find the annual rate r where NPV = 0.
+ *
+ * cashFlows: [{ amount, date }]  — negative = outflow (purchase), positive = inflow (current value)
+ * Returns annualised rate as a decimal (e.g. 0.142 = 14.2%), or null if it fails.
+ */
+function xirr(cashFlows, guess = 0.1) {
+  if (cashFlows.length < 2) return null;
+  const dates = cashFlows.map(cf => cf.date);
+  const t0    = dates[0];
+  const years = dates.map(d => (d - t0) / (365.25 * 24 * 3600 * 1000));
+
+  function npv(r) {
+    return cashFlows.reduce((s, cf, i) => s + cf.amount / Math.pow(1 + r, years[i]), 0);
+  }
+  function dnpv(r) {
+    return cashFlows.reduce((s, cf, i) => s - years[i] * cf.amount / Math.pow(1 + r, years[i] + 1), 0);
+  }
+
+  let r = guess;
+  for (let i = 0; i < 100; i++) {
+    const n = npv(r);
+    const d = dnpv(r);
+    if (Math.abs(d) < 1e-12) break;
+    const r1 = r - n / d;
+    if (Math.abs(r1 - r) < 1e-8) return r1;
+    r = r1;
+    if (!isFinite(r) || r < -0.9999) return null; // diverged
+  }
+  return null; // failed to converge
+}
+
+/**
+ * Compute portfolio XIRR across all holdings.
+ * Rules:
+ * - Only dated lots are included
+ * - Lots held for less than 2 months are excluded entirely
+ * - If no eligible lots remain, returns null
+ * - Result capped at ±999% for display
+ */
+function portfolioXIRR(holdings, priceMap) {
+  const today     = new Date();
+  const twoMonths = 60 * 24 * 3600 * 1000;
+  const cashFlows = [];
+  let totalCurrentValue = 0;
+
+  for (const h of holdings) {
+    const cmp = priceMap[h.ticker];
+    if (!cmp) continue;
+
+    const lots = h.lots?.length
+      ? h.lots
+      : (h.quantity && h.avgBuyPrice ? [{ purchaseDate: null, quantity: h.quantity, buyPrice: h.avgBuyPrice }] : []);
+
+    for (const lot of lots) {
+      if (!lot.purchaseDate) continue; // skip undated
+      const lotDate = new Date(lot.purchaseDate);
+      const held    = today - lotDate;
+      if (held < twoMonths) continue; // skip < 2 months
+
+      const cost         = lot.quantity * lot.buyPrice;
+      const currentValue = lot.quantity * cmp;
+      cashFlows.push({ amount: -cost, date: lotDate });
+      totalCurrentValue += currentValue;
+    }
+  }
+
+  if (cashFlows.length === 0 || totalCurrentValue === 0) return null;
+
+  // Sort by date ascending, add terminal inflow at today
+  cashFlows.sort((a, b) => a.date - b.date);
+  cashFlows.push({ amount: totalCurrentValue, date: today });
+
+  const rate = xirr(cashFlows);
+  if (rate === null || !isFinite(rate)) return null;
+
+  // Cap at ±999% for display
+  return Math.max(-9.99, Math.min(9.99, rate)) * 100;
+}
+
 /** Build the full holdings summary for the Holdings tab. */
 function buildHoldingsSummary(holdings, priceMap, dividendMap) {
   const rows = holdings.map((h) => {
@@ -153,6 +234,7 @@ function buildHoldingsSummary(holdings, priceMap, dividendMap) {
   const overallProfitPct   = totalInvested > 0
     ? ((totalCurrentValue - totalInvested) / totalInvested) * 100
     : null;
+  const xirrPct = portfolioXIRR(holdings, priceMap);
 
   return {
     rows: rows.map((r) => ({
@@ -165,12 +247,14 @@ function buildHoldingsSummary(holdings, priceMap, dividendMap) {
     totalCurrentValue,
     totalDividends,
     overallProfitPct,
+    xirrPct,
   };
 }
 
 const holdingsCalculationsExports = {
   totalQuantity, avgBuyPrice, investedValue, currentValue, profitPct,
   totalDividendsReceived, buildHoldingsSummary, splitMultiplier, bonusMultiplier,
+  portfolioXIRR,
 };
 if (typeof module !== "undefined" && module.exports) {
   module.exports = holdingsCalculationsExports;
