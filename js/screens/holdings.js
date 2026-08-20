@@ -154,7 +154,6 @@ const holdingsScreen = {
     const toggleAbs  = document.getElementById("toggle-abs");
     const toggleXirr = document.getElementById("toggle-xirr");
     const overallVal = document.getElementById("overall-value");
-    const overallLbl = document.getElementById("overall-mode-label");
 
     if (toggleAbs && toggleXirr && overallVal) {
       const absText  = summary.overallProfitPct !== null
@@ -168,7 +167,6 @@ const holdingsScreen = {
         if (mode === "abs") {
           overallVal.textContent = absText;
           overallVal.className = `metric-card-value ${absCls}`;
-          overallLbl.textContent = "Overall (Abs)";
           toggleAbs.style.background  = "var(--color-text)";
           toggleAbs.style.color       = "var(--color-surface)";
           toggleXirr.style.background = "none";
@@ -176,7 +174,6 @@ const holdingsScreen = {
         } else {
           overallVal.textContent = xirrText;
           overallVal.className = `metric-card-value ${xirrCls}`;
-          overallLbl.textContent = "Overall (XIRR)";
           toggleXirr.style.background = "var(--color-text)";
           toggleXirr.style.color      = "var(--color-surface)";
           toggleAbs.style.background  = "none";
