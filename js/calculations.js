@@ -605,15 +605,21 @@ function normalizeSector(raw) {
   return SECTOR_MAP[raw] || raw;
 }
 
-/** Returns display category for a stock, board-aware. */
+/** Returns display category for a stock, board-aware.
+ * Priority: explicit capOverride → board override → threshold derivation.
+ * Thresholds based on SEBI/AMFI July 2026 (Large ≥₹1,06,300 Cr, Mid ₹33,500–₹1,06,300 Cr).
+ * These cutoffs are rank-based (top 100 / next 150 / rest) and updated by AMFI each Jan & Jul.
+ * Use capOverride on each stock to set the correct SEBI category when precision matters.
+ */
 function capCategory(stock) {
+  if (stock?.capOverride) return stock.capOverride; // explicit manual override wins
   const board = stock?.board || "mainboard";
   if (board === "sme")      return "SME";
   if (board === "microcap") return "Microcap";
   const mc = stock?.fundamentals?.marketCap;
   if (!mc) return "Unknown";
-  if (mc >= 20000) return "Large cap";
-  if (mc >= 5000)  return "Mid cap";
+  if (mc >= 106300) return "Large cap";
+  if (mc >= 33500)  return "Mid cap";
   return "Small cap";
 }
 

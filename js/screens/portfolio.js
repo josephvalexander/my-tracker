@@ -98,15 +98,16 @@ const portfolioScreen = {
 
     const needsEl = document.getElementById("needs-attention");
     if (triageItems.length === 0) {
-      needsEl.innerHTML = `<span class="muted">All held stocks pass the Buffett checklist.</span>`;
+      needsEl.innerHTML = `<span class="muted" style="font-size:12px;">All held stocks pass the Buffett checklist.</span>`;
     } else {
       needsEl.innerHTML = triageItems.map(item => `
         <div class="triage-row" onclick="window.location.hash='#stock/${encodeURIComponent(item.ticker)}'">
-          <span style="color:var(--color-red); font-size:10px; flex-shrink:0;">●</span>
-          <div>
-            <div class="stock-name">${item.name}</div>
-            <div class="muted" style="font-size:11px;">${item.text}</div>
+          <span style="color:var(--color-red); font-size:9px; flex-shrink:0; margin-top:2px;">●</span>
+          <div style="flex:1; min-width:0;">
+            <span class="stock-name" style="font-size:13px;">${item.name}</span>
+            <span class="muted" style="font-size:11px;"> · ${item.text}</span>
           </div>
+          <span class="muted" style="font-size:11px; flex-shrink:0;">→</span>
         </div>`).join("");
     }
 

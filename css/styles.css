@@ -92,13 +92,10 @@ body {
 
 .stock-list { display: flex; flex-direction: column; gap: 8px; }
 
-.stock-row, .holding-row, .archived-row, .triage-row {
-  background: var(--color-surface);
-  border: 0.5px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 12px;
-  cursor: pointer;
-}
+.stock-row, .holding-row, .archived-row { background: var(--color-surface); border: 0.5px solid var(--color-border); border-radius: var(--radius-md); padding: 12px; cursor: pointer; }
+.triage-row { display: flex; align-items: flex-start; gap: 8px; padding: 7px 0; border-bottom: 0.5px solid var(--color-border); cursor: pointer; }
+.triage-row:last-child { border-bottom: none; }
+.triage-row:hover { opacity: 0.75; }
 
 .stock-row-grid {
   display: grid;

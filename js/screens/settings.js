@@ -99,16 +99,28 @@ const settingsScreen = {
         classEl.innerHTML = `<span class="muted">No stocks on watchlist yet.</span>`;
         return;
       }
-      classEl.innerHTML = stocks.map(s => `
-        <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:0.5px solid var(--color-border); gap:8px;">
-          <span style="font-size:13px; flex:1;">${s.name || s.ticker}</span>
-          <div style="display:flex; gap:10px;">
+
+      const CAP_OPTIONS = ["", "Large cap", "Mid cap", "Small cap"];
+
+      classEl.innerHTML = `
+        <div style="display:grid; grid-template-columns:1fr auto auto; gap:6px; align-items:center; padding:4px 0; border-bottom:0.5px solid var(--color-border); margin-bottom:4px;">
+          <span class="muted" style="font-size:10px;">Stock</span>
+          <span class="muted" style="font-size:10px;">Board</span>
+          <span class="muted" style="font-size:10px;">Cap category</span>
+        </div>` +
+        stocks.map(s => `
+        <div style="display:grid; grid-template-columns:1fr auto auto; gap:6px; align-items:center; padding:5px 0; border-bottom:0.5px solid var(--color-border);">
+          <span style="font-size:12px;">${s.name || s.ticker}</span>
+          <div style="display:flex; gap:8px;">
             ${["mainboard","sme","microcap"].map(b => `
-              <label style="display:flex; align-items:center; gap:3px; font-size:11px;">
+              <label style="display:flex; align-items:center; gap:2px; font-size:10px;">
                 <input type="radio" name="board-${s.ticker}" value="${b}" ${(!s.board && b==="mainboard") || s.board===b ? "checked" : ""}/>
                 ${b==="mainboard"?"Main":b==="sme"?"SME":"μCap"}
               </label>`).join("")}
           </div>
+          <select name="cap-${s.ticker}" style="font-size:10px; padding:2px 4px; border:0.5px solid var(--color-border); border-radius:4px; background:var(--color-bg); color:var(--color-text);">
+            ${CAP_OPTIONS.map(c => `<option value="${c}" ${(s.capOverride||"")=== c ? "selected":""}>${c || "Auto"}</option>`).join("")}
+          </select>
         </div>`).join("");
 
       document.getElementById("save-board-classification-btn").onclick = async () => {
@@ -116,14 +128,13 @@ const settingsScreen = {
         statusEl.textContent = "Saving...";
         const freshStocks = await StockStore.getActive();
         for (const s of freshStocks) {
-          const selected = document.querySelector(`input[name="board-${CSS.escape(s.ticker)}"]:checked`);
-          if (selected) {
-            const fresh = await StockStore.get(s.ticker);
-            if (fresh && fresh.board !== selected.value) {
-              fresh.board = selected.value;
-              await StockStore.set(s.ticker, fresh);
-            }
-          }
+          const boardSel = document.querySelector(`input[name="board-${CSS.escape(s.ticker)}"]:checked`);
+          const capSel   = document.querySelector(`select[name="cap-${CSS.escape(s.ticker)}"]`);
+          const fresh = await StockStore.get(s.ticker);
+          if (!fresh) continue;
+          if (boardSel) fresh.board = boardSel.value;
+          if (capSel)   fresh.capOverride = capSel.value || null;
+          await StockStore.set(s.ticker, fresh);
         }
         statusEl.textContent = "✓ Saved";
         setTimeout(() => { statusEl.textContent = ""; }, 2000);
