@@ -49,6 +49,11 @@ const portfolioScreen = {
             <button class="btn btn-small" onclick="window.location.hash='#calendar'">📅 Calendar</button>
           </div>
         </div>
+        <div class="toggle-row" style="margin-bottom:12px;">
+          <button id="af-all"       class="toggle-btn">All</button>
+          <button id="af-mainboard" class="toggle-btn toggle-btn-active">Mainboard</button>
+          <button id="af-sme"       class="toggle-btn">SME / Microcap</button>
+        </div>
         <div class="section-label">Buffett checklist — held stocks</div>
         <div id="portfolio-summary" class="metric-grid-3"></div>
         <div id="needs-attention" class="card" style="margin-bottom:14px;"></div>
@@ -76,30 +81,56 @@ const portfolioScreen = {
   },
 
   async afterRender() {
-    // Base data: holdings + their stock records
-    const holdings    = await HoldingStore.getAll();
-    const allStocks   = await StockStore.getAll();
-    const stockMap    = {};
+    const holdings  = await HoldingStore.getAll();
+    const allStocks = await StockStore.getAll();
+    const stockMap  = {};
     allStocks.forEach(s => { stockMap[s.ticker] = s; });
 
-    // Build list of held stocks with their current values
-    const heldStocksWithValues = holdings
+    const allHeldWithValues = holdings
       .map(h => {
         const stock = stockMap[h.ticker];
         if (!stock) return null;
         const qty   = totalQuantity(h);
         const price = stock.fundamentals?.currentPrice ?? 0;
-        const value = qty * price;
-        return { stock, holding: h, qty, value };
+        return { stock, holding: h, qty, value: qty * price };
       })
       .filter(Boolean);
 
-    const heldStocks = heldStocksWithValues.map(h => h.stock);
+    let activeFilter = "mainboard";
+
+    function applyFilter(items) {
+      if (activeFilter === "all")       return items;
+      if (activeFilter === "mainboard") return items.filter(h => !h.stock.board || h.stock.board === "mainboard");
+      return items.filter(h => h.stock.board === "sme" || h.stock.board === "microcap");
+    }
+
+    // ── Toggle wiring ────────────────────────────────────────────────
+    ["all","mainboard","sme"].forEach(f => {
+      document.getElementById(`af-${f}`).addEventListener("click", () => {
+        activeFilter = f;
+        document.querySelectorAll("#af-all,#af-mainboard,#af-sme").forEach(b => b.classList.remove("toggle-btn-active"));
+        document.getElementById(`af-${f}`).classList.add("toggle-btn-active");
+        buildAnalytics();
+      });
+    });
+
+    // Chart instances stored for destruction on re-render
+    let chartInstances = [];
+    function destroyCharts() {
+      chartInstances.forEach(c => { try { c.destroy(); } catch {} });
+      chartInstances = [];
+    }
+
+    function buildAnalytics() {
+      destroyCharts();
+      const heldStocksWithValues = applyFilter(allHeldWithValues);
+      const heldStocks = heldStocksWithValues.map(h => h.stock);
+      const holdingsFiltered = heldStocksWithValues.map(h => h.holding);
 
     // ── Portfolio growth YoY / QoQ ────────────────────────────────
     const growthEl = document.getElementById("portfolio-growth");
     const totalCurrentValue = heldStocksWithValues.reduce((s, h) => s + h.value, 0);
-    const totalInvested     = holdings.reduce((s, h) => s + investedValue(h), 0);
+    const totalInvested     = holdingsFiltered.reduce((s, h) => s + investedValue(h), 0);
     const overallReturn     = totalInvested > 0 ? ((totalCurrentValue - totalInvested) / totalInvested * 100) : null;
 
     // QoQ/YoY: derived from quarterly revenue of held stocks (weighted by portfolio value)
@@ -158,6 +189,14 @@ const portfolioScreen = {
           <div class="muted" style="font-size:10px;">aggregate held stocks</div>
         </div>
       </div>`;
+
+    // Wire tooltips each time growth section re-renders
+    document.querySelectorAll(".tooltip-wrap").forEach(wrap => {
+      const box = wrap.querySelector(".tooltip-box");
+      wrap.addEventListener("mouseenter", () => { box.style.display = "block"; });
+      wrap.addEventListener("mouseleave", () => { box.style.display = "none"; });
+      wrap.addEventListener("click", (e) => { e.stopPropagation(); box.style.display = box.style.display === "none" ? "block" : "none"; });
+    });
 
     // ── Position sizing ───────────────────────────────────────────────
     const sizingEl = document.getElementById("position-sizing");
@@ -258,20 +297,6 @@ const portfolioScreen = {
         </div>`).join("");
     }
 
-    // ── Tooltip wiring for growth metrics ─────────────────────────────
-    document.querySelectorAll(".tooltip-wrap").forEach(wrap => {
-      const box = wrap.querySelector(".tooltip-box");
-      wrap.addEventListener("mouseenter", () => { box.style.display = "block"; });
-      wrap.addEventListener("mouseleave", () => { box.style.display = "none"; });
-      wrap.addEventListener("click", (e) => {
-        e.stopPropagation();
-        box.style.display = box.style.display === "none" ? "block" : "none";
-      });
-    });
-    document.addEventListener("click", () => {
-      document.querySelectorAll(".tooltip-box").forEach(b => { b.style.display = "none"; });
-    }, { once: false, capture: true });
-
     // ── Collapsible toggle wiring ─────────────────────────────────────
     [["sizing-header","sizing-chevron","position-sizing-wrap"],
      ["earnings-header","earnings-chevron","earnings-season-wrap"]].forEach(([hId, cId, pId]) => {
@@ -302,11 +327,11 @@ const portfolioScreen = {
               </div>`).join("")}
           </div>
         </div>`;
-      new Chart(document.getElementById("sector-pie"), {
+      chartInstances.push(new Chart(document.getElementById("sector-pie"), {
         type: "pie",
         data: { labels: breakdown.map(b=>b.sector), datasets: [{ data: breakdown.map(b=>b.pct), backgroundColor: breakdown.map((_,i)=>SECTOR_PALETTE[i%SECTOR_PALETTE.length]), borderWidth: 2, borderColor: "var(--color-surface)" }] },
         options: { responsive:true, maintainAspectRatio:true, plugins:{ legend:{display:false}, tooltip:{callbacks:{label:(ctx)=>` ${ctx.label}: ${ctx.parsed.toFixed(0)}%`}} } },
-      });
+      }));
     }
 
     // ── Cap mix (value-weighted) ──────────────────────────────────
@@ -327,11 +352,11 @@ const portfolioScreen = {
               </div>`).join("")}
           </div>
         </div>`;
-      new Chart(document.getElementById("cap-pie"), {
+      chartInstances.push(new Chart(document.getElementById("cap-pie"), {
         type: "pie",
         data: { labels: caps.map(c=>c.cat), datasets: [{ data: caps.map(c=>c.pct), backgroundColor: caps.map(c=>CAP_PALETTE[c.cat]), borderWidth: 2, borderColor: "var(--color-surface)" }] },
         options: { responsive:true, maintainAspectRatio:true, plugins:{ legend:{display:false}, tooltip:{callbacks:{label:(ctx)=>` ${ctx.label}: ${ctx.parsed.toFixed(0)}%`}} } },
-      });
+      }));
     }
 
     // ── Valuation snapshot ────────────────────────────────────────
@@ -365,6 +390,15 @@ const portfolioScreen = {
             }).join("")}
           </tbody>
         </table>`;
+
+    } // end buildAnalytics
+
+    // Tooltip dismiss — registered once outside buildAnalytics
+    document.addEventListener("click", () => {
+      document.querySelectorAll(".tooltip-box").forEach(b => { b.style.display = "none"; });
+    }, { capture: true });
+
+    buildAnalytics();
   },
 };
 
