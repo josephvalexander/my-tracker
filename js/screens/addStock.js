@@ -49,8 +49,11 @@ async function applyIndianApiResult(ticker, parsed) {
     marketCap: parsed.stockFundamentals.marketCap ?? stock.fundamentals?.marketCap,
   };
 
-  if (parsed.companyName && (!stock.name || stock.name === ticker)) {
-    stock.name = parsed.companyName;
+  if (parsed.companyName) {
+    const isNumericCode = /^\d+$/.test(stock.name || "");
+    if (!stock.name || stock.name === ticker || isNumericCode) {
+      stock.name = parsed.companyName;
+    }
   }
   if (parsed.sector && !stock.sector) {
     stock.sector = parsed.sector;

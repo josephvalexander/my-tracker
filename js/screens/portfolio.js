@@ -92,7 +92,7 @@ const portfolioScreen = {
         const parts = [];
         if (verdict.hardFlags.length > 0) parts.push(`${verdict.hardFlags.length} hard flag${verdict.hardFlags.length === 1 ? "" : "s"}`);
         if (verdict.softFlags.length > 0) parts.push(`${verdict.softFlags.length} soft flag${verdict.softFlags.length === 1 ? "" : "s"}`);
-        triageItems.push({ ticker: s.ticker, type: "bad", text: parts.join(" · ") + " · verdict: No" });
+        triageItems.push({ ticker: s.ticker, name: s.name || s.ticker, type: "bad", text: parts.join(" · ") + " · verdict: No" });
       }
     });
 
@@ -111,7 +111,7 @@ const portfolioScreen = {
         <div class="triage-row" data-ticker="${item.ticker}">
           <span class="dot dot-${item.type === "good" ? "green" : "red"}"></span>
           <div>
-            <div class="stock-name">${item.ticker}</div>
+            <div class="stock-name">${item.name}</div>
             <div class="stock-meta">${item.text}</div>
           </div>
         </div>`
@@ -248,7 +248,7 @@ const portfolioScreen = {
                   ? `<span style="color:${diff > 20 ? "var(--color-red)" : diff < -10 ? "var(--color-green)" : "var(--color-text-secondary)"}">${diff >= 0 ? "+" : ""}${diff.toFixed(0)}%</span>`
                   : `<span class="muted">—</span>`;
                 return `<tr style="border-bottom:0.5px solid var(--color-border);">
-                  <td style="padding:5px 0; font-size:13px;">${v.ticker}</td>
+                  <td style="padding:5px 0; font-size:13px;">${v.name}</td>
                   <td class="${peCls}" style="text-align:right; font-size:13px;">${v.pe.toFixed(1)}x</td>
                   <td class="muted" style="text-align:right; font-size:13px;">${v.sectorPE ? v.sectorPE.toFixed(1) + "x" : "—"}</td>
                   <td style="text-align:right; font-size:13px;">${diffStr}</td>
