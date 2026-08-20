@@ -78,26 +78,31 @@ const compareScreen = {
         const hlB = winner === "b" ? "color:var(--color-green); font-weight:600;" : "";
         return `
           <tr style="border-bottom:0.5px solid var(--color-border);">
-            <td style="padding:7px 0; font-size:12px; color:var(--color-text-secondary);">${m.label}</td>
-            <td style="padding:7px 4px; font-size:13px; text-align:right; ${hlA}">${valA}</td>
-            <td style="padding:7px 4px; font-size:13px; text-align:right; ${hlB}">${valB}</td>
+            <td style="padding:8px 12px; font-size:12px; color:var(--color-text-secondary);">${m.label}</td>
+            <td style="padding:8px 8px; font-size:13px; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; ${hlA}">${valA}</td>
+            <td style="padding:8px 12px; font-size:13px; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; ${hlB}">${valB}</td>
           </tr>`;
       }).join("");
 
       document.getElementById("compare-result").innerHTML = `
         <div class="card" style="padding:0; overflow:hidden;">
-          <table style="width:100%; border-collapse:collapse;">
+          <table style="width:100%; border-collapse:collapse; table-layout:fixed;">
+            <colgroup>
+              <col style="width:38%">
+              <col style="width:31%">
+              <col style="width:31%">
+            </colgroup>
             <thead>
               <tr style="border-bottom:1px solid var(--color-border);">
-                <th style="padding:8px 0; font-size:11px; text-align:left; color:var(--color-text-tertiary); font-weight:500;">Metric</th>
-                <th style="padding:8px 4px; font-size:12px; text-align:right; color:var(--color-text);">${a.name || a.ticker}</th>
-                <th style="padding:8px 4px; font-size:12px; text-align:right; color:var(--color-text);">${b.name || b.ticker}</th>
+                <th style="padding:8px 12px; font-size:11px; text-align:left; color:var(--color-text-tertiary); font-weight:500;">Metric</th>
+                <th style="padding:8px 8px; font-size:12px; text-align:right; color:var(--color-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${a.name || a.ticker}</th>
+                <th style="padding:8px 12px; font-size:12px; text-align:right; color:var(--color-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${b.name || b.ticker}</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
           </table>
         </div>
-        <div class="muted" style="font-size:10px; margin-top:6px;">Green = better value on that metric</div>`;
+        <div class="muted" style="font-size:10px; margin-top:6px; padding:0 4px;">Green = better value on that metric</div>`;
     }
 
     document.getElementById("run-compare-btn").addEventListener("click", runCompare);
