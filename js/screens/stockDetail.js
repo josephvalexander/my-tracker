@@ -182,7 +182,7 @@ const stockDetailScreen = {
           </div>
           <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
             <div class="price-main">${formatCurrency(stock.fundamentals?.currentPrice)}</div>
-            <button class="btn btn-small" onclick="event.stopPropagation(); window.location.hash='#editStock/${encodeURIComponent(stock.ticker)}'" style="font-size:11px; padding:2px 8px;">✏ Edit</button>
+            <button class="btn btn-small" onclick="event.stopPropagation(); window.location.hash='#editStock/${encodeURIComponent(stock.ticker)}'" style="font-size:11px; padding:2px 10px;">Edit</button>
           </div>
         </div>
 
