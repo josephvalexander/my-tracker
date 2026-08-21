@@ -126,12 +126,19 @@ async function deleteStockPermanently(ticker) {
   await HoldingStore.remove(ticker);
 }
 
-/** Export everything as one JSON blob — used for Drive push and for manual backup. */
+/** Export everything as one JSON blob — used for Drive push and for manual backup.
+ *  API keys are excluded from Drive sync (device-specific, security concern).
+ */
 async function exportAll() {
-  const stocks = await StockStore.getAll();
+  const stocks   = await StockStore.getAll();
   const holdings = await HoldingStore.getAll();
   const settings = await MetaStore.getSettings();
-  return { stocks, holdings, settings, exportedAt: new Date().toISOString() };
+  const snapshots = await MetaStore.getSnapshots();
+  // Strip sensitive keys before pushing to Drive
+  const safeSettings = { ...settings };
+  delete safeSettings.indianApiKey;
+  delete safeSettings.geminiApiKey;
+  return { stocks, holdings, settings: safeSettings, snapshots, exportedAt: new Date().toISOString() };
 }
 
 /**
@@ -149,19 +156,36 @@ async function importAll(data) {
     const local = await StockStore.get(stock.ticker);
     const incomingTime = stock.updatedAt ? new Date(stock.updatedAt).getTime() : 0;
     const localTime = local?.updatedAt ? new Date(local.updatedAt).getTime() : 0;
-    if (!local || incomingTime >= localTime) {
-      await StockStore.setRaw(stock.ticker, stock);
-    }
+    if (!local || incomingTime >= localTime) await StockStore.setRaw(stock.ticker, stock);
   }
   for (const holding of data.holdings || []) {
     const local = await HoldingStore.get(holding.ticker);
     const incomingTime = holding.updatedAt ? new Date(holding.updatedAt).getTime() : 0;
     const localTime = local?.updatedAt ? new Date(local.updatedAt).getTime() : 0;
-    if (!local || incomingTime >= localTime) {
-      await HoldingStore.setRaw(holding.ticker, holding);
-    }
+    if (!local || incomingTime >= localTime) await HoldingStore.setRaw(holding.ticker, holding);
   }
-  if (data.settings) await MetaStore.setSettings(data.settings);
+  if (data.settings) {
+    // Preserve local API keys — don't let Drive overwrite them
+    const local = (await MetaStore.getSettings()) || {};
+    await MetaStore.setSettings({
+      ...data.settings,
+      indianApiKey: local.indianApiKey ?? data.settings.indianApiKey,
+      geminiApiKey: local.geminiApiKey ?? data.settings.geminiApiKey,
+    });
+  }
+  // Merge snapshots — take the union, keeping more data
+  if (data.snapshots) {
+    const localSnaps = (await MetaStore.getSnapshots()) || {};
+    const merged = {};
+    for (const filter of ["all","mainboard","sme"]) {
+      const local  = (localSnaps[filter] || []);
+      const remote = (data.snapshots[filter] || []);
+      const byDate = {};
+      [...local, ...remote].forEach(s => { byDate[s.date] = s; });
+      merged[filter] = Object.values(byDate).sort((a,b) => a.date.localeCompare(b.date)).slice(-400);
+    }
+    await MetaStore.setSnapshots(merged);
+  }
 }
 
 /**
@@ -195,13 +219,28 @@ async function savePortfolioSnapshot() {
       sme:       computeValue(s => s.board === "sme" || s.board === "microcap"),
     };
 
-    const existing = (await MetaStore.getSnapshots()) || { all: [], mainboard: [], sme: [] };
+    // Fetch index values for benchmark comparison
+    const WORKER = "https://portfolio-tracker-nse-proxy.josephv-mec.workers.dev";
+    let sensex = null, nifty = null;
+    try {
+      const [sr, nr] = await Promise.all([
+        fetch(`${WORKER}/yf-index?symbol=%5EBSESN`).then(r => r.json()),
+        fetch(`${WORKER}/yf-index?symbol=%5ENSEI`).then(r => r.json()),
+      ]);
+      sensex = sr?.current ?? null;
+      nifty  = nr?.current ?? null;
+    } catch { /* non-critical */ }
+
+    const existing = (await MetaStore.getSnapshots()) || { all: [], mainboard: [], sme: [], index: [] };
     for (const filter of ["all", "mainboard", "sme"]) {
       const arr = (existing[filter] || []).filter(s => s.date !== today);
       if (values[filter] > 0) arr.push({ date: today, value: Math.round(values[filter]) });
-      // Keep last 400 days
       existing[filter] = arr.sort((a, b) => a.date.localeCompare(b.date)).slice(-400);
     }
+    // Store index snapshots for benchmark chart
+    const idxArr = (existing.index || []).filter(s => s.date !== today);
+    if (sensex || nifty) idxArr.push({ date: today, sensex: sensex ? Math.round(sensex) : null, nifty: nifty ? Math.round(nifty) : null });
+    existing.index = idxArr.sort((a,b) => a.date.localeCompare(b.date)).slice(-400);
     await MetaStore.setSnapshots(existing);
   } catch (err) {
     console.warn("Portfolio snapshot failed:", err);

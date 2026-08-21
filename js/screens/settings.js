@@ -41,6 +41,7 @@ const settingsScreen = {
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <button id="export-holdings-csv" class="btn btn-small">↓ Holdings CSV</button>
             <button id="export-watchlist-csv" class="btn btn-small">↓ Watchlist CSV</button>
+            <button id="export-tax-csv" class="btn btn-small">↓ Tax summary CSV</button>
           </div>
           <div id="export-status" class="muted" style="font-size:11px; margin-top:6px;"></div>
         </div>
@@ -147,7 +148,53 @@ const settingsScreen = {
       setTimeout(() => { document.getElementById("export-status").textContent=""; }, 3000);
     });
 
-    // ── Board classification — expand/collapse, re-reads DB on expand ──
+    // Tax summary: realised (from sell history on archived stocks) + unrealised (open lots)
+    document.getElementById("export-tax-csv").addEventListener("click", async () => {
+      const today    = new Date().toISOString().slice(0,10);
+      const allStocks = await StockStore.getAll();
+      const holdings  = await HoldingStore.getAll();
+      const sMap = {}; allStocks.forEach(s => { sMap[s.ticker] = s; });
+
+      const rows = [["Type","Ticker","Name","Buy Date","Buy Price","Sell Date","Sell Price","Quantity","P&L ₹","Holding Type","Status"]];
+
+      // Realised: from archived stocks with sellHistory
+      for (const s of allStocks) {
+        if (!s.sellHistory?.length) continue;
+        for (const sale of s.sellHistory) {
+          for (const lc of sale.lotsConsumed||[]) {
+            rows.push(["Realised", s.ticker, s.name||s.ticker, lc.buyDate||"", lc.buyPrice, sale.date, sale.sellPrice, lc.quantity, lc.pnl, lc.type||"Unknown", "Closed"]);
+          }
+        }
+      }
+
+      // Also: sells still on active holdings
+      for (const h of holdings) {
+        const s = sMap[h.ticker];
+        for (const sale of h.sells||[]) {
+          for (const lc of sale.lotsConsumed||[]) {
+            rows.push(["Realised", h.ticker, s?.name||h.ticker, lc.buyDate||"", lc.buyPrice, sale.date, sale.sellPrice, lc.quantity, lc.pnl, lc.type||"Unknown", "Partial"]);
+          }
+        }
+      }
+
+      // Unrealised: open lots
+      for (const h of holdings) {
+        const s   = sMap[h.ticker];
+        const cmp = s?.fundamentals?.currentPrice;
+        const lots = h.lots?.length ? h.lots : [{ purchaseDate:"", quantity:h.quantity??0, buyPrice:h.avgBuyPrice??0 }];
+        for (const l of lots) {
+          if (!cmp) continue;
+          const pnl    = Math.round((cmp - l.buyPrice) * l.quantity);
+          const months = l.purchaseDate ? (new Date(today)-new Date(l.purchaseDate))/(30.44*86400000) : null;
+          const htype  = months===null?"Unknown" : months>=12?"LTCG":"STCG";
+          rows.push(["Unrealised", h.ticker, s?.name||h.ticker, l.purchaseDate||"", l.buyPrice, "—", cmp, l.quantity, pnl, htype, "Open"]);
+        }
+      }
+
+      downloadCSV("buffett-compos-tax.csv", rows);
+      document.getElementById("export-status").textContent = `✓ Tax summary downloaded`;
+      setTimeout(() => { document.getElementById("export-status").textContent=""; }, 3000);
+    });
     async function renderBoardList() {
       const stocks = await StockStore.getActive();
       const classEl = document.getElementById("board-classification-list");

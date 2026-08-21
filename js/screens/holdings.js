@@ -6,7 +6,7 @@
 
 const PENCIL_SVG = `<svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
 const TRASH_SVG  = `<svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
-const PALETTE    = ["#534AB7","#378ADD","#1D9E75","#D85A30","#D4537E","#BA7517"];
+const SELL_SVG = `<svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>`;
 
 function lotRows(row) {
   if (!row.lots?.length) return `<div class="lot-empty muted">No lots recorded.</div>`;
@@ -50,7 +50,37 @@ function holdingRow(row, color) {
           <div class="${pClass}">${pText}</div>
         </div>
         <div class="holding-row-actions">
+          <button class="sell-lot-btn icon-btn" data-ticker="${row.ticker}" title="Record a sale" style="color:var(--color-red);">${SELL_SVG}</button>
           <button class="holding-remove-btn icon-btn icon-btn-danger" data-ticker="${row.ticker}" title="Remove holding">${TRASH_SVG}</button>
+        </div>
+      </div>
+      <div class="sell-accordion" style="display:none;">
+        <div style="padding:10px 0 4px; border-top:0.5px solid var(--color-border); margin-top:6px;">
+          <div style="font-size:12px; font-weight:500; margin-bottom:8px; color:var(--color-red);">Record sale</div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
+            <div class="form-group" style="flex:1; min-width:110px; margin-bottom:0;">
+              <label style="font-size:11px;">Sale date</label>
+              <input type="date" class="sell-date-input" value="${new Date().toISOString().slice(0,10)}" />
+            </div>
+            <div class="form-group" style="flex:0.7; min-width:80px; margin-bottom:0;">
+              <label style="font-size:11px;">Qty to sell</label>
+              <input type="number" class="sell-qty-input" min="1" step="1" placeholder="Qty" />
+            </div>
+            <div class="form-group" style="flex:1; min-width:90px; margin-bottom:0;">
+              <label style="font-size:11px;">Sell price (₹)</label>
+              <input type="number" class="sell-price-input" step="0.01" placeholder="Price" />
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+            <label style="font-size:11px; display:flex; align-items:center; gap:4px;">
+              <input type="checkbox" class="sell-manual-lot" /> Override FIFO — pick lots manually
+            </label>
+          </div>
+          <div class="sell-preview" style="font-size:11px; color:var(--color-text-secondary); margin-bottom:8px;"></div>
+          <div style="display:flex; gap:6px;">
+            <button class="btn btn-small btn-primary confirm-sell-btn" data-ticker="${row.ticker}">Confirm sale</button>
+            <button class="btn btn-small cancel-sell-btn" data-ticker="${row.ticker}">Cancel</button>
+          </div>
         </div>
       </div>
       <div class="allocation-bar-track">
@@ -205,6 +235,94 @@ function wireLotHandlers() {
       navigate("#holdings");
     });
   });
+
+    // ── Sell handlers ────────────────────────────────────────────────
+    document.querySelectorAll(".sell-lot-btn").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const acc = btn.closest(".holding-row").querySelector(".sell-accordion");
+        acc.style.display = acc.style.display !== "none" ? "none" : "block";
+      });
+    });
+
+    document.querySelectorAll(".cancel-sell-btn").forEach(btn => {
+      btn.addEventListener("click", () => { btn.closest(".sell-accordion").style.display = "none"; });
+    });
+
+    function fifoMatch(lots, qtyToSell, saleDate) {
+      const dated   = [...lots].map((l,i)=>({...l,origIdx:i})).filter(l=>l.purchaseDate && l.purchaseDate<=saleDate).sort((a,b)=>a.purchaseDate.localeCompare(b.purchaseDate));
+      const undated = [...lots].map((l,i)=>({...l,origIdx:i})).filter(l=>!l.purchaseDate);
+      const queue   = [...dated, ...undated];
+      const consumed=[]; let remaining=qtyToSell;
+      for (const lot of queue) {
+        if (remaining<=0) break;
+        const take=Math.min(lot.quantity, remaining);
+        consumed.push({lotId:lot.id, origIdx:lot.origIdx, qty:take, buyPrice:lot.buyPrice, buyDate:lot.purchaseDate});
+        remaining-=take;
+      }
+      return {consumed, unmatched:remaining};
+    }
+
+    function holdingPeriodType(buyDate, sellDate) {
+      if (!buyDate) return "Unknown";
+      return (new Date(sellDate)-new Date(buyDate))/(30.44*86400000)>=12 ? "LTCG" : "STCG";
+    }
+
+    document.querySelectorAll(".sell-qty-input,.sell-price-input,.sell-date-input").forEach(input => {
+      input.addEventListener("input", () => {
+        const hRow = input.closest(".holding-row");
+        const ticker = hRow.dataset.ticker;
+        const previewEl = hRow.querySelector(".sell-preview");
+        const qty   = parseFloat(hRow.querySelector(".sell-qty-input").value);
+        const price = parseFloat(hRow.querySelector(".sell-price-input").value);
+        const date  = hRow.querySelector(".sell-date-input").value;
+        const summaryRow = summary.rows.find(r=>r.ticker===ticker);
+        if (!summaryRow||!qty||!price||!date){previewEl.textContent="";return;}
+        if (qty>summaryRow.quantity){previewEl.textContent="⚠ Exceeds holding.";previewEl.style.color="var(--color-red)";return;}
+        const h = holdings.find(h=>h.ticker===ticker);
+        const {consumed, unmatched} = fifoMatch(h.lots||[], qty, date);
+        if (unmatched>0){previewEl.textContent=`⚠ Only ${qty-unmatched} shares matchable via FIFO.`;return;}
+        const pnl = qty*price - consumed.reduce((s,c)=>s+c.qty*c.buyPrice,0);
+        const types = [...new Set(consumed.map(c=>holdingPeriodType(c.buyDate,date)))].join("/");
+        previewEl.style.color = pnl>=0?"var(--color-green)":"var(--color-red)";
+        previewEl.textContent = `FIFO: ${consumed.length} lot(s) · P&L ${pnl>=0?"+":""}₹${Math.round(pnl).toLocaleString("en-IN")} · ${types}`;
+      });
+    });
+
+    document.querySelectorAll(".confirm-sell-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const ticker  = btn.dataset.ticker;
+        const hRow    = btn.closest(".holding-row");
+        const qty     = parseFloat(hRow.querySelector(".sell-qty-input").value);
+        const price   = parseFloat(hRow.querySelector(".sell-price-input").value);
+        const date    = hRow.querySelector(".sell-date-input").value;
+        if (!qty||!price||!date){alert("Enter date, quantity and sell price.");return;}
+        const holding = await HoldingStore.get(ticker);
+        const lots    = holding.lots||[];
+        const totalQty = lots.reduce((s,l)=>s+(l.quantity||0),0);
+        if (qty>totalQty){alert(`Cannot sell ${qty} — only ${totalQty} shares held.`);return;}
+        const {consumed,unmatched} = fifoMatch(lots, qty, date);
+        if (unmatched>0){alert("Not enough dated lots for FIFO. Add purchase dates to lots first.");return;}
+        const updatedLots = lots.map(l=>({...l}));
+        consumed.forEach(c=>{updatedLots[c.origIdx].quantity-=c.qty;});
+        holding.lots  = updatedLots.filter(l=>l.quantity>0);
+        holding.sells = holding.sells||[];
+        holding.sells.push({
+          id:`sell_${Date.now()}`, date, quantity:qty, sellPrice:price,
+          lotsConsumed: consumed.map(c=>({lotId:c.lotId, quantity:c.qty, buyPrice:c.buyPrice, buyDate:c.buyDate, type:holdingPeriodType(c.buyDate,date), pnl:Math.round((price-c.buyPrice)*c.qty)})),
+        });
+        if (holding.lots.reduce((s,l)=>s+(l.quantity||0),0)===0) {
+          const stock = await StockStore.get(ticker);
+          if (stock){stock.status="archived";stock.archivedDate=date;stock.archiveReason=`Fully sold on ${date}`;stock.sellHistory=holding.sells;await StockStore.set(ticker,stock);}
+          await HoldingStore.remove(ticker);
+          alert(`${ticker} fully sold and archived.`);
+        } else {
+          await HoldingStore.set(ticker, holding);
+        }
+        navigate("#holdings");
+      });
+    });
+
   document.querySelectorAll(".holding-remove-btn").forEach(btn => {
     btn.addEventListener("click", async e => {
       e.stopPropagation();

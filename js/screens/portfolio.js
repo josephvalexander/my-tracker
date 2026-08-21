@@ -317,122 +317,118 @@ const portfolioScreen = {
       wrap.addEventListener("click", (e) => { e.stopPropagation(); box.style.display = box.style.display === "none" ? "block" : "none"; });
     });
 
-    // Portfolio value chart with dynamic period toggle
+    // Portfolio value chart with dynamic period toggle + benchmark
     if (allSnaps.length > 1) {
       const baseFont = { family: "-apple-system,'Segoe UI',Roboto,sans-serif", size: 10 };
       let pvChart = null;
 
-      // Determine which periods are available based on data span
-      const firstDate   = new Date(allSnaps[0].date);
-      const lastDate    = new Date(allSnaps[allSnaps.length - 1].date);
-      const totalDays   = Math.round((lastDate - firstDate) / 86400000);
-      const totalMonths = totalDays / 30;
+      const firstDate = new Date(allSnaps[0].date);
+      const lastDate  = new Date(allSnaps[allSnaps.length-1].date);
+      const totalDays = Math.round((lastDate-firstDate)/86400000);
 
       const PERIODS = [
-        { key: "1W",  label: "1W",  days: 7   },
-        { key: "1M",  label: "1M",  days: 30  },
-        { key: "3M",  label: "3M",  days: 90  },
-        { key: "6M",  label: "6M",  days: 180 },
-        { key: "1Y",  label: "1Y",  days: 365 },
-        { key: "All", label: "All", days: 9999 },
-      ].filter(p => p.days === 9999 || totalDays >= p.days * 0.7); // show period if we have ~70% of its data
+        { key:"1W",  label:"1W",  days:7   },
+        { key:"1M",  label:"1M",  days:30  },
+        { key:"3M",  label:"3M",  days:90  },
+        { key:"6M",  label:"6M",  days:180 },
+        { key:"1Y",  label:"1Y",  days:365 },
+        { key:"All", label:"All", days:9999},
+      ].filter(p => p.days===9999 || totalDays>=p.days*0.7);
+      if (!PERIODS.length) PERIODS.push({key:"All",label:"All",days:9999});
 
-      // Always show at least "All"
-      if (PERIODS.length === 0) PERIODS.push({ key: "All", label: "All", days: 9999 });
+      let activePeriod = (PERIODS.find(p=>p.days<=30)||PERIODS[0]).key;
+      let benchmark    = "none"; // "none" | "sensex" | "nifty"
 
-      // Default: largest available period under 90 days, else All
-      let activePeriod = PERIODS[PERIODS.length - 1].key;
-      const defaultPeriod = PERIODS.find(p => p.days <= 30) || PERIODS[0];
-      activePeriod = defaultPeriod.key;
-
-      // Build period toggle buttons
       const toggleDiv = document.getElementById("snap-period-toggle");
       if (toggleDiv) {
         toggleDiv.innerHTML = PERIODS.map(p =>
-          `<button class="snap-period-btn btn btn-small" data-period="${p.key}" style="font-size:10px; padding:1px 7px; ${p.key === activePeriod ? "background:var(--color-text); color:var(--color-surface);" : ""}">${p.label}</button>`
-        ).join("");
+          `<button class="snap-period-btn btn btn-small" data-period="${p.key}" style="font-size:10px;padding:1px 7px;${p.key===activePeriod?"background:var(--color-text);color:var(--color-surface);":" "}">${p.label}</button>`
+        ).join("") +
+        `<span style="margin-left:8px;font-size:10px;color:var(--color-text-tertiary);">vs</span>
+         <button class="bm-btn btn btn-small" data-bm="none"   style="font-size:10px;padding:1px 7px;background:var(--color-text);color:var(--color-surface);">None</button>
+         <button class="bm-btn btn btn-small" data-bm="sensex" style="font-size:10px;padding:1px 7px;">SENSEX</button>
+         <button class="bm-btn btn btn-small" data-bm="nifty"  style="font-size:10px;padding:1px 7px;">NIFTY</button>`;
       }
 
+      const idxSnaps = (allSnapshots.index || []);
+
       function getFilteredSnaps(periodKey) {
-        const period = PERIODS.find(p => p.key === periodKey);
-        if (!period || period.days === 9999) return allSnaps;
-        const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() - period.days);
-        const cutoffStr = cutoff.toISOString().slice(0, 10);
-        return allSnaps.filter(s => s.date >= cutoffStr);
+        if ((PERIODS.find(p=>p.key===periodKey)?.days??9999)===9999) return allSnaps;
+        const days = PERIODS.find(p=>p.key===periodKey)?.days??9999;
+        const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-days);
+        return allSnaps.filter(s=>s.date>=cutoff.toISOString().slice(0,10));
       }
 
       function aggregateSnaps(snaps, periodKey) {
-        // For periods > 3M, aggregate by week or month to reduce points
-        const period = PERIODS.find(p => p.key === periodKey);
-        const days = period?.days ?? 9999;
-        if (days <= 90 || snaps.length <= 60) return snaps; // show daily
-
-        // Group by week (for 6M) or month (for 1Y/All)
-        const byKey = {};
-        const useMonth = days > 180;
-        for (const s of snaps) {
-          const k = useMonth ? s.date.slice(0, 7) : getWeekKey(s.date);
-          byKey[k] = s; // last value in each period wins
-        }
-        return Object.entries(byKey)
-          .sort(([a], [b]) => a.localeCompare(b))
-          .map(([k, s]) => ({ date: useMonth ? k : s.date, value: s.value }));
+        const days = PERIODS.find(p=>p.key===periodKey)?.days??9999;
+        if (days<=90||snaps.length<=60) return snaps;
+        const byKey={};
+        const useMonth=days>180;
+        for (const s of snaps) { const k=useMonth?s.date.slice(0,7):getWeekKey(s.date); byKey[k]=s; }
+        return Object.entries(byKey).sort(([a],[b])=>a.localeCompare(b)).map(([,s])=>s);
       }
 
       function getWeekKey(dateStr) {
-        const d = new Date(dateStr);
-        const day = d.getDay();
-        const monday = new Date(d);
-        monday.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-        return monday.toISOString().slice(0, 10);
+        const d=new Date(dateStr); const day=d.getDay();
+        const mon=new Date(d); mon.setDate(d.getDate()-(day===0?6:day-1));
+        return mon.toISOString().slice(0,10);
       }
 
       function formatLabel(dateStr, periodKey) {
-        const period = PERIODS.find(p => p.key === periodKey);
-        const days = period?.days ?? 9999;
-        if (days <= 30) return dateStr.slice(5);      // MM-DD
-        if (days <= 90) return dateStr.slice(5);      // MM-DD
-        if (days <= 180) return "W" + dateStr.slice(5,10); // week
-        return dateStr.slice(0, 7);                    // YYYY-MM → show as month
+        const days=PERIODS.find(p=>p.key===periodKey)?.days??9999;
+        return days<=90?dateStr.slice(5):days<=180?"W"+dateStr.slice(5,10):dateStr.slice(0,7);
+      }
+
+      // Rebase index to match portfolio start value for visual comparison
+      function rebaseIndex(snaps, idxSnaps, field) {
+        if (!snaps.length||!idxSnaps.length) return [];
+        const firstPortDate = snaps[0].date;
+        const firstIdx = idxSnaps.find(s=>s.date>=firstPortDate&&s[field]);
+        if (!firstIdx) return [];
+        const firstPortVal = snaps[0].value;
+        const scale = firstPortVal / firstIdx[field];
+        return snaps.map(s=>{
+          const idxSnap = idxSnaps.filter(i=>i.date<=s.date&&i[field]).slice(-1)[0];
+          return idxSnap ? { date:s.date, value:Math.round(idxSnap[field]*scale) } : null;
+        }).filter(Boolean);
       }
 
       function drawChart(periodKey) {
-        if (pvChart) { try { pvChart.destroy(); } catch {} }
+        if (pvChart) { try{pvChart.destroy();}catch{} }
         const snaps   = aggregateSnaps(getFilteredSnaps(periodKey), periodKey);
-        const labels  = snaps.map(s => formatLabel(s.date, periodKey));
-        const values  = snaps.map(s => s.value);
-        const showDots = snaps.length <= 40;
+        const labels  = snaps.map(s=>formatLabel(s.date, periodKey));
+        const datasets = [{
+          label:"Portfolio", data:snaps.map(s=>s.value),
+          borderColor:"#1D9E75", backgroundColor:"rgba(29,158,117,0.08)",
+          fill:true, tension:0.3, pointRadius:snaps.length<=40?2:0, borderWidth:2,
+        }];
+
+        if (benchmark!=="none") {
+          const field  = benchmark==="sensex"?"sensex":"nifty";
+          const rebased = rebaseIndex(snaps, idxSnaps, field);
+          if (rebased.length) {
+            datasets.push({
+              label: benchmark==="sensex"?"SENSEX":"NIFTY",
+              data: rebased.map(s=>s.value),
+              borderColor:"#BA7517", backgroundColor:"transparent",
+              fill:false, tension:0.3, pointRadius:0, borderWidth:1.5, borderDash:[4,3],
+            });
+          }
+        }
 
         pvChart = new Chart(document.getElementById("portfolio-value-chart"), {
-          type: "line",
-          data: {
-            labels,
-            datasets: [{
-              data: values,
-              borderColor: "#1D9E75",
-              backgroundColor: "rgba(29,158,117,0.08)",
-              fill: true,
-              tension: 0.3,
-              pointRadius: showDots ? 2 : 0,
-              pointBackgroundColor: "#1D9E75",
-              borderWidth: 2,
-            }],
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                backgroundColor: "#2c2c2a",
-                titleFont: baseFont, bodyFont: baseFont,
-                callbacks: { label: (ctx) => ` ₹${Math.round(ctx.parsed.y).toLocaleString("en-IN")}` },
-              },
+          type:"line",
+          data:{ labels, datasets },
+          options:{
+            responsive:true, maintainAspectRatio:false,
+            plugins:{
+              legend:{ display:datasets.length>1, position:"bottom", labels:{font:baseFont,boxWidth:10,boxHeight:10,usePointStyle:true,pointStyle:"circle"} },
+              tooltip:{ backgroundColor:"#2c2c2a", titleFont:baseFont, bodyFont:baseFont,
+                callbacks:{ label:(ctx)=>` ${ctx.dataset.label}: ₹${Math.round(ctx.parsed.y).toLocaleString("en-IN")}` }},
             },
-            scales: {
-              x: { grid: { display: false }, ticks: { font: baseFont, color: "#888780", maxTicksLimit: 6 } },
-              y: { grid: { color: "rgba(0,0,0,0.06)" }, ticks: { font: baseFont, color: "#888780", callback: v => formatCurrencyShort(v) } },
+            scales:{
+              x:{ grid:{display:false}, ticks:{font:baseFont,color:"#888780",maxTicksLimit:6} },
+              y:{ grid:{color:"rgba(0,0,0,0.06)"}, ticks:{font:baseFont,color:"#888780",callback:v=>formatCurrencyShort(v)} },
             },
           },
         });
@@ -441,21 +437,25 @@ const portfolioScreen = {
 
       drawChart(activePeriod);
 
-      // Wire period toggle buttons
       document.querySelectorAll(".snap-period-btn").forEach(btn => {
-        btn.addEventListener("click", () => {
-          activePeriod = btn.dataset.period;
-          document.querySelectorAll(".snap-period-btn").forEach(b => {
-            b.style.background = ""; b.style.color = "";
-          });
-          btn.style.background = "var(--color-text)";
-          btn.style.color      = "var(--color-surface)";
-          // Remove old chart from instances before redraw
-          chartInstances = chartInstances.filter(c => c !== pvChart);
-          drawChart(activePeriod);
+        btn.addEventListener("click", ()=>{
+          activePeriod=btn.dataset.period;
+          document.querySelectorAll(".snap-period-btn").forEach(b=>{b.style.background="";b.style.color="";});
+          btn.style.background="var(--color-text)"; btn.style.color="var(--color-surface)";
+          chartInstances=chartInstances.filter(c=>c!==pvChart); drawChart(activePeriod);
+        });
+      });
+
+      document.querySelectorAll(".bm-btn").forEach(btn => {
+        btn.addEventListener("click", ()=>{
+          benchmark=btn.dataset.bm;
+          document.querySelectorAll(".bm-btn").forEach(b=>{b.style.background="";b.style.color="";});
+          btn.style.background="var(--color-text)"; btn.style.color="var(--color-surface)";
+          chartInstances=chartInstances.filter(c=>c!==pvChart); drawChart(activePeriod);
         });
       });
     }
+
 
     // ── Collapsible toggle wiring ─────────────────────────────────────
     [["sizing-header","sizing-chevron","position-sizing-wrap"],
