@@ -466,7 +466,7 @@ const holdingsScreen = {
       const summary = buildHoldingsSummary(filtered, priceMap, divMap);
       renderSummaryCard(summary);
       document.getElementById("holdings-list").innerHTML = summary.rows
-        .map((row,i) => holdingRow(row, PALETTE[i%PALETTE.length])).join("");
+        .map((row,i) => holdingRow(row, ["#534AB7","#378ADD","#1D9E75","#D85A30","#D4537E","#BA7517"][i%6])).join("");
       wireLotHandlers();
       wireDividendModal(filtered, divMap);
     }
