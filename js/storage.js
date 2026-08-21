@@ -105,6 +105,8 @@ const HoldingStore = {
 const MetaStore = {
   getSettings: () => get("meta", "settings"),
   setSettings: (settings) => set("meta", "settings", settings),
+  getSnapshots: () => get("meta", "portfolioSnapshots").catch(() => null),
+  setSnapshots: (snaps) => set("meta", "portfolioSnapshots", snaps),
 };
 
 /** Archive a stock: flips status, keeps all data (notes, thesis, fundamentals). */
@@ -162,7 +164,51 @@ async function importAll(data) {
   if (data.settings) await MetaStore.setSettings(data.settings);
 }
 
-const storageExports = { StockStore, HoldingStore, MetaStore, archiveStock, deleteStockPermanently, exportAll, importAll };
+/**
+ * Save a portfolio value snapshot for today.
+ * Stores separate snapshots for "all", "mainboard", and "sme" filters.
+ * Keeps the last 400 days per filter (more than 1 year).
+ * Deduplicates by date — only one snapshot per day per filter.
+ */
+async function savePortfolioSnapshot() {
+  try {
+    const holdings  = await HoldingStore.getAll();
+    const allStocks = await StockStore.getAll();
+    const stockMap  = {};
+    allStocks.forEach(s => { stockMap[s.ticker] = s; });
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    function computeValue(filterFn) {
+      return holdings.reduce((sum, h) => {
+        const s = stockMap[h.ticker];
+        if (!s || (filterFn && !filterFn(s))) return sum;
+        const qty   = (h.lots || []).reduce((q, l) => q + (l.quantity || 0), h.quantity || 0);
+        const price = s.fundamentals?.currentPrice ?? 0;
+        return sum + qty * price;
+      }, 0);
+    }
+
+    const values = {
+      all:       computeValue(null),
+      mainboard: computeValue(s => !s.board || s.board === "mainboard"),
+      sme:       computeValue(s => s.board === "sme" || s.board === "microcap"),
+    };
+
+    const existing = (await MetaStore.getSnapshots()) || { all: [], mainboard: [], sme: [] };
+    for (const filter of ["all", "mainboard", "sme"]) {
+      const arr = (existing[filter] || []).filter(s => s.date !== today);
+      if (values[filter] > 0) arr.push({ date: today, value: Math.round(values[filter]) });
+      // Keep last 400 days
+      existing[filter] = arr.sort((a, b) => a.date.localeCompare(b.date)).slice(-400);
+    }
+    await MetaStore.setSnapshots(existing);
+  } catch (err) {
+    console.warn("Portfolio snapshot failed:", err);
+  }
+}
+
+const storageExports = { StockStore, HoldingStore, MetaStore, archiveStock, deleteStockPermanently, exportAll, importAll, savePortfolioSnapshot };
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports = storageExports;

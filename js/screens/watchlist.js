@@ -314,6 +314,9 @@ const watchlistScreen = {
       btn.disabled = false;
       setTimeout(() => { progressEl.textContent = ""; }, 5000);
 
+      // Save portfolio snapshot now that prices are fresh
+      savePortfolioSnapshot().catch(() => {});
+
       // Full re-render respecting board grouping
       const freshStocks = await StockStore.getActive();
       const mainboard = freshStocks.filter(s => !s.board || s.board === "mainboard");

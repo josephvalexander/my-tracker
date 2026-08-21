@@ -115,6 +115,7 @@ async function init() {
   await registerServiceWorker();
   await autoPullOnOpen();
   await migrateWatchlistPrice(); // must run AFTER pull so Drive doesn't overwrite it
+  savePortfolioSnapshot().catch(() => {}); // capture today's value on each open
   initRouter();
 }
 

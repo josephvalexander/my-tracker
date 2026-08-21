@@ -110,7 +110,7 @@ const portfolioScreen = {
         activeFilter = f;
         document.querySelectorAll("#af-all,#af-mainboard,#af-sme").forEach(b => b.classList.remove("toggle-btn-active"));
         document.getElementById(`af-${f}`).classList.add("toggle-btn-active");
-        buildAnalytics();
+        buildAnalytics(); // async, but fire-and-forget is fine here
       });
     });
 
@@ -121,59 +121,63 @@ const portfolioScreen = {
       chartInstances = [];
     }
 
-    function buildAnalytics() {
+    async function buildAnalytics() {
       destroyCharts();
       const heldStocksWithValues = applyFilter(allHeldWithValues);
       const heldStocks = heldStocksWithValues.map(h => h.stock);
       const holdingsFiltered = heldStocksWithValues.map(h => h.holding);
 
-    // ── Portfolio growth YoY / QoQ ────────────────────────────────
+    // ── Portfolio growth section ──────────────────────────────────
     const growthEl = document.getElementById("portfolio-growth");
     const totalCurrentValue = heldStocksWithValues.reduce((s, h) => s + h.value, 0);
-    const totalInvested     = holdingsFiltered.reduce((s, h) => s + investedValue(h), 0);
-    const overallReturn     = totalInvested > 0 ? ((totalCurrentValue - totalInvested) / totalInvested * 100) : null;
 
-    // QoQ/YoY: derived from quarterly revenue of held stocks (weighted by portfolio value)
-    // Sum latest quarter revenue vs previous quarter and vs same quarter last year
-    let totalRevQ  = 0, totalRevPrevQ = 0, totalRevYoY = 0, revenueCount = 0;
+    // XIRR across filtered holdings (replaces simple P&L)
+    const xirrVal = portfolioXIRR(holdingsFiltered, (() => {
+      const m = {}; heldStocksWithValues.forEach(({stock}) => { m[stock.ticker] = stock.fundamentals?.currentPrice ?? 0; }); return m;
+    })());
+
+    // Revenue QoQ/YoY aggregate
+    let totalRevQ = 0, totalRevPrevQ = 0, totalRevYoY = 0, revenueCount = 0;
     for (const { stock } of heldStocksWithValues) {
       const q = stock.fundamentals?.quarterly;
       if (!q?.revenue?.length || q.revenue.length < 2) continue;
       const latest = q.revenue[q.revenue.length - 1];
       const prevQ  = q.revenue[q.revenue.length - 2];
       const sameQLastYear = q.revenue.length >= 5 ? q.revenue[q.revenue.length - 5] : null;
-      if (latest != null && prevQ != null) {
-        totalRevQ += latest; totalRevPrevQ += prevQ; revenueCount++;
-      }
+      if (latest != null && prevQ != null) { totalRevQ += latest; totalRevPrevQ += prevQ; revenueCount++; }
       if (latest != null && sameQLastYear != null) totalRevYoY += sameQLastYear;
     }
     const qoq = revenueCount > 0 && totalRevPrevQ > 0 ? ((totalRevQ - totalRevPrevQ) / totalRevPrevQ * 100) : null;
-    const yoy = revenueCount > 0 && totalRevYoY > 0  ? ((totalRevQ - totalRevYoY)  / totalRevYoY  * 100) : null;
+    const yoy  = revenueCount > 0 && totalRevYoY  > 0 ? ((totalRevQ - totalRevYoY)  / totalRevYoY  * 100) : null;
+
+    // Load all snapshots for the current filter
+    const allSnapshots = (await MetaStore.getSnapshots()) || {};
+    const allSnaps     = (allSnapshots[snapKey] || []).sort((a,b) => a.date.localeCompare(b.date));
 
     growthEl.innerHTML = `
-      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+      <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:${allSnaps.length > 1 ? "14px" : "0"};">
         <div style="flex:1; min-width:100px;">
-          <div class="muted" style="font-size:11px;">Portfolio P&amp;L
+          <div class="muted" style="font-size:11px;">XIRR
             <span class="tooltip-wrap" style="position:relative; display:inline-block; margin-left:3px; cursor:help;">
               <span style="font-size:9px; border:0.5px solid var(--color-border); border-radius:50%; padding:0 3px; color:var(--color-text-tertiary);">?</span>
               <span class="tooltip-box" style="display:none; position:absolute; bottom:120%; left:50%; transform:translateX(-50%); width:200px; background:var(--color-text); color:var(--color-surface); font-size:10px; padding:7px 9px; border-radius:6px; z-index:99; line-height:1.4;">
-                (Current value − Amount invested) ÷ Amount invested. Simple return on your total cost basis — not time-adjusted. Treats all purchases the same regardless of when you bought. Use XIRR in Holdings for a time-adjusted view.
+                Annualised return accounting for when each lot was purchased. 20% XIRR means each rupee invested compounds at 20% per year, adjusted for timing. More meaningful than simple P&amp;L. Lots under 2 months excluded.
               </span>
             </span>
           </div>
-          <div style="font-size:16px; font-weight:600; color:var(${overallReturn>=0?"--color-green":"--color-red"});">${overallReturn!==null?(overallReturn>=0?"+":"")+overallReturn.toFixed(1)+"%":"—"}</div>
-          <div class="muted" style="font-size:10px;">vs cost basis</div>
+          <div style="font-size:16px; font-weight:600; color:var(${(xirrVal??0)>=0?"--color-green":"--color-red"});">${xirrVal!==null?(xirrVal>=0?"+":"")+xirrVal.toFixed(1)+"%":"—"}</div>
+          <div class="muted" style="font-size:10px;">annualised, time-adjusted</div>
         </div>
         <div style="flex:1; min-width:100px;">
           <div class="muted" style="font-size:11px;">Revenue QoQ
             <span class="tooltip-wrap" style="position:relative; display:inline-block; margin-left:3px; cursor:help;">
               <span style="font-size:9px; border:0.5px solid var(--color-border); border-radius:50%; padding:0 3px; color:var(--color-text-tertiary);">?</span>
               <span class="tooltip-box" style="display:none; position:absolute; bottom:120%; left:50%; transform:translateX(-50%); width:210px; background:var(--color-text); color:var(--color-surface); font-size:10px; padding:7px 9px; border-radius:6px; z-index:99; line-height:1.4;">
-                Sum of latest quarter revenue across all held stocks vs the previous quarter. Treats your holdings as one combined business. Weighted by company revenue size, not your position size. Shows short-term momentum but can be noisy due to seasonality.
+                Sum of latest quarter revenue across all held stocks vs the previous quarter. Weighted by company revenue size. Shows short-term momentum but can be noisy due to seasonality.
               </span>
             </span>
           </div>
-          <div style="font-size:16px; font-weight:600; color:var(${qoq>=0?"--color-green":"--color-red"});">${qoq!==null?(qoq>=0?"+":"")+qoq.toFixed(1)+"%":"—"}</div>
+          <div style="font-size:16px; font-weight:600; color:var(${(qoq??0)>=0?"--color-green":"--color-red"});">${qoq!==null?(qoq>=0?"+":"")+qoq.toFixed(1)+"%":"—"}</div>
           <div class="muted" style="font-size:10px;">aggregate held stocks</div>
         </div>
         <div style="flex:1; min-width:100px;">
@@ -181,14 +185,22 @@ const portfolioScreen = {
             <span class="tooltip-wrap" style="position:relative; display:inline-block; margin-left:3px; cursor:help;">
               <span style="font-size:9px; border:0.5px solid var(--color-border); border-radius:50%; padding:0 3px; color:var(--color-text-tertiary);">?</span>
               <span class="tooltip-box" style="display:none; position:absolute; bottom:120%; left:50%; transform:translateX(-50%); width:210px; background:var(--color-text); color:var(--color-surface); font-size:10px; padding:7px 9px; border-radius:6px; z-index:99; line-height:1.4;">
-                Latest quarter revenue vs the same quarter one year ago, across all held stocks. Removes seasonal effects — a retailer's Diwali quarter will always look good QoQ, but YoY comparison is fair. The most meaningful growth signal for your quarterly review.
+                Latest quarter revenue vs the same quarter one year ago. Removes seasonal effects. The most meaningful growth signal for quarterly review.
               </span>
             </span>
           </div>
-          <div style="font-size:16px; font-weight:600; color:var(${yoy>=0?"--color-green":"--color-red"});">${yoy!==null?(yoy>=0?"+":"")+yoy.toFixed(1)+"%":"—"}</div>
+          <div style="font-size:16px; font-weight:600; color:var(${(yoy??0)>=0?"--color-green":"--color-red"});">${yoy!==null?(yoy>=0?"+":"")+yoy.toFixed(1)+"%":"—"}</div>
           <div class="muted" style="font-size:10px;">aggregate held stocks</div>
         </div>
-      </div>`;
+      </div>
+      ${allSnaps.length > 1 ? `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <span class="muted" style="font-size:11px;">Portfolio value</span>
+          <div id="snap-period-toggle" style="display:flex; gap:4px;"></div>
+        </div>
+        <div style="position:relative; height:110px;"><canvas id="portfolio-value-chart"></canvas></div>`
+        : `<div class="muted" style="font-size:11px; padding-top:8px; border-top:0.5px solid var(--color-border);">Portfolio value chart will appear after a few days of price refreshes. Tap ↻ Prices daily to build history.</div>`
+      }`;
 
     // Wire tooltips each time growth section re-renders
     document.querySelectorAll(".tooltip-wrap").forEach(wrap => {
@@ -295,6 +307,154 @@ const portfolioScreen = {
           </div>
           <span class="muted" style="font-size:11px; flex-shrink:0;">→</span>
         </div>`).join("");
+    }
+
+    // Wire tooltips after growth section renders
+    document.querySelectorAll(".tooltip-wrap").forEach(wrap => {
+      const box = wrap.querySelector(".tooltip-box");
+      wrap.addEventListener("mouseenter", () => { box.style.display = "block"; });
+      wrap.addEventListener("mouseleave", () => { box.style.display = "none"; });
+      wrap.addEventListener("click", (e) => { e.stopPropagation(); box.style.display = box.style.display === "none" ? "block" : "none"; });
+    });
+
+    // Portfolio value chart with dynamic period toggle
+    if (allSnaps.length > 1) {
+      const baseFont = { family: "-apple-system,'Segoe UI',Roboto,sans-serif", size: 10 };
+      let pvChart = null;
+
+      // Determine which periods are available based on data span
+      const firstDate   = new Date(allSnaps[0].date);
+      const lastDate    = new Date(allSnaps[allSnaps.length - 1].date);
+      const totalDays   = Math.round((lastDate - firstDate) / 86400000);
+      const totalMonths = totalDays / 30;
+
+      const PERIODS = [
+        { key: "1W",  label: "1W",  days: 7   },
+        { key: "1M",  label: "1M",  days: 30  },
+        { key: "3M",  label: "3M",  days: 90  },
+        { key: "6M",  label: "6M",  days: 180 },
+        { key: "1Y",  label: "1Y",  days: 365 },
+        { key: "All", label: "All", days: 9999 },
+      ].filter(p => p.days === 9999 || totalDays >= p.days * 0.7); // show period if we have ~70% of its data
+
+      // Always show at least "All"
+      if (PERIODS.length === 0) PERIODS.push({ key: "All", label: "All", days: 9999 });
+
+      // Default: largest available period under 90 days, else All
+      let activePeriod = PERIODS[PERIODS.length - 1].key;
+      const defaultPeriod = PERIODS.find(p => p.days <= 30) || PERIODS[0];
+      activePeriod = defaultPeriod.key;
+
+      // Build period toggle buttons
+      const toggleDiv = document.getElementById("snap-period-toggle");
+      if (toggleDiv) {
+        toggleDiv.innerHTML = PERIODS.map(p =>
+          `<button class="snap-period-btn btn btn-small" data-period="${p.key}" style="font-size:10px; padding:1px 7px; ${p.key === activePeriod ? "background:var(--color-text); color:var(--color-surface);" : ""}">${p.label}</button>`
+        ).join("");
+      }
+
+      function getFilteredSnaps(periodKey) {
+        const period = PERIODS.find(p => p.key === periodKey);
+        if (!period || period.days === 9999) return allSnaps;
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - period.days);
+        const cutoffStr = cutoff.toISOString().slice(0, 10);
+        return allSnaps.filter(s => s.date >= cutoffStr);
+      }
+
+      function aggregateSnaps(snaps, periodKey) {
+        // For periods > 3M, aggregate by week or month to reduce points
+        const period = PERIODS.find(p => p.key === periodKey);
+        const days = period?.days ?? 9999;
+        if (days <= 90 || snaps.length <= 60) return snaps; // show daily
+
+        // Group by week (for 6M) or month (for 1Y/All)
+        const byKey = {};
+        const useMonth = days > 180;
+        for (const s of snaps) {
+          const k = useMonth ? s.date.slice(0, 7) : getWeekKey(s.date);
+          byKey[k] = s; // last value in each period wins
+        }
+        return Object.entries(byKey)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([k, s]) => ({ date: useMonth ? k : s.date, value: s.value }));
+      }
+
+      function getWeekKey(dateStr) {
+        const d = new Date(dateStr);
+        const day = d.getDay();
+        const monday = new Date(d);
+        monday.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+        return monday.toISOString().slice(0, 10);
+      }
+
+      function formatLabel(dateStr, periodKey) {
+        const period = PERIODS.find(p => p.key === periodKey);
+        const days = period?.days ?? 9999;
+        if (days <= 30) return dateStr.slice(5);      // MM-DD
+        if (days <= 90) return dateStr.slice(5);      // MM-DD
+        if (days <= 180) return "W" + dateStr.slice(5,10); // week
+        return dateStr.slice(0, 7);                    // YYYY-MM → show as month
+      }
+
+      function drawChart(periodKey) {
+        if (pvChart) { try { pvChart.destroy(); } catch {} }
+        const snaps   = aggregateSnaps(getFilteredSnaps(periodKey), periodKey);
+        const labels  = snaps.map(s => formatLabel(s.date, periodKey));
+        const values  = snaps.map(s => s.value);
+        const showDots = snaps.length <= 40;
+
+        pvChart = new Chart(document.getElementById("portfolio-value-chart"), {
+          type: "line",
+          data: {
+            labels,
+            datasets: [{
+              data: values,
+              borderColor: "#1D9E75",
+              backgroundColor: "rgba(29,158,117,0.08)",
+              fill: true,
+              tension: 0.3,
+              pointRadius: showDots ? 2 : 0,
+              pointBackgroundColor: "#1D9E75",
+              borderWidth: 2,
+            }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: "#2c2c2a",
+                titleFont: baseFont, bodyFont: baseFont,
+                callbacks: { label: (ctx) => ` ₹${Math.round(ctx.parsed.y).toLocaleString("en-IN")}` },
+              },
+            },
+            scales: {
+              x: { grid: { display: false }, ticks: { font: baseFont, color: "#888780", maxTicksLimit: 6 } },
+              y: { grid: { color: "rgba(0,0,0,0.06)" }, ticks: { font: baseFont, color: "#888780", callback: v => formatCurrencyShort(v) } },
+            },
+          },
+        });
+        chartInstances.push(pvChart);
+      }
+
+      drawChart(activePeriod);
+
+      // Wire period toggle buttons
+      document.querySelectorAll(".snap-period-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          activePeriod = btn.dataset.period;
+          document.querySelectorAll(".snap-period-btn").forEach(b => {
+            b.style.background = ""; b.style.color = "";
+          });
+          btn.style.background = "var(--color-text)";
+          btn.style.color      = "var(--color-surface)";
+          // Remove old chart from instances before redraw
+          chartInstances = chartInstances.filter(c => c !== pvChart);
+          drawChart(activePeriod);
+        });
+      });
     }
 
     // ── Collapsible toggle wiring ─────────────────────────────────────
