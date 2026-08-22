@@ -530,12 +530,24 @@ const portfolioScreen = {
 
     // Build FY options from transaction dates + dividend dates
     const fySet = new Set();
-    allTxs.forEach(t => { if (t.sellDate) { const d=new Date(t.sellDate); fySet.add(d.getMonth()>=3?d.getFullYear()+1:d.getFullYear()); }});
+    // Add FYs from realized transactions
+    allTxs.forEach(t => {
+      if (t.sellDate) { const d=new Date(t.sellDate); fySet.add(d.getMonth()>=3?d.getFullYear()+1:d.getFullYear()); }
+    });
+    // Add FYs from dividends only if there's actually an eligible holding with a non-zero receipt
     for (const h of taxHoldings) {
       const s = taxSMap[h.ticker]; if (!s) continue;
+      const lots = h.lots?.length ? h.lots : [{purchaseDate:null, quantity:h.quantity??0}];
       for (const div of s.corporateActions?.dividends||[]) {
-        const ds = div.recordDate||div.announced||null; if (!ds) continue;
-        const d = new Date(ds); if (d > today) continue;
+        if (!div.amount) continue;
+        const dateStr = div.recordDate||div.announced||null; if (!dateStr) continue;
+        const recordDate = new Date(dateStr); if (recordDate > today) continue;
+        // Only include this FY if at least one lot was eligible
+        const hasEligible = lots.some(lot =>
+          !lot.purchaseDate || new Date(lot.purchaseDate) <= recordDate
+        );
+        if (!hasEligible) continue;
+        const d = new Date(dateStr);
         fySet.add(d.getMonth()>=3 ? d.getFullYear()+1 : d.getFullYear());
       }
     }

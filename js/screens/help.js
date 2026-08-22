@@ -59,7 +59,70 @@ const helpScreen = {
     return `
       <div class="screen-padding">
         <div class="screen-title">Help & glossary</div>
-        <div class="muted" style="margin-bottom:12px;">Plain explanations for every metric and term used in Buffett Compos. Search by name or keyword.</div>
+
+        <!-- Buffett model primer -->
+        <div class="section-label">The Buffett model — how this app thinks</div>
+        <div class="card" style="margin-bottom:14px;">
+          <div style="font-size:13px; line-height:1.7;">
+            <p style="margin:0 0 12px;">Warren Buffett's investing approach, refined with Charlie Munger, focuses on buying <strong>wonderful businesses at fair prices</strong> and holding them for the long term — ideally forever. The goal is not to trade prices but to own pieces of exceptional businesses that compound your capital year after year.</p>
+
+            <div class="section-label" style="margin:0 0 8px; font-size:10px;">THE CENTRAL QUESTION</div>
+            <div style="background:var(--color-bg); border-radius:var(--radius-md); padding:10px 14px; margin-bottom:14px; border-left:3px solid var(--color-green);">
+              <em style="font-size:13px; color:var(--color-text);">"Would I own this business for 10 years if the stock market shut down tomorrow?"</em>
+              <div class="muted" style="font-size:11px; margin-top:4px;">If yes, the price fluctuations stop mattering. You own the earnings power of the business.</div>
+            </div>
+
+            <div class="section-label" style="margin:0 0 8px; font-size:10px;">PRINCIPLE 1 — ECONOMIC MOAT</div>
+            <p style="margin:0 0 10px;">A moat is what protects a business from competition over time. Without a moat, profits attract competitors who erode them. Moat types: <strong>pricing power</strong> (customers pay up without complaint), <strong>switching costs</strong> (painful to change supplier), <strong>network effects</strong> (product gets better as more people use it), <strong>cost advantages</strong> (structurally cheaper to operate), <strong>intangibles</strong> (brands, patents, regulatory licences). The wider and more durable the moat, the more confidently you can hold through bad quarters.</p>
+
+            <div class="section-label" style="margin:0 0 8px; font-size:10px;">PRINCIPLE 2 — MANAGEMENT QUALITY</div>
+            <p style="margin:0 0 10px;">Buffett looks for managers who think and act like owners. Signals: <strong>promoter skin in the game</strong> (high and stable holding), <strong>rational capital allocation</strong> (reinvesting at high returns or returning cash when no good use exists), <strong>honest communication</strong> (acknowledge mistakes, explain clearly), and <strong>no empire-building</strong> (not issuing shares unnecessarily or making value-destroying acquisitions).</p>
+
+            <div class="section-label" style="margin:0 0 8px; font-size:10px;">PRINCIPLE 3 — FINANCIAL STRENGTH</div>
+            <p style="margin:0 0 10px;">Great businesses don't need debt to earn great returns. <strong>ROE above 15% without heavy leverage</strong> means the business genuinely earns high returns on its own capital. <strong>Consistent EPS growth</strong> (6/6 earnings consistency) means the business is reliable, not cyclical. <strong>Low D/E</strong> means it can survive recessions without distress. <strong>Cash EPS gap</strong> confirms profits are real — actual cash, not accounting fiction.</p>
+
+            <div class="section-label" style="margin:0 0 8px; font-size:10px;">PRINCIPLE 4 — FAIR PRICE</div>
+            <p style="margin:0 0 10px;">Even a wonderful business is a bad investment at an absurd price. Buffett looks for a <strong>margin of safety</strong> — paying less than what the business is worth, so you're protected even if your analysis is imperfect. This app shows P/E vs Sector P/E as a starting point. A business growing at 20% EPS CAGR trading at 25x P/E is likely cheaper than one growing at 5% at 18x.</p>
+
+            <div class="section-label" style="margin:0 0 8px; font-size:10px;">PRINCIPLE 5 — CIRCLE OF COMPETENCE</div>
+            <p style="margin:0 0 10px;">Only invest in businesses you genuinely understand — how they make money, why customers choose them, what could go wrong. Buffett's famously avoided tech companies for decades because he couldn't reliably predict their competitive position. The thesis field in this app is for you to articulate this: if you can't write it down in plain language, you probably don't understand it well enough yet.</p>
+
+            <div class="section-label" style="margin:0 0 8px; font-size:10px;">THIS APP'S CHECKLIST — HOW IT MAPS</div>
+            <table style="width:100%; border-collapse:collapse; font-size:12px;">
+              <tbody>
+                <tr style="border-bottom:0.5px solid var(--color-border);">
+                  <td style="padding:6px 0; font-weight:500;">ROE ≥ 15%</td>
+                  <td style="padding:6px 4px; color:var(--color-text-secondary);">Hard flag. Measures capital efficiency — the core of a high-return business.</td>
+                </tr>
+                <tr style="border-bottom:0.5px solid var(--color-border);">
+                  <td style="padding:6px 0; font-weight:500;">D/E ≤ 0.2</td>
+                  <td style="padding:6px 4px; color:var(--color-text-secondary);">Hard flag. Buffett strongly avoids businesses that need debt to earn good returns.</td>
+                </tr>
+                <tr style="border-bottom:0.5px solid var(--color-border);">
+                  <td style="padding:6px 0; font-weight:500;">Promoter not declining</td>
+                  <td style="padding:6px 4px; color:var(--color-text-secondary);">Hard flag. Founders selling signals loss of conviction — or financial stress.</td>
+                </tr>
+                <tr style="border-bottom:0.5px solid var(--color-border);">
+                  <td style="padding:6px 0; font-weight:500;">EPS CAGR ≥ 12%</td>
+                  <td style="padding:6px 4px; color:var(--color-text-secondary);">Soft flag. Earnings must compound meaningfully to beat inflation + opportunity cost.</td>
+                </tr>
+                <tr style="border-bottom:0.5px solid var(--color-border);">
+                  <td style="padding:6px 0; font-weight:500;">Earnings consistency ≥ 5/6</td>
+                  <td style="padding:6px 4px; color:var(--color-text-secondary);">Soft flag. Reliability over time is more valuable than one great year.</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0; font-weight:500;">Retained earnings ratio ≥ 1.0×</td>
+                  <td style="padding:6px 4px; color:var(--color-text-secondary);">Soft flag. Every rupee retained should create at least ₹1 of value — management is compounding for you.</td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="muted" style="font-size:11px; margin-top:8px;">3 or more soft flags = verdict No. Any hard flag = verdict No regardless of soft flags. The verdict is a starting point, not a final answer — use your judgement, especially on the moat and management quality, which no algorithm can fully capture.</div>
+          </div>
+        </div>
+
+        <!-- Glossary search -->
+        <div class="section-label">Metric glossary</div>
+        <div class="muted" style="margin-bottom:10px; font-size:12px;">Plain explanations for every metric and term used in this app.</div>
         <div class="glossary-search-wrap">
           <input type="text" id="glossary-search" placeholder="Search — try 'quarterly', 'PAT', 'moat'..." />
         </div>
