@@ -59,6 +59,28 @@ const portfolioScreen = {
         <div id="needs-attention" class="card" style="margin-bottom:14px;"></div>
         <div class="section-label">Portfolio growth</div>
         <div id="portfolio-growth" class="card"></div>
+        <div class="section-label">Sector concentration <span class="muted" style="font-size:11px;">value-weighted</span></div>
+        <div id="sector-chart" class="card"></div>
+        <div class="section-label">Market cap mix <span class="muted" style="font-size:11px;">value-weighted</span></div>
+        <div id="cap-chart" class="card"></div>
+        <div class="section-label collapsible-header" id="valuation-header" style="cursor:pointer; display:flex; justify-content:space-between;">
+          Valuation snapshot <span class="muted" style="font-size:11px;" id="valuation-chevron">▶ expand</span>
+        </div>
+        <div id="valuation-wrap" style="display:none;">
+          <div id="valuation-snapshot" class="card"></div>
+        </div>
+        <div class="section-label collapsible-header" id="tax-header" style="cursor:pointer; display:flex; justify-content:space-between;">
+          Tax summary <span class="muted" style="font-size:11px;" id="tax-chevron">▶ expand</span>
+        </div>
+        <div id="tax-wrap" style="display:none;">
+          <div class="card">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+              <label class="muted" style="font-size:12px;">Financial year:</label>
+              <select id="analytics-fy-select" style="font-size:12px; padding:4px 8px; border:0.5px solid var(--color-border); border-radius:6px; background:var(--color-bg); color:var(--color-text);"></select>
+            </div>
+            <div id="tax-summary-content"></div>
+          </div>
+        </div>
         <div class="section-label collapsible-header" id="sizing-header" style="cursor:pointer; display:flex; justify-content:space-between;">
           Position sizing <span class="muted" style="font-size:11px;" id="sizing-chevron">▶ expand</span>
         </div>
@@ -70,16 +92,6 @@ const portfolioScreen = {
         </div>
         <div id="earnings-season-wrap" style="display:none;">
           <div id="earnings-season" class="card"></div>
-        </div>
-        <div class="section-label">Sector concentration <span class="muted" style="font-size:11px;">value-weighted</span></div>
-        <div id="sector-chart" class="card"></div>
-        <div class="section-label">Market cap mix <span class="muted" style="font-size:11px;">value-weighted</span></div>
-        <div id="cap-chart" class="card"></div>
-        <div class="section-label collapsible-header" id="valuation-header" style="cursor:pointer; display:flex; justify-content:space-between;">
-          Valuation snapshot <span class="muted" style="font-size:11px;" id="valuation-chevron">▶ expand</span>
-        </div>
-        <div id="valuation-wrap" style="display:none;">
-          <div id="valuation-snapshot" class="card"></div>
         </div>
       </div>`;
   },
@@ -462,10 +474,139 @@ const portfolioScreen = {
     }
 
 
+    // ── Tax summary ──────────────────────────────────────────────────
+    const taxAllStocks = await StockStore.getAll();
+    const taxHoldings  = holdings; // already loaded above
+    const taxSMap = {}; taxAllStocks.forEach(s => { taxSMap[s.ticker] = s; });
+    const today = new Date(); today.setHours(23,59,59,0);
+
+    // Collect all realized transactions
+    function getRealizedTx() {
+      const txs = [];
+      function addSells(ticker, name, sells) {
+        for (const sale of sells||[]) {
+          for (const lc of sale.lotsConsumed||[]) {
+            const d = lc.sellDate||sale.date;
+            txs.push({ ticker, name, buyDate:lc.buyDate||null, buyPrice:lc.buyPrice,
+              sellDate:d, sellPrice:lc.sellPrice||sale.sellPrice,
+              quantity:lc.quantity, pnl:lc.pnl, type:lc.type||"Unknown" });
+          }
+        }
+      }
+      taxAllStocks.forEach(s => addSells(s.ticker, s.name||s.ticker, s.sellHistory));
+      taxHoldings.forEach(h => addSells(h.ticker, taxSMap[h.ticker]?.name||h.ticker, h.sells));
+      return txs;
+    }
+
+    // Compute dividends for a given FY filter
+    function getDividendForFY(fyFilter) {
+      let total = 0;
+      for (const h of taxHoldings) {
+        const s = taxSMap[h.ticker]; if (!s) continue;
+        const lots = h.lots?.length ? h.lots : [{purchaseDate:null, quantity:h.quantity??0}];
+        for (const div of s.corporateActions?.dividends||[]) {
+          if (!div.amount) continue;
+          const dateStr = div.recordDate||div.announced||null; if (!dateStr) continue;
+          const recordDate = new Date(dateStr); if (recordDate > today) continue;
+          if (!inFYFilter(dateStr, fyFilter)) continue;
+          const eligibleQty = lots.reduce((sum, lot) => {
+            if (!lot.purchaseDate) return sum + (lot.quantity||0);
+            return new Date(lot.purchaseDate) <= recordDate ? sum + (lot.quantity||0) : sum;
+          }, 0);
+          total += eligibleQty * div.amount;
+        }
+      }
+      return total;
+    }
+
+    function inFYFilter(dateStr, fyFilter) {
+      if (fyFilter === "all") return true;
+      const d = new Date(dateStr);
+      const fy = d.getMonth() >= 3 ? d.getFullYear() + 1 : d.getFullYear();
+      return fy === parseInt(fyFilter);
+    }
+
+    const allTxs = getRealizedTx();
+
+    // Build FY options from transaction dates + dividend dates
+    const fySet = new Set();
+    allTxs.forEach(t => { if (t.sellDate) { const d=new Date(t.sellDate); fySet.add(d.getMonth()>=3?d.getFullYear()+1:d.getFullYear()); }});
+    for (const h of taxHoldings) {
+      const s = taxSMap[h.ticker]; if (!s) continue;
+      for (const div of s.corporateActions?.dividends||[]) {
+        const ds = div.recordDate||div.announced||null; if (!ds) continue;
+        const d = new Date(ds); if (d > today) continue;
+        fySet.add(d.getMonth()>=3 ? d.getFullYear()+1 : d.getFullYear());
+      }
+    }
+    const fyOptions = [...fySet].sort((a,b)=>b-a);
+
+    const fySelect = document.getElementById("analytics-fy-select");
+    fySelect.innerHTML = `<option value="all">All years</option>` +
+      fyOptions.map(fy=>`<option value="${fy}">FY${fy} (Apr ${fy-1}–Mar ${fy})</option>`).join("");
+
+    function renderTaxSummary(fyFilter) {
+      const filtered = allTxs.filter(t => inFYFilter(t.sellDate||"", fyFilter));
+      const stcg = filtered.filter(t=>t.type==="STCG").reduce((s,t)=>s+t.pnl,0);
+      const ltcg = filtered.filter(t=>t.type==="LTCG").reduce((s,t)=>s+t.pnl,0);
+      const divs = getDividendForFY(fyFilter);
+      const fmtPnl = v => `${v>=0?"":""}₹${Math.abs(v).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+
+      const summaryHtml = `
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+          <div style="flex:1; min-width:120px; padding:10px 12px; background:var(--color-bg); border-radius:var(--radius-md);">
+            <div class="muted" style="font-size:11px;">Short Term P&L (STCG)</div>
+            <div style="font-size:15px; font-weight:600; color:var(${stcg>=0?"--color-green":"--color-red"});">${fmtPnl(stcg)}</div>
+          </div>
+          <div style="flex:1; min-width:120px; padding:10px 12px; background:var(--color-bg); border-radius:var(--radius-md);">
+            <div class="muted" style="font-size:11px;">Long Term P&L (LTCG)</div>
+            <div style="font-size:15px; font-weight:600; color:var(${ltcg>=0?"--color-green":"--color-red"});">${fmtPnl(ltcg)}</div>
+          </div>
+          <div style="flex:1; min-width:120px; padding:10px 12px; background:var(--color-bg); border-radius:var(--radius-md);">
+            <div class="muted" style="font-size:11px;">Dividends received</div>
+            <div style="font-size:15px; font-weight:600;">₹${Math.round(divs).toLocaleString("en-IN")}</div>
+          </div>
+        </div>`;
+
+      // Detail table — realized transactions
+      const detailHtml = filtered.length === 0
+        ? `<div class="muted" style="font-size:12px;">No realized transactions${fyFilter==="all"?"":" for this FY"}.</div>`
+        : `<table style="width:100%; border-collapse:collapse; font-size:12px;">
+            <thead><tr style="border-bottom:1px solid var(--color-border);">
+              <td class="muted" style="padding:5px 0; font-size:10px;">Stock</td>
+              <td class="muted" style="padding:5px 4px; font-size:10px;">Buy date</td>
+              <td class="muted" style="padding:5px 4px; font-size:10px;">Sell date</td>
+              <td class="muted" style="text-align:right; font-size:10px;">Qty</td>
+              <td class="muted" style="text-align:right; font-size:10px;">P&L</td>
+              <td class="muted" style="text-align:right; font-size:10px;">Type</td>
+            </tr></thead>
+            <tbody>${filtered.map(t=>`
+              <tr style="border-bottom:0.5px solid var(--color-border);">
+                <td style="padding:5px 0;">${t.name}</td>
+                <td style="padding:5px 4px; color:var(--color-text-tertiary);">${t.buyDate||"—"}</td>
+                <td style="padding:5px 4px; color:var(--color-text-tertiary);">${t.sellDate||"—"}</td>
+                <td style="text-align:right;">${t.quantity.toLocaleString()}</td>
+                <td style="text-align:right; color:var(${t.pnl>=0?"--color-green":"--color-red"});">${fmtPnl(t.pnl)}</td>
+                <td style="text-align:right;"><span style="font-size:10px; padding:1px 5px; border-radius:8px; background:var(${t.type==="LTCG"?"--color-green":"--color-red"})22; color:var(${t.type==="LTCG"?"--color-green":"--color-red"});">${t.type}</span></td>
+              </tr>`).join("")}
+            </tbody>
+          </table>`;
+
+      document.getElementById("tax-summary-content").innerHTML = summaryHtml + detailHtml;
+    }
+
+    fySelect.addEventListener("change", () => renderTaxSummary(fySelect.value));
+    // Render when tax section is expanded (lazy)
+    document.getElementById("tax-header").addEventListener("click", () => {
+      const panel = document.getElementById("tax-wrap");
+      if (panel.style.display === "block") renderTaxSummary(fySelect.value);
+    });
+
     // ── Collapsible toggle wiring ─────────────────────────────────────
     [["sizing-header","sizing-chevron","position-sizing-wrap"],
      ["earnings-header","earnings-chevron","earnings-season-wrap"],
-     ["valuation-header","valuation-chevron","valuation-wrap"]].forEach(([hId, cId, pId]) => {
+     ["valuation-header","valuation-chevron","valuation-wrap"],
+     ["tax-header","tax-chevron","tax-wrap"]].forEach(([hId, cId, pId]) => {
       document.getElementById(hId).addEventListener("click", () => {
         const panel = document.getElementById(pId);
         const chev  = document.getElementById(cId);
