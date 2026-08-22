@@ -37,13 +37,29 @@ const settingsScreen = {
 
         <div class="section-label">Export data</div>
         <div class="card">
-          <div class="muted" style="font-size:11px; margin-bottom:10px;">Download your holdings and watchlist as CSV for use in Excel or with your CA.</div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <div class="muted" style="font-size:11px; margin-bottom:10px;">Download your holdings and watchlist as CSV.</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
             <button id="export-holdings-csv" class="btn btn-small">↓ Holdings CSV</button>
             <button id="export-watchlist-csv" class="btn btn-small">↓ Watchlist CSV</button>
+          </div>
+          <div class="muted" style="font-size:11px; margin-bottom:6px;">Tax summary (realised gains only):</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <select id="tax-fy-select" style="font-size:12px; padding:4px 8px; border:0.5px solid var(--color-border); border-radius:6px; background:var(--color-bg); color:var(--color-text);">
+              <option value="all">All years</option>
+            </select>
             <button id="export-tax-csv" class="btn btn-small">↓ Tax summary CSV</button>
           </div>
           <div id="export-status" class="muted" style="font-size:11px; margin-top:6px;"></div>
+        </div>
+
+        <div class="section-label">Import watchlist</div>
+        <div class="card">
+          <div class="muted" style="font-size:11px; margin-bottom:8px;">Import a watchlist CSV exported from another device. Merges with existing stocks — does not overwrite fundamentals already fetched.</div>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <input type="file" id="import-watchlist-file" accept=".csv" style="font-size:12px;" />
+            <button id="import-watchlist-btn" class="btn btn-small">↑ Import</button>
+          </div>
+          <div id="import-status" class="muted" style="font-size:11px; margin-top:6px;"></div>
         </div>
 
         <div class="section-label">Buffett rule thresholds</div>
@@ -148,53 +164,161 @@ const settingsScreen = {
       setTimeout(() => { document.getElementById("export-status").textContent=""; }, 3000);
     });
 
-    // Tax summary: realised (from sell history on archived stocks) + unrealised (open lots)
-    document.getElementById("export-tax-csv").addEventListener("click", async () => {
-      const today    = new Date().toISOString().slice(0,10);
+    // ── Tax FY select — populate with available years ───────────────
+    async function populateFYSelect() {
       const allStocks = await StockStore.getAll();
       const holdings  = await HoldingStore.getAll();
-      const sMap = {}; allStocks.forEach(s => { sMap[s.ticker] = s; });
-
-      const rows = [["Type","Ticker","Name","Buy Date","Buy Price","Sell Date","Sell Price","Quantity","P&L ₹","Holding Type","Status"]];
-
-      // Realised: from archived stocks with sellHistory
+      const fySet = new Set();
       for (const s of allStocks) {
-        if (!s.sellHistory?.length) continue;
-        for (const sale of s.sellHistory) {
-          for (const lc of sale.lotsConsumed||[]) {
-            rows.push(["Realised", s.ticker, s.name||s.ticker, lc.buyDate||"", lc.buyPrice, sale.date, sale.sellPrice, lc.quantity, lc.pnl, lc.type||"Unknown", "Closed"]);
-          }
+        for (const sale of s.sellHistory||[]) {
+          const d = sale.date; if (d) { const m = new Date(d).getMonth(); fySet.add(m>=3?new Date(d).getFullYear()+1:new Date(d).getFullYear()); }
         }
       }
-
-      // Also: sells still on active holdings
       for (const h of holdings) {
-        const s = sMap[h.ticker];
         for (const sale of h.sells||[]) {
+          const d = sale.date; if (d) { const m = new Date(d).getMonth(); fySet.add(m>=3?new Date(d).getFullYear()+1:new Date(d).getFullYear()); }
+        }
+      }
+      const fySelect = document.getElementById("tax-fy-select");
+      const sorted = [...fySet].sort((a,b)=>b-a);
+      fySelect.innerHTML = `<option value="all">All years</option>` +
+        sorted.map(fy=>`<option value="${fy}">FY${fy} (Apr ${fy-1} – Mar ${fy})</option>`).join("");
+    }
+    populateFYSelect();
+
+    // Tax summary: realized gains only with summary header, FY filter
+    document.getElementById("export-tax-csv").addEventListener("click", async () => {
+      const selectedFY = document.getElementById("tax-fy-select").value;
+      const allStocks  = await StockStore.getAll();
+      const holdings   = await HoldingStore.getAll();
+      const sMap = {}; allStocks.forEach(s=>{sMap[s.ticker]=s;});
+
+      // Collect dividends per holding for the selected FY
+      const allHoldingStocks = await StockStore.getAll();
+      const stockMap = {}; allHoldingStocks.forEach(s=>{stockMap[s.ticker]=s;});
+
+      function inFY(dateStr, fy) {
+        if (!dateStr||dateStr==="none"||fy==="all") return fy==="all";
+        const d = new Date(dateStr); const m = d.getMonth();
+        const yearFY = m>=3 ? d.getFullYear()+1 : d.getFullYear();
+        return yearFY===parseInt(fy);
+      }
+      function inSelectedFY(dateStr) { return selectedFY==="all" ? true : inFY(dateStr, selectedFY); }
+
+      // Gather all realized transactions
+      const realized = [];
+      function addSells(ticker, name, sells) {
+        for (const sale of sells||[]) {
+          if (!inSelectedFY(sale.date)) continue;
           for (const lc of sale.lotsConsumed||[]) {
-            rows.push(["Realised", h.ticker, s?.name||h.ticker, lc.buyDate||"", lc.buyPrice, sale.date, sale.sellPrice, lc.quantity, lc.pnl, lc.type||"Unknown", "Partial"]);
+            realized.push({
+              ticker, name, buyDate:lc.buyDate||"", buyPrice:lc.buyPrice,
+              sellDate:lc.sellDate||sale.date, sellPrice:lc.sellPrice||sale.sellPrice,
+              quantity:lc.quantity, pnl:lc.pnl, type:lc.type||"Unknown",
+            });
           }
         }
       }
+      for (const s of allStocks)  addSells(s.ticker, s.name||s.ticker, s.sellHistory);
+      for (const h of holdings)   addSells(h.ticker, sMap[h.ticker]?.name||h.ticker, h.sells);
 
-      // Unrealised: open lots
+      // Aggregate dividends for selected FY from held stocks
+      let totalDivFY = 0;
+      const today = new Date(); today.setHours(23,59,59,0);
       for (const h of holdings) {
-        const s   = sMap[h.ticker];
-        const cmp = s?.fundamentals?.currentPrice;
-        const lots = h.lots?.length ? h.lots : [{ purchaseDate:"", quantity:h.quantity??0, buyPrice:h.avgBuyPrice??0 }];
-        for (const l of lots) {
-          if (!cmp) continue;
-          const pnl    = Math.round((cmp - l.buyPrice) * l.quantity);
-          const months = l.purchaseDate ? (new Date(today)-new Date(l.purchaseDate))/(30.44*86400000) : null;
-          const htype  = months===null?"Unknown" : months>=12?"LTCG":"STCG";
-          rows.push(["Unrealised", h.ticker, s?.name||h.ticker, l.purchaseDate||"", l.buyPrice, "—", cmp, l.quantity, pnl, htype, "Open"]);
+        const s = sMap[h.ticker]; if (!s) continue;
+        const divs = s.corporateActions?.dividends||[];
+        const lots = h.lots?.length?h.lots:[{purchaseDate:null,quantity:h.quantity??0}];
+        for (const div of divs) {
+          if (!div.amount) continue;
+          const dateStr = div.recordDate||div.announced||null;
+          if (!dateStr||!inSelectedFY(dateStr)) continue;
+          const recordDate = new Date(dateStr); if (recordDate>today) continue;
+          const eligibleQty = lots.reduce((sum,lot)=>{
+            if (!lot.purchaseDate) return sum+(lot.quantity||0);
+            return new Date(lot.purchaseDate)<=recordDate?sum+(lot.quantity||0):sum;
+          },0);
+          totalDivFY += eligibleQty*div.amount;
         }
       }
 
-      downloadCSV("buffett-compos-tax.csv", rows);
-      document.getElementById("export-status").textContent = `✓ Tax summary downloaded`;
-      setTimeout(() => { document.getElementById("export-status").textContent=""; }, 3000);
+      // Summary figures
+      const stcgTotal = realized.filter(r=>r.type==="STCG").reduce((s,r)=>s+r.pnl,0);
+      const ltcgTotal = realized.filter(r=>r.type==="LTCG").reduce((s,r)=>s+r.pnl,0);
+      const fyLabel   = selectedFY==="all" ? "All years" : `FY${selectedFY}`;
+
+      const rows = [];
+      // Summary block at top
+      rows.push(["SUMMARY",fyLabel,"","","","","","","",""]);
+      rows.push(["Short Term P&L (STCG)","",stcgTotal.toFixed(2),"","","","","","",""]);
+      rows.push(["Long Term P&L (LTCG)","",ltcgTotal.toFixed(2),"","","","","","",""]);
+      rows.push(["Dividends received","",totalDivFY.toFixed(2),"","","","","","",""]);
+      rows.push(["","","","","","","","","",""]);
+      // Detail header
+      rows.push(["Ticker","Name","Buy Date","Buy Price","Sell Date","Sell Price","Quantity","P&L","Type","Status"]);
+      // Detail rows — realized only
+      for (const r of realized) {
+        rows.push([r.ticker, r.name, r.buyDate, r.buyPrice, r.sellDate, r.sellPrice, r.quantity, r.pnl.toFixed(2), r.type, "Realized"]);
+      }
+      if (realized.length===0) rows.push(["No realized transactions for the selected period","","","","","","","","",""]);
+
+      // BOM prefix ensures Excel opens UTF-8 correctly and avoids foreign characters
+      const bom = "\uFEFF";
+      const csv = bom + rows.map(r=>r.map(c=>`"${String(c??"").replace(/"/g,'""')}"`).join(",")).join("\n");
+      const blob = new Blob([csv],{type:"text/csv;charset=utf-8"});
+      const a = Object.assign(document.createElement("a"),{href:URL.createObjectURL(blob),download:`buffett-compos-tax-${fyLabel.replace(/\s/g,"-")}.csv`});
+      document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(a.href);
+      document.getElementById("export-status").textContent=`✓ Tax summary downloaded (${fyLabel})`;
+      setTimeout(()=>{document.getElementById("export-status").textContent="";},3000);
     });
+    // ── Import watchlist CSV ─────────────────────────────────────────
+    document.getElementById("import-watchlist-btn").addEventListener("click", async () => {
+      const file = document.getElementById("import-watchlist-file").files[0];
+      const statusEl = document.getElementById("import-status");
+      if (!file) { statusEl.textContent = "Select a CSV file first."; return; }
+      statusEl.textContent = "Reading…";
+      try {
+        const text = await file.text();
+        const lines = text.replace(/^\uFEFF/,"").split("\n").map(l=>l.trim()).filter(Boolean);
+        if (lines.length < 2) { statusEl.textContent = "CSV appears empty."; return; }
+        const header = lines[0].split(",").map(h=>h.replace(/^"|"$/g,"").trim());
+        const tickerIdx = header.findIndex(h=>h.toLowerCase()==="ticker");
+        const nameIdx   = header.findIndex(h=>h.toLowerCase()==="name");
+        const boardIdx  = header.findIndex(h=>h.toLowerCase()==="board");
+        const capIdx    = header.findIndex(h=>h.toLowerCase().includes("cap category"));
+        if (tickerIdx===-1){statusEl.textContent="CSV must have a Ticker column.";return;}
+
+        function getCell(cells, idx) { return idx>=0 ? (cells[idx]||"").replace(/^"|"$/g,"").trim() : ""; }
+
+        let added=0, skipped=0;
+        for (let i=1;i<lines.length;i++) {
+          const cells = lines[i].split(",");
+          const ticker = getCell(cells, tickerIdx); if (!ticker) continue;
+          const existing = await StockStore.get(ticker);
+          if (existing) { skipped++; continue; } // don't overwrite
+          const newStock = {
+            ticker,
+            name:         getCell(cells, nameIdx) || ticker,
+            status:       "active",
+            board:        getCell(cells, boardIdx) || "mainboard",
+            capOverride:  getCell(cells, capIdx) || null,
+            addedDate:    new Date().toISOString().slice(0,10),
+            fundamentals: { source:null, lastUpdated:null, currentPrice:null, marketCap:null, annual:{}, quarterly:{} },
+            shareholding: { source:null, lastUpdated:null, history:[] },
+            corporateActions: { source:null, lastUpdated:null, dividends:[], splits:[], bonus:[] },
+            priceContext: { source:null, lastUpdated:null },
+            notes: [], thesis: { text:"", lastUpdated:null },
+          };
+          await StockStore.set(ticker, newStock);
+          added++;
+        }
+        statusEl.textContent = `✓ Imported ${added} stock${added===1?"":"s"}${skipped?` · ${skipped} already existed`:""}. Fetch fundamentals to load data.`;
+        setTimeout(()=>{statusEl.textContent="";},6000);
+      } catch(e) {
+        statusEl.textContent = `Import failed: ${e.message}`;
+      }
+    });
+
     async function renderBoardList() {
       const stocks = await StockStore.getActive();
       const classEl = document.getElementById("board-classification-list");

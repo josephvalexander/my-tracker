@@ -75,8 +75,12 @@ const portfolioScreen = {
         <div id="sector-chart" class="card"></div>
         <div class="section-label">Market cap mix <span class="muted" style="font-size:11px;">value-weighted</span></div>
         <div id="cap-chart" class="card"></div>
-        <div class="section-label">Valuation snapshot</div>
-        <div id="valuation-snapshot" class="card"></div>
+        <div class="section-label collapsible-header" id="valuation-header" style="cursor:pointer; display:flex; justify-content:space-between;">
+          Valuation snapshot <span class="muted" style="font-size:11px;" id="valuation-chevron">▶ expand</span>
+        </div>
+        <div id="valuation-wrap" style="display:none;">
+          <div id="valuation-snapshot" class="card"></div>
+        </div>
       </div>`;
   },
 
@@ -460,7 +464,8 @@ const portfolioScreen = {
 
     // ── Collapsible toggle wiring ─────────────────────────────────────
     [["sizing-header","sizing-chevron","position-sizing-wrap"],
-     ["earnings-header","earnings-chevron","earnings-season-wrap"]].forEach(([hId, cId, pId]) => {
+     ["earnings-header","earnings-chevron","earnings-season-wrap"],
+     ["valuation-header","valuation-chevron","valuation-wrap"]].forEach(([hId, cId, pId]) => {
       document.getElementById(hId).addEventListener("click", () => {
         const panel = document.getElementById(pId);
         const chev  = document.getElementById(cId);
