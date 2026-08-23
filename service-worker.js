@@ -32,6 +32,7 @@ const APP_SHELL = [
   "./js/screens/portfolio.js",
   "./js/screens/compare.js",
   "./js/screens/calendar.js",
+  "./js/screens/goals.js",
   "./js/screens/archived.js",
   "./js/screens/settings.js",
   "./js/screens/addStock.js",

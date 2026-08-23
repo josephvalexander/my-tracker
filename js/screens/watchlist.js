@@ -91,6 +91,7 @@ const watchlistScreen = {
         <div class="screen-header">
           <div class="screen-title">My watchlist <span id="watchlist-count" class="muted"></span></div>
           <div class="header-actions">
+            <button id="goals-btn" class="btn btn-small" onclick="window.location.hash='#goals'" title="Financial goals">🎯 Goals</button>
             <button id="drive-push-btn" class="btn btn-small" style="display:none;" title="Save to Drive">↑ Drive</button>
             <button id="refresh-prices-btn" class="btn btn-small">↻ Prices</button>
             <button id="add-stock-btn" class="btn btn-small">+ Add</button>

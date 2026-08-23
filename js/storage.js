@@ -107,6 +107,8 @@ const MetaStore = {
   setSettings: (settings) => set("meta", "settings", settings),
   getSnapshots: () => get("meta", "portfolioSnapshots").catch(() => null),
   setSnapshots: (snaps) => set("meta", "portfolioSnapshots", snaps),
+  getGoals: () => get("meta", "goals").catch(() => null),
+  setGoals: (goals) => set("meta", "goals", goals),
 };
 
 /** Archive a stock: flips status, keeps all data (notes, thesis, fundamentals). */
@@ -138,7 +140,8 @@ async function exportAll() {
   const safeSettings = { ...settings };
   delete safeSettings.indianApiKey;
   delete safeSettings.geminiApiKey;
-  return { stocks, holdings, settings: safeSettings, snapshots, exportedAt: new Date().toISOString() };
+  const goals = await MetaStore.getGoals();
+  return { stocks, holdings, settings: safeSettings, snapshots, goals, exportedAt: new Date().toISOString() };
 }
 
 /**
@@ -177,7 +180,7 @@ async function importAll(data) {
   if (data.snapshots) {
     const localSnaps = (await MetaStore.getSnapshots()) || {};
     const merged = {};
-    for (const filter of ["all","mainboard","sme"]) {
+    for (const filter of ["all","mainboard","sme","index"]) {
       const local  = (localSnaps[filter] || []);
       const remote = (data.snapshots[filter] || []);
       const byDate = {};
@@ -185,6 +188,9 @@ async function importAll(data) {
       merged[filter] = Object.values(byDate).sort((a,b) => a.date.localeCompare(b.date)).slice(-400);
     }
     await MetaStore.setSnapshots(merged);
+  }
+  if (data.goals) {
+    await MetaStore.setGoals(data.goals);
   }
 }
 
