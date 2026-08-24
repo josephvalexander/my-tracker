@@ -213,7 +213,10 @@ async function savePortfolioSnapshot() {
       return holdings.reduce((sum, h) => {
         const s = stockMap[h.ticker];
         if (!s || (filterFn && !filterFn(s))) return sum;
-        const qty   = (h.lots || []).reduce((q, l) => q + (l.quantity || 0), h.quantity || 0);
+        // Use lots if available (same logic as totalQuantity in holdingsCalculations.js)
+        const qty = h.lots?.length
+          ? h.lots.reduce((q, l) => q + (l.quantity || 0), 0)
+          : (h.quantity || 0);
         const price = s.fundamentals?.currentPrice ?? 0;
         return sum + qty * price;
       }, 0);
