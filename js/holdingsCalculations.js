@@ -214,6 +214,7 @@ function buildHoldingsSummary(holdings, priceMap, dividendMap) {
     const current = currentValue(h, cmp);
     const pPct = profitPct(h, cmp);
     const dividends = totalDividendsReceived(h, divs);
+    const posXIRR = cmp ? portfolioXIRR([h], { [h.ticker]: cmp }) : null;
     return {
       ticker: h.ticker,
       quantity: qty,
@@ -225,6 +226,7 @@ function buildHoldingsSummary(holdings, priceMap, dividendMap) {
       profitAbsolute: current !== null ? current - invested : null,
       dividends,
       lots: h.lots || [],
+      posXIRR,
     };
   });
 

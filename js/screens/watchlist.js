@@ -91,12 +91,22 @@ const watchlistScreen = {
         <div class="screen-header">
           <div class="screen-title">My watchlist <span id="watchlist-count" class="muted"></span></div>
           <div class="header-actions">
+            <select id="watchlist-sort" style="font-size:11px; padding:3px 6px; border:0.5px solid var(--color-border); border-radius:6px; background:var(--color-bg); color:var(--color-text);">
+              <option value="default">Order added</option>
+              <option value="since-asc">Since watchlisted ↑</option>
+              <option value="since-desc">Since watchlisted ↓</option>
+              <option value="pe-asc">P/E low→high</option>
+              <option value="eps-desc">EPS CAGR high→low</option>
+              <option value="roe-desc">ROE high→low</option>
+              <option value="stale">Stalest first</option>
+            </select>
             <button id="goals-btn" class="btn btn-small" onclick="window.location.hash='#goals'" title="Financial goals">🎯 Goals</button>
             <button id="drive-push-btn" class="btn btn-small" style="display:none;" title="Save to Drive">↑ Drive</button>
             <button id="refresh-prices-btn" class="btn btn-small">↻ Prices</button>
             <button id="add-stock-btn" class="btn btn-small">+ Add</button>
           </div>
         </div>
+        <div id="alert-banner" style="display:none; margin-bottom:8px; padding:8px 12px; background:var(--color-red-bg); border:0.5px solid var(--color-red); border-radius:var(--radius-md); font-size:12px; color:var(--color-red);"></div>
         <div id="refresh-progress" class="muted" style="font-size:11px; min-height:16px; margin-bottom:4px;"></div>
         <div id="drive-status-line" class="drive-status-line"></div>
         <div id="watchlist-list" class="stock-list">
@@ -212,11 +222,77 @@ const watchlistScreen = {
     }
 
     const listEl = document.getElementById("watchlist-list");
-    if (stocks.length === 0) {
-      listEl.innerHTML = `<div class="empty-state">No stocks yet. Tap "+ Add" to start tracking one.</div>`;
+
+    // ── Alert banner — stocks below alert price ───────────────────────
+    const alertBanner  = document.getElementById("alert-banner");
+    const alertStocks  = stocks.filter(s => s.alertPrice && s.fundamentals?.currentPrice && s.fundamentals.currentPrice < s.alertPrice);
+    if (alertStocks.length > 0) {
+      alertBanner.style.display = "block";
+      alertBanner.innerHTML = `⚠ ${alertStocks.length} stock${alertStocks.length===1?"":"s"} below alert price: ` +
+        alertStocks.map(s => `<strong>${s.name||s.ticker}</strong> ₹${s.fundamentals.currentPrice?.toLocaleString("en-IN")} &lt; ₹${s.alertPrice.toLocaleString("en-IN")}`).join(", ");
     } else {
-      const mainboard = stocks.filter(s => !s.board || s.board === "mainboard");
-      const satellite = stocks.filter(s => s.board === "sme" || s.board === "microcap");
+      alertBanner.style.display = "none";
+    }
+
+    // ── Sort function ─────────────────────────────────────────────────
+    function sortStocks(arr, mode) {
+      const sorted = [...arr];
+      switch (mode) {
+        case "since-desc": return sorted.sort((a,b) => {
+          const pa = a.watchlistPrice, pb = b.watchlistPrice;
+          const ca = a.fundamentals?.currentPrice, cb = b.fundamentals?.currentPrice;
+          const ra = (ca&&pa) ? (ca-pa)/pa : null;
+          const rb = (cb&&pb) ? (cb-pb)/pb : null;
+          if (ra===null&&rb===null) return 0;
+          if (ra===null) return 1; if (rb===null) return -1;
+          return rb - ra;
+        });
+        case "since-asc": return sorted.sort((a,b) => {
+          const pa = a.watchlistPrice, pb = b.watchlistPrice;
+          const ca = a.fundamentals?.currentPrice, cb = b.fundamentals?.currentPrice;
+          const ra = (ca&&pa) ? (ca-pa)/pa : null;
+          const rb = (cb&&pb) ? (cb-pb)/pb : null;
+          if (ra===null&&rb===null) return 0;
+          if (ra===null) return 1; if (rb===null) return -1;
+          return ra - rb;
+        });
+        case "pe-asc": return sorted.sort((a,b) => {
+          const pa = a.priceContext?.peTTM ?? null, pb = b.priceContext?.peTTM ?? null;
+          if (pa===null&&pb===null) return 0;
+          if (pa===null) return 1; if (pb===null) return -1;
+          return pa - pb;
+        });
+        case "eps-desc": return sorted.sort((a,b) => {
+          const ea = epsCagr(a) ?? null, eb = epsCagr(b) ?? null;
+          if (ea===null&&eb===null) return 0;
+          if (ea===null) return 1; if (eb===null) return -1;
+          return eb - ea;
+        });
+        case "roe-desc": return sorted.sort((a,b) => {
+          const ra = roe5yAvg(a) ?? null, rb = roe5yAvg(b) ?? null;
+          if (ra===null&&rb===null) return 0;
+          if (ra===null) return 1; if (rb===null) return -1;
+          return rb - ra;
+        });
+        case "stale": return sorted.sort((a,b) => {
+          const da = a.fundamentals?.lastUpdated ?? "0";
+          const db = b.fundamentals?.lastUpdated ?? "0";
+          return da.localeCompare(db);
+        });
+        default: return sorted; // "default" = add order unchanged
+      }
+    }
+
+    // ── Render list (called on load and on sort change) ───────────────
+    function renderList(sortMode) {
+      if (stocks.length === 0) {
+        listEl.innerHTML = `<div class="empty-state">No stocks yet. Tap "+ Add" to start tracking one.</div>`;
+        return;
+      }
+      let mainboard = stocks.filter(s => !s.board || s.board === "mainboard");
+      let satellite = stocks.filter(s => s.board === "sme" || s.board === "microcap");
+      mainboard = sortStocks(mainboard, sortMode);
+      satellite = sortStocks(satellite, sortMode);
 
       let html = "";
       if (mainboard.length > 0) {
@@ -228,26 +304,32 @@ const watchlistScreen = {
         html += satellite.map(stockRow).join("");
       }
       listEl.innerHTML = html;
+      wireRowEvents();
     }
 
-    listEl.querySelectorAll(".stock-row").forEach((row) => {
-      row.addEventListener("click", (e) => {
-        if (e.target.closest(".row-menu-btn")) return;
-        window.location.hash = `#stock/${encodeURIComponent(row.dataset.ticker)}`;
+    function wireRowEvents() {
+      listEl.querySelectorAll(".stock-row").forEach(row => {
+        row.addEventListener("click", (e) => {
+          if (e.target.closest(".row-menu-btn")) return;
+          window.location.hash = `#stock/${encodeURIComponent(row.dataset.ticker)}`;
+        });
       });
-    });
+      listEl.querySelectorAll(".row-menu-btn").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const ticker = btn.dataset.menuTicker;
+          if (confirm(`Delete ${ticker}? This permanently removes all data for this stock.`)) {
+            await deleteStockPermanently(ticker);
+            navigate("#watchlist");
+          }
+        });
+      });
+    }
 
-    listEl.querySelectorAll(".row-menu-btn").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        const ticker = btn.dataset.menuTicker;
-        const confirmed = confirm(`Delete ${ticker}? This permanently removes all data for this stock and cannot be undone.`);
-        if (confirmed) {
-          await deleteStockPermanently(ticker);
-          navigate("#watchlist");
-        }
-      });
-    });
+    // Initial render
+    const sortEl = document.getElementById("watchlist-sort");
+    renderList(sortEl.value);
+    sortEl.addEventListener("change", () => renderList(sortEl.value));
 
     document.getElementById("add-stock-btn").addEventListener("click", () => {
       window.location.hash = "#addStock";
@@ -318,38 +400,21 @@ const watchlistScreen = {
       // Save portfolio snapshot now that prices are fresh
       savePortfolioSnapshot().catch(() => {});
 
-      // Full re-render respecting board grouping
+      // Full re-render respecting current sort and board grouping
       const freshStocks = await StockStore.getActive();
-      const mainboard = freshStocks.filter(s => !s.board || s.board === "mainboard");
-      const satellite = freshStocks.filter(s => s.board === "sme" || s.board === "microcap");
-      let html = "";
-      if (mainboard.length > 0) {
-        html += `<div class="watchlist-group-header">Mainboard <span class="muted">${mainboard.length}</span></div>`;
-        html += mainboard.map(stockRow).join("");
+      // Update the stocks array in-place so renderList uses fresh data
+      stocks.length = 0;
+      freshStocks.forEach(s => stocks.push(s));
+      renderList(document.getElementById("watchlist-sort").value);
+      // Refresh alert banner with new prices
+      const freshAlerts = stocks.filter(s => s.alertPrice && s.fundamentals?.currentPrice && s.fundamentals.currentPrice < s.alertPrice);
+      if (freshAlerts.length > 0) {
+        alertBanner.style.display = "block";
+        alertBanner.innerHTML = `⚠ ${freshAlerts.length} stock${freshAlerts.length===1?"":"s"} below alert price: ` +
+          freshAlerts.map(s => `<strong>${s.name||s.ticker}</strong> ₹${s.fundamentals.currentPrice?.toLocaleString("en-IN")} &lt; ₹${s.alertPrice.toLocaleString("en-IN")}`).join(", ");
+      } else {
+        alertBanner.style.display = "none";
       }
-      if (satellite.length > 0) {
-        html += `<div class="watchlist-group-header" style="margin-top:12px;">SME / Microcap <span class="muted">${satellite.length}</span></div>`;
-        html += satellite.map(stockRow).join("");
-      }
-      document.getElementById("watchlist-list").innerHTML = html;
-
-      // Re-wire row click handlers after re-render
-      document.querySelectorAll(".stock-row").forEach((row) => {
-        row.addEventListener("click", (e) => {
-          if (e.target.closest(".row-menu-btn")) return;
-          window.location.hash = `#stock/${encodeURIComponent(row.dataset.ticker)}`;
-        });
-      });
-      document.querySelectorAll(".row-menu-btn").forEach((btn2) => {
-        btn2.addEventListener("click", async (e) => {
-          e.stopPropagation();
-          const ticker = btn2.dataset.menuTicker;
-          if (confirm(`Delete ${ticker}? This permanently removes all data for this stock.`)) {
-            await deleteStockPermanently(ticker);
-            navigate("#watchlist");
-          }
-        });
-      });
     });
   },
 };

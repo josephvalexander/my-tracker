@@ -38,6 +38,10 @@ function holdingRow(row, color) {
   const pClass = row.profitPct === null ? "muted" : row.profitPct >= 0 ? "text-good" : "text-bad";
   const pText  = row.profitPct === null ? "—" : `${row.profitPct >= 0 ? "+" : ""}${row.profitPct.toFixed(1)}%`;
   const divText = row.dividends > 0 ? formatCurrencyShort(row.dividends) : "—";
+  const xirrText = row.posXIRR !== null
+    ? `${row.posXIRR >= 0 ? "+" : ""}${row.posXIRR.toFixed(1)}% XIRR`
+    : null;
+  const xirrClass = row.posXIRR === null ? "muted" : row.posXIRR >= 0 ? "text-good" : "text-bad";
   return `
     <div class="holding-row" data-ticker="${row.ticker}">
       <div class="holding-row-top holding-row-tap" data-ticker="${row.ticker}" style="cursor:pointer;">
@@ -48,6 +52,7 @@ function holdingRow(row, color) {
         <div class="holding-row-right">
           <div class="price-main">${formatCurrency(row.currentPrice)}</div>
           <div class="${pClass}">${pText}</div>
+          ${xirrText ? `<div class="${xirrClass}" style="font-size:10px;">${xirrText}</div>` : ""}
         </div>
         <div class="holding-row-actions">
           <button class="sell-lot-btn icon-btn" data-ticker="${row.ticker}" title="Record a sale" style="color:var(--color-red);">${SELL_SVG}</button>
