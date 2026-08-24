@@ -109,6 +109,25 @@ const settingsScreen = {
             <button id="export-tickers-btn" class="btn btn-small">Export ticker list for scraper</button>
           </div>
         </div>
+
+        <div class="section-label collapsible-header" id="diag-header" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center;">
+          Diagnostics <span class="muted" style="font-size:11px;" id="diag-chevron">▶ expand</span>
+        </div>
+        <div id="diag-panel" style="display:none;">
+          <div class="card">
+            <div class="muted" style="font-size:11px; margin-bottom:12px;">Use these tools to fix data issues on mobile without needing browser DevTools.</div>
+
+            <div style="margin-bottom:12px;">
+              <div style="font-size:13px; font-weight:500; margin-bottom:4px;">Portfolio snapshots</div>
+              <div class="muted" style="font-size:11px; margin-bottom:8px;">Clears all stored portfolio value history (used for the Analytics growth chart). After clearing, tap ↻ Prices on the watchlist to start recording fresh snapshots. The next Drive push will save the cleared state.</div>
+              <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <button id="clear-snapshots-btn" class="btn btn-small" style="color:var(--color-red); border-color:var(--color-red);">Clear snapshots</button>
+                <span id="snapshot-count" class="muted" style="font-size:11px;"></span>
+              </div>
+              <div id="diag-status" class="muted" style="font-size:11px; margin-top:6px;"></div>
+            </div>
+          </div>
+        </div>
       </div>`;
   },
 
@@ -533,6 +552,37 @@ const settingsScreen = {
       a.download = "tickers.json";
       a.click();
       URL.revokeObjectURL(url);
+    });
+
+    // ── Diagnostics — expand/collapse + snapshot clear ────────────────
+    const diagHeader = document.getElementById("diag-header");
+    const diagPanel  = document.getElementById("diag-panel");
+    const diagChev   = document.getElementById("diag-chevron");
+    let diagOpen = false;
+
+    async function showSnapshotCount() {
+      try {
+        const snaps = (await MetaStore.getSnapshots()) || {};
+        const counts = ["all","mainboard","sme"].map(f => `${f}: ${(snaps[f]||[]).length}`).join(" · ");
+        const countEl = document.getElementById("snapshot-count");
+        if (countEl) countEl.textContent = `(${counts} snapshots stored)`;
+      } catch {}
+    }
+
+    diagHeader.addEventListener("click", async () => {
+      diagOpen = !diagOpen;
+      diagPanel.style.display = diagOpen ? "block" : "none";
+      diagChev.textContent    = diagOpen ? "▼ collapse" : "▶ expand";
+      if (diagOpen) await showSnapshotCount();
+    });
+
+    document.getElementById("clear-snapshots-btn").addEventListener("click", async () => {
+      const statusEl = document.getElementById("diag-status");
+      if (!confirm("Clear all portfolio snapshots? The growth chart will be empty until you refresh prices again.")) return;
+      await MetaStore.setSnapshots({ all: [], mainboard: [], sme: [], index: [] });
+      statusEl.textContent = "✓ Snapshots cleared. Tap ↻ Prices on the watchlist to start fresh. Push to Drive to sync the cleared state.";
+      await showSnapshotCount();
+      setTimeout(() => { statusEl.textContent = ""; }, 8000);
     });
   },
 };
