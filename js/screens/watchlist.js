@@ -91,20 +91,23 @@ const watchlistScreen = {
         <div class="screen-header">
           <div class="screen-title">My watchlist <span id="watchlist-count" class="muted"></span></div>
           <div class="header-actions">
-            <select id="watchlist-sort" style="font-size:11px; padding:3px 6px; border:0.5px solid var(--color-border); border-radius:6px; background:var(--color-bg); color:var(--color-text);">
-              <option value="default">Order added</option>
-              <option value="since-asc">Since watchlisted ↑</option>
-              <option value="since-desc">Since watchlisted ↓</option>
-              <option value="pe-asc">P/E low→high</option>
-              <option value="eps-desc">EPS CAGR high→low</option>
-              <option value="roe-desc">ROE high→low</option>
-              <option value="stale">Stalest first</option>
-            </select>
             <button id="goals-btn" class="btn btn-small" onclick="window.location.hash='#goals'" title="Financial goals">🎯 Goals</button>
             <button id="drive-push-btn" class="btn btn-small" style="display:none;" title="Save to Drive">↑ Drive</button>
             <button id="refresh-prices-btn" class="btn btn-small">↻ Prices</button>
             <button id="add-stock-btn" class="btn btn-small">+ Add</button>
           </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+          <span class="muted" style="font-size:11px;">Sort:</span>
+          <select id="watchlist-sort" style="font-size:11px; padding:2px 6px; border:0.5px solid var(--color-border); border-radius:6px; background:var(--color-bg); color:var(--color-text); height:24px;">
+            <option value="default">Order added</option>
+            <option value="since-asc">Since watchlisted ↑</option>
+            <option value="since-desc">Since watchlisted ↓</option>
+            <option value="pe-asc">P/E low→high</option>
+            <option value="eps-desc">EPS CAGR high→low</option>
+            <option value="roe-desc">ROE high→low</option>
+            <option value="stale">Stalest first</option>
+          </select>
         </div>
         <div id="alert-banner" style="display:none; margin-bottom:8px; padding:8px 12px; background:var(--color-red-bg); border:0.5px solid var(--color-red); border-radius:var(--radius-md); font-size:12px; color:var(--color-red);"></div>
         <div id="refresh-progress" class="muted" style="font-size:11px; min-height:16px; margin-bottom:4px;"></div>
@@ -191,7 +194,7 @@ const watchlistScreen = {
     const drivePushBtn = document.getElementById("drive-push-btn");
 
     if (settings?.driveConnected) {
-      driveLine.innerHTML = `<i>Drive connected · last pushed ${settings.lastSyncPush ? new Date(settings.lastSyncPush).toLocaleDateString("en-IN") : "never"}</i> <a href="#settings">Manage</a>`;
+      driveLine.innerHTML = `<i>Drive connected · last pushed ${settings.lastSyncPush ? new Date(settings.lastSyncPush).toLocaleDateString("en-IN") : "never"}</i>`;
       drivePushBtn.style.display = "";
 
       drivePushBtn.addEventListener("click", async () => {
@@ -209,7 +212,7 @@ const watchlistScreen = {
           await pushToDrive(token, localData);
           settings.lastSyncPush = new Date().toISOString();
           await MetaStore.setSettings(settings);
-          driveLine.innerHTML = `<i>Drive connected · last pushed just now</i> <a href="#settings">Manage</a>`;
+          driveLine.innerHTML = `<i>Drive connected · last pushed just now</i>`;
           progressEl.textContent = "✓ Saved to Drive";
           setTimeout(() => { progressEl.textContent = ""; }, 3000);
         } catch (err) {
