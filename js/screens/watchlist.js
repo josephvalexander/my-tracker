@@ -97,21 +97,9 @@ const watchlistScreen = {
             <button id="add-stock-btn" class="btn btn-small">+ Add</button>
           </div>
         </div>
-        <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
-          <span class="muted" style="font-size:11px;">Sort:</span>
-          <select id="watchlist-sort" style="font-size:11px; padding:2px 6px; border:0.5px solid var(--color-border); border-radius:6px; background:var(--color-bg); color:var(--color-text); height:24px;">
-            <option value="default">Order added</option>
-            <option value="since-asc">Since watchlisted ↑</option>
-            <option value="since-desc">Since watchlisted ↓</option>
-            <option value="pe-asc">P/E low→high</option>
-            <option value="eps-desc">EPS CAGR high→low</option>
-            <option value="roe-desc">ROE high→low</option>
-            <option value="stale">Stalest first</option>
-          </select>
-        </div>
         <div id="alert-banner" style="display:none; margin-bottom:8px; padding:8px 12px; background:var(--color-red-bg); border:0.5px solid var(--color-red); border-radius:var(--radius-md); font-size:12px; color:var(--color-red);"></div>
         <div id="refresh-progress" class="muted" style="font-size:11px; min-height:16px; margin-bottom:4px;"></div>
-        <div id="drive-status-line" class="drive-status-line"></div>
+        <div id="drive-status-line" class="drive-status-line" style="display:flex; align-items:center; justify-content:space-between;"></div>
         <div id="watchlist-list" class="stock-list">
           <div class="loading">Loading...</div>
         </div>
@@ -190,11 +178,19 @@ const watchlistScreen = {
 
     const countEl = document.getElementById("watchlist-count");
     countEl.textContent = `· ${stocks.length} stock${stocks.length === 1 ? "" : "s"}`;
+    // Sort dropdown is rendered inside drive-status-line — re-wire after each update
+    function wireSortDropdown() {
+      const sel = document.getElementById("watchlist-sort");
+      if (!sel) return;
+      sel.addEventListener("change", () => renderList(sel.value));
+    }
+
     const driveLine = document.getElementById("drive-status-line");
     const drivePushBtn = document.getElementById("drive-push-btn");
 
     if (settings?.driveConnected) {
-      driveLine.innerHTML = `<i>Drive connected · last pushed ${settings.lastSyncPush ? new Date(settings.lastSyncPush).toLocaleDateString("en-IN") : "never"}</i>`;
+      driveLine.innerHTML = `<i>Drive connected · last pushed ${settings.lastSyncPush ? new Date(settings.lastSyncPush).toLocaleDateString("en-IN") : "never"}</i><select id="watchlist-sort" style="font-size:11px; padding:2px 6px; border:0.5px solid var(--color-border); border-radius:6px; background:var(--color-bg); color:var(--color-text); height:24px;"><option value="default">Order added</option><option value="since-asc">Since watchlisted ↑</option><option value="since-desc">Since watchlisted ↓</option><option value="pe-asc">P/E low→high</option><option value="eps-desc">EPS CAGR high→low</option><option value="roe-desc">ROE high→low</option><option value="stale">Stalest first</option></select>`;
+      wireSortDropdown();
       drivePushBtn.style.display = "";
 
       drivePushBtn.addEventListener("click", async () => {
@@ -212,7 +208,8 @@ const watchlistScreen = {
           await pushToDrive(token, localData);
           settings.lastSyncPush = new Date().toISOString();
           await MetaStore.setSettings(settings);
-          driveLine.innerHTML = `<i>Drive connected · last pushed just now</i>`;
+          driveLine.innerHTML = `<i>Drive connected · last pushed just now</i><select id="watchlist-sort" style="font-size:11px; padding:2px 6px; border:0.5px solid var(--color-border); border-radius:6px; background:var(--color-bg); color:var(--color-text); height:24px;"><option value="default">Order added</option><option value="since-asc">Since watchlisted ↑</option><option value="since-desc">Since watchlisted ↓</option><option value="pe-asc">P/E low→high</option><option value="eps-desc">EPS CAGR high→low</option><option value="roe-desc">ROE high→low</option><option value="stale">Stalest first</option></select>`;
+          wireSortDropdown();
           progressEl.textContent = "✓ Saved to Drive";
           setTimeout(() => { progressEl.textContent = ""; }, 3000);
         } catch (err) {
@@ -221,7 +218,8 @@ const watchlistScreen = {
         drivePushBtn.disabled = false;
       });
     } else {
-      driveLine.innerHTML = `<i>Working from local data only</i> <a href="#settings">Connect Drive</a>`;
+      driveLine.innerHTML = `<i>Working from local data only · <a href="#settings">Connect Drive</a></i><select id="watchlist-sort" style="font-size:11px; padding:2px 6px; border:0.5px solid var(--color-border); border-radius:6px; background:var(--color-bg); color:var(--color-text); height:24px;"><option value="default">Order added</option><option value="since-asc">Since watchlisted ↑</option><option value="since-desc">Since watchlisted ↓</option><option value="pe-asc">P/E low→high</option><option value="eps-desc">EPS CAGR high→low</option><option value="roe-desc">ROE high→low</option><option value="stale">Stalest first</option></select>`;
+      wireSortDropdown();
     }
 
     const listEl = document.getElementById("watchlist-list");
@@ -329,10 +327,8 @@ const watchlistScreen = {
       });
     }
 
-    // Initial render
-    const sortEl = document.getElementById("watchlist-sort");
-    renderList(sortEl.value);
-    sortEl.addEventListener("change", () => renderList(sortEl.value));
+    // Initial list render (sort dropdown already wired by wireSortDropdown above)
+    renderList((document.getElementById("watchlist-sort") || {value:"default"}).value);
 
     document.getElementById("add-stock-btn").addEventListener("click", () => {
       window.location.hash = "#addStock";
@@ -408,7 +404,7 @@ const watchlistScreen = {
       // Update the stocks array in-place so renderList uses fresh data
       stocks.length = 0;
       freshStocks.forEach(s => stocks.push(s));
-      renderList(document.getElementById("watchlist-sort").value);
+      renderList((document.getElementById("watchlist-sort") || {value:"default"}).value);
       // Refresh alert banner with new prices
       const freshAlerts = stocks.filter(s => s.alertPrice && s.fundamentals?.currentPrice && s.fundamentals.currentPrice < s.alertPrice);
       if (freshAlerts.length > 0) {
