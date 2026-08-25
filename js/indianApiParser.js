@@ -247,21 +247,6 @@ function parseIndianApiResponse(data) {
     }
   }
 
-  const priceContext = {
-    source: "indianapi",
-    lastUpdated: new Date().toISOString().slice(0, 10),
-    week52High,
-    week52Low,
-    peTTM,
-    sectorPE,
-    distributionYield,
-    gearing,
-    interestCoverage,
-    cashFlowPerShare,
-    distPerShare5yr,
-    operatingMargin,
-  };
-
   // Current price: prefer reusable.price (live intraday), fall back to currentPrice object
   const currentPrice =
     parseFloat(reusable.price) ||
@@ -302,6 +287,23 @@ function parseIndianApiResponse(data) {
       distPerShare5yr = distPerShare5yr || parseFloat((divPaid / shares).toFixed(2));
     }
   }
+
+  // Build priceContext AFTER all fallback computations above so cashFlowPerShare
+  // and distPerShare5yr reflect their final computed values (not the initial nulls).
+  const priceContext = {
+    source: "indianapi",
+    lastUpdated: new Date().toISOString().slice(0, 10),
+    week52High,
+    week52Low,
+    peTTM,
+    sectorPE,
+    distributionYield,
+    gearing,
+    interestCoverage,
+    cashFlowPerShare,
+    distPerShare5yr,
+    operatingMargin,
+  };
 
   const stockFundamentals = {
     source: "indianapi",
