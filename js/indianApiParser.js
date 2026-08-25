@@ -215,9 +215,9 @@ function parseIndianApiResponse(data) {
   if (!gearing && data.financials?.length > 0) {
     const sfm = data.financials[0]?.stockFinancialMap?.BAL || [];
     const balMap = {};
-    sfm.forEach(item => { balMap[item.displayName] = parseFloat(item.value) || 0; });
-    const totalDebt   = balMap["Total Debt"] || balMap["Long Term Debt"] || 0;
-    const totalEquity = (balMap["Total Liabilities Shareholders' Equity"] || 0) - (balMap["Total Liabilities"] || 0);
+    sfm.forEach(item => { balMap[item.displayName.trim()] = parseFloat(item.value) || 0; });
+    const totalDebt   = balMap["Total Debt"] || 0;
+    const totalEquity = balMap["Total Equity"] || 0;
     if (totalDebt > 0 && totalEquity > 0) {
       gearing = parseFloat((totalDebt / totalEquity).toFixed(2));
     }
@@ -227,11 +227,23 @@ function parseIndianApiResponse(data) {
   if (!interestCoverage && data.financials?.length > 0) {
     const sfm = data.financials[0]?.stockFinancialMap?.INC || [];
     const incMap = {};
-    sfm.forEach(item => { incMap[item.displayName] = parseFloat(item.value) || 0; });
-    const ebit     = incMap["Operating Income"] || incMap["Total Operating Expense"] || 0;
-    const interest = incMap["Interest Expense"] || incMap["Total Interest Expense"] || 0;
-    if (ebit && interest && interest !== 0) {
-      interestCoverage = parseFloat(Math.abs(ebit / interest).toFixed(2));
+    sfm.forEach(item => { incMap[item.displayName.trim()] = parseFloat(item.value) || 0; });
+    const ebit          = incMap["Operating Income"] || 0;
+    const interestExp   = Math.abs(incMap["Interest Inc( Exp) Net- Non- Op Total"] || incMap["Interest Expense"] || 0);
+    if (ebit > 0 && interestExp > 0) {
+      interestCoverage = parseFloat((ebit / interestExp).toFixed(2));
+    }
+  }
+
+  // Compute operating margin from income statement if not available
+  if (!operatingMargin && data.financials?.length > 0) {
+    const sfm = data.financials[0]?.stockFinancialMap?.INC || [];
+    const incMap = {};
+    sfm.forEach(item => { incMap[item.displayName.trim()] = parseFloat(item.value) || 0; });
+    const revenue = incMap["Total Revenue"] || incMap["Revenue"] || 0;
+    const ebit    = incMap["Operating Income"] || 0;
+    if (revenue > 0 && ebit) {
+      operatingMargin = parseFloat(((ebit / revenue) * 100).toFixed(2));
     }
   }
 
