@@ -142,6 +142,12 @@ async function applyIndianApiResult(ticker, parsed) {
     week52Low: parsed.priceContext.week52Low,
     peTTM: parsed.priceContext.peTTM ?? stock.priceContext?.peTTM ?? null,
     sectorPE: parsed.priceContext.sectorPE ?? stock.priceContext?.sectorPE ?? null,
+    distributionYield:  parsed.priceContext.distributionYield  ?? stock.priceContext?.distributionYield  ?? null,
+    gearing:            parsed.priceContext.gearing            ?? stock.priceContext?.gearing            ?? null,
+    interestCoverage:   parsed.priceContext.interestCoverage   ?? stock.priceContext?.interestCoverage   ?? null,
+    cashFlowPerShare:   parsed.priceContext.cashFlowPerShare   ?? stock.priceContext?.cashFlowPerShare   ?? null,
+    distPerShare5yr:    parsed.priceContext.distPerShare5yr    ?? stock.priceContext?.distPerShare5yr    ?? null,
+    operatingMargin:    parsed.priceContext.operatingMargin    ?? stock.priceContext?.operatingMargin    ?? null,
   };
 
   await StockStore.set(ticker, stock);
@@ -221,7 +227,7 @@ const addStockScreen = {
 
         <div class="form-group">
           <label>Board</label>
-          <div style="display:flex; gap:16px; margin-top:4px;">
+          <div style="display:flex; gap:16px; margin-top:4px; flex-wrap:wrap;">
             <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="board" value="mainboard" checked /> Mainboard</label>
             <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="board" value="sme" /> SME</label>
             <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="board" value="microcap" /> Microcap</label>
@@ -335,6 +341,21 @@ const addStockScreen = {
         const cagr = epsCagr(updatedStock);
         const years = parsed.stockFundamentals.annual.years?.length ?? 0;
         const latestShareholding = parsed.shareholding.history?.slice(-1)?.[0];
+        const isReitAdd = (document.querySelector('input[name="board"]:checked')?.value) === "reit";
+        const pc = parsed.priceContext;
+
+        const equityRows = `
+              <tr><td>Years of data</td><td>${years} ${years >= 8 ? "✓" : "⚠ fewer than 8"}</td></tr>
+              <tr><td>ROE (5y avg)</td><td>${roe !== null ? formatPct(roe) : "N/A"}</td></tr>
+              <tr><td>D/E</td><td>${de !== null ? formatRatio(de) : "N/A"}</td></tr>
+              <tr><td>EPS CAGR (5y)</td><td>${cagr !== null ? formatPct(cagr) : "N/A"}</td></tr>
+              <tr><td>Promoter holding</td><td>${latestShareholding?.promoter != null ? latestShareholding.promoter + "% (Q: " + latestShareholding.quarter + ")" : "—"}</td></tr>`;
+
+        const reitRows = `
+              <tr><td>Distribution yield</td><td>${pc.distributionYield ? pc.distributionYield.toFixed(2)+"%" : "—"}</td></tr>
+              <tr><td>Gearing (D/E)</td><td>${pc.gearing != null ? pc.gearing.toFixed(2)+"x" : "—"}</td></tr>
+              <tr><td>Interest coverage</td><td>${pc.interestCoverage != null ? pc.interestCoverage.toFixed(2)+"x" : "—"}</td></tr>
+              <tr><td>Operating margin</td><td>${pc.operatingMargin != null ? pc.operatingMargin.toFixed(1)+"%" : "—"}</td></tr>`;
 
         statusEl.textContent = "";
         document.getElementById("fetch-preview").innerHTML = `
@@ -344,12 +365,8 @@ const addStockScreen = {
               <tr><td>Company</td><td>${parsed.companyName || ticker}</td></tr>
               <tr><td>Current price</td><td>${parsed.stockFundamentals.currentPrice ? "₹" + parsed.stockFundamentals.currentPrice.toLocaleString("en-IN") : "—"}</td></tr>
               <tr><td>52w range</td><td>${parsed.priceContext.week52Low && parsed.priceContext.week52High ? `₹${parsed.priceContext.week52Low.toLocaleString("en-IN")} – ₹${parsed.priceContext.week52High.toLocaleString("en-IN")}` : "—"}</td></tr>
-              <tr><td>Years of data</td><td>${years} ${years >= 8 ? "✓" : "⚠ fewer than 8"}</td></tr>
-              <tr><td>ROE (5y avg)</td><td>${roe !== null ? formatPct(roe) : "N/A"}</td></tr>
-              <tr><td>D/E</td><td>${de !== null ? formatRatio(de) : "N/A"}</td></tr>
-              <tr><td>EPS CAGR (5y)</td><td>${cagr !== null ? formatPct(cagr) : "N/A"}</td></tr>
-              <tr><td>Promoter holding</td><td>${latestShareholding?.promoter != null ? latestShareholding.promoter + "% (Q: " + latestShareholding.quarter + ")" : "—"}</td></tr>
-              <tr><td>Dividends on record</td><td>${parsed.corporateActions.dividends?.length ?? 0}</td></tr>
+              ${isReitAdd ? reitRows : equityRows}
+              <tr><td>Distributions on record</td><td>${parsed.corporateActions.dividends?.length ?? 0}</td></tr>
             </table>
             ${parsed.warnings.length > 0 ? `<div class="preview-warnings">${parsed.warnings.map(w => `<div class="warning-text">⚠ ${w}</div>`).join("")}</div>` : ""}
 

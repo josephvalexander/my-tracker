@@ -171,9 +171,9 @@ const portfolioScreen = {
     const yoy  = revenueCount > 0 && totalRevYoY  > 0 ? ((totalRevQ - totalRevYoY)  / totalRevYoY  * 100) : null;
 
     // Load all snapshots for the current filter
-    const snapKey = activeFilters.size > 1 ? "all"
-      : activeFilters.has("mainboard") ? "mainboard"
-      : activeFilters.has("sme") ? "sme" : "all";
+    const snapKey = activeFilters.size === 1 && activeFilters.has("mainboard") ? "mainboard"
+      : activeFilters.size === 1 && activeFilters.has("sme") ? "sme"
+      : "all";
     const allSnapshots = (await MetaStore.getSnapshots()) || {};
     const allSnaps     = (allSnapshots[snapKey] || []).sort((a,b) => a.date.localeCompare(b.date));
 

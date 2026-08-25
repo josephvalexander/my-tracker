@@ -93,6 +93,15 @@ function priceContextStrip(stock) {
         <div class="price-context-label">52w range${entryZonePct !== null ? ` <span class="muted" style="font-size:9px;">(${entryZonePct}% of range)</span>` : ""}</div>
         <div class="price-context-value">${has52w ? `${Math.round(pc.week52Low).toLocaleString("en-IN")}–${Math.round(pc.week52High).toLocaleString("en-IN")}` : "—"}</div>
       </div>
+      ${stock.board === "reit" ? `
+      <div class="price-context-box">
+        <div class="price-context-label">Dist. yield</div>
+        <div class="price-context-value">${pc.distributionYield ? pc.distributionYield.toFixed(2)+"%" : "—"}</div>
+      </div>
+      <div class="price-context-box">
+        <div class="price-context-label">Gearing</div>
+        <div class="price-context-value">${pc.gearing != null ? pc.gearing.toFixed(2)+"x" : "—"}</div>
+      </div>` : `
       <div class="price-context-box">
         <div class="price-context-label">P/E (TTM)</div>
         <div class="price-context-value">${pc.peTTM ? pc.peTTM.toFixed(1) : "—"}</div>
@@ -100,7 +109,7 @@ function priceContextStrip(stock) {
       <div class="price-context-box">
         <div class="price-context-label">Sector P/E</div>
         <div class="price-context-value">${pc.sectorPE ? pc.sectorPE.toFixed(1) : "—"}</div>
-      </div>
+      </div>`}
     </div>`;
 }
 
