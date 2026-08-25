@@ -491,3 +491,4 @@ const holdingsScreen = {
     applyFilter();
   },
 };
+registerScreen("holdings", holdingsScreen);
