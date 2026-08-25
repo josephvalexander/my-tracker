@@ -28,11 +28,11 @@ const editStockScreen = {
 
         <div class="section-label">Board</div>
         <div class="card">
-          <div style="display:flex; gap:20px; flex-wrap:wrap;">
-            <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="edit-board" value="mainboard" ${(!stock.board || stock.board==="mainboard") ? "checked" : ""}/> Mainboard</label>
-            <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="edit-board" value="sme" ${stock.board==="sme" ? "checked" : ""}/> SME</label>
-            <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="edit-board" value="microcap" ${stock.board==="microcap" ? "checked" : ""}/> Microcap</label>
-            <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="edit-board" value="reit" ${stock.board==="reit" ? "checked" : ""}/> REIT / InvIT</label>
+          <div style="display:grid; grid-template-columns:repeat(4,auto); gap:12px 16px; width:fit-content;">
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; white-space:nowrap;"><input type="radio" name="edit-board" value="mainboard" ${(!stock.board || stock.board==="mainboard") ? "checked" : ""}/> Mainboard</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; white-space:nowrap;"><input type="radio" name="edit-board" value="sme" ${stock.board==="sme" ? "checked" : ""}/> SME</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; white-space:nowrap;"><input type="radio" name="edit-board" value="microcap" ${stock.board==="microcap" ? "checked" : ""}/> Microcap</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; white-space:nowrap;"><input type="radio" name="edit-board" value="reit" ${stock.board==="reit" ? "checked" : ""}/> REIT / InvIT</label>
           </div>
           <div id="reit-subtype-row" style="margin-top:10px; display:${stock.board==="reit"?"flex":"none"}; gap:20px;">
             <label style="font-size:12px; color:var(--color-text-secondary);">Sub-type:</label>

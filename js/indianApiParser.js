@@ -178,13 +178,62 @@ function parseIndianApiResponse(data) {
   const week52High = parseFloat(reusable.yhigh) || parseFloat(data.yearHigh) || null;
   const week52Low  = parseFloat(reusable.ylow)  || parseFloat(data.yearLow)  || null;
 
-  // REIT/InvIT specific fields
-  const distributionYield = parseFloat(reusable.currentDividendYieldCommonStockPrimaryIssueLTM) || null;
-  const gearing           = parseFloat(reusable.totalDebtPerTotalEquityMostRecentQuarter) || null;
-  const interestCoverage  = parseFloat(getMetric(data.keyMetrics, "netInterestCoverageMostRecentFiscalYear")) || null;
-  const cashFlowPerShare  = parseFloat(getMetric(data.keyMetrics, "cashFlowPerShareTrailing12Month")) || null;
-  const distPerShare5yr   = parseFloat(getMetric(data.keyMetrics, "dividendperShare5YearAverage")) || null;
-  const operatingMargin   = parseFloat(getMetric(data.keyMetrics, "operatingMarginTrailing12Month")) || null;
+  // REIT/InvIT specific fields — prefer reusable fields, fall back to computed values
+  let distributionYield = parseFloat(reusable.currentDividendYieldCommonStockPrimaryIssueLTM) || null;
+  let gearing           = parseFloat(reusable.totalDebtPerTotalEquityMostRecentQuarter) || null;
+  let interestCoverage  = parseFloat(getMetric(data.keyMetrics, "netInterestCoverageMostRecentFiscalYear")) || null;
+  let cashFlowPerShare  = parseFloat(getMetric(data.keyMetrics, "cashFlowPerShareTrailing12Month")) || null;
+  let distPerShare5yr   = parseFloat(getMetric(data.keyMetrics, "dividendperShare5YearAverage")) || null;
+  let operatingMargin   = parseFloat(getMetric(data.keyMetrics, "operatingMarginTrailing12Month")) || null;
+
+  // For InvIT/REIT where keyMetrics is empty, compute from financials + dividend records
+  const reitCurrentPrice = parseFloat(reusable.price) || null;
+
+  // Compute annual distribution from last 12 months of dividend records
+  if (!distributionYield || !distPerShare5yr) {
+    const now = new Date();
+    const oneYearAgo = new Date(now); oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    const divRecords = (data.stockCorporateActionData?.dividend || []);
+    const byDate = {};
+    divRecords.forEach(d => {
+      if (!d.recordDate) return;
+      const dt = new Date(d.recordDate);
+      if (dt >= oneYearAgo && dt <= now) {
+        byDate[d.recordDate] = (byDate[d.recordDate] || 0) + (parseFloat(d.value) || 0);
+      }
+    });
+    const annualDist = Object.values(byDate).reduce((s, v) => s + v, 0);
+    if (annualDist > 0) {
+      distPerShare5yr = distPerShare5yr || annualDist;
+      if (!distributionYield && reitCurrentPrice) {
+        distributionYield = parseFloat(((annualDist / reitCurrentPrice) * 100).toFixed(2));
+      }
+    }
+  }
+
+  // Compute gearing from balance sheet financials when not available from reusable
+  if (!gearing && data.financials?.length > 0) {
+    const sfm = data.financials[0]?.stockFinancialMap?.BAL || [];
+    const balMap = {};
+    sfm.forEach(item => { balMap[item.displayName] = parseFloat(item.value) || 0; });
+    const totalDebt   = balMap["Total Debt"] || balMap["Long Term Debt"] || 0;
+    const totalEquity = (balMap["Total Liabilities Shareholders' Equity"] || 0) - (balMap["Total Liabilities"] || 0);
+    if (totalDebt > 0 && totalEquity > 0) {
+      gearing = parseFloat((totalDebt / totalEquity).toFixed(2));
+    }
+  }
+
+  // Compute interest coverage from income statement if not available
+  if (!interestCoverage && data.financials?.length > 0) {
+    const sfm = data.financials[0]?.stockFinancialMap?.INC || [];
+    const incMap = {};
+    sfm.forEach(item => { incMap[item.displayName] = parseFloat(item.value) || 0; });
+    const ebit     = incMap["Operating Income"] || incMap["Total Operating Expense"] || 0;
+    const interest = incMap["Interest Expense"] || incMap["Total Interest Expense"] || 0;
+    if (ebit && interest && interest !== 0) {
+      interestCoverage = parseFloat(Math.abs(ebit / interest).toFixed(2));
+    }
+  }
 
   const priceContext = {
     source: "indianapi",

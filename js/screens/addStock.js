@@ -227,11 +227,11 @@ const addStockScreen = {
 
         <div class="form-group">
           <label>Board</label>
-          <div style="display:flex; gap:16px; margin-top:4px; flex-wrap:wrap;">
-            <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="board" value="mainboard" checked /> Mainboard</label>
-            <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="board" value="sme" /> SME</label>
-            <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="board" value="microcap" /> Microcap</label>
-            <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="board" value="reit" /> REIT / InvIT</label>
+          <div style="display:grid; grid-template-columns:repeat(4,auto); gap:12px 16px; margin-top:4px; width:fit-content;">
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; white-space:nowrap;"><input type="radio" name="board" value="mainboard" checked /> Mainboard</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; white-space:nowrap;"><input type="radio" name="board" value="sme" /> SME</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; white-space:nowrap;"><input type="radio" name="board" value="microcap" /> Microcap</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; white-space:nowrap;"><input type="radio" name="board" value="reit" /> REIT / InvIT</label>
           </div>
           <div id="add-reit-subtype-row" style="display:none; gap:20px; margin-top:10px;">
             <label style="font-size:12px; color:var(--color-text-secondary);">Sub-type:</label>
