@@ -269,9 +269,37 @@ function parseIndianApiResponse(data) {
     parseFloat(data.currentPrice?.BSE) ||
     null;
 
-  // Market cap: prefer reusable.marketCap (already in Cr), fall back to keyMetrics
+  // Market cap: prefer reusable.marketCap, fall back to shares × price
   const marketCapRaw = parseFloat(reusable.marketCap) || getMetric(data.keyMetrics, "marketCap");
-  const marketCap = marketCapRaw || null;
+  let marketCap = marketCapRaw || null;
+  if (!marketCap && currentPrice && data.financials?.length > 0) {
+    const balItems = data.financials[0]?.stockFinancialMap?.BAL || [];
+    const balMap = {}; balItems.forEach(i => { balMap[i.displayName.trim()] = parseFloat(i.value) || 0; });
+    const sharesOutstanding = balMap["Total Common Shares Outstanding"] || 0;
+    if (sharesOutstanding > 0) {
+      // Shares in Cr × price → Cr market cap
+      marketCap = parseFloat((sharesOutstanding * currentPrice / 100).toFixed(2)) || null;
+    }
+  }
+
+  // Cash flow per share: compute from operating cash flow / shares if not in keyMetrics
+  if (!cashFlowPerShare && data.financials?.length > 0) {
+    const casItems = data.financials[0]?.stockFinancialMap?.CAS || [];
+    const balItems = data.financials[0]?.stockFinancialMap?.BAL || [];
+    const casMap = {}; casItems.forEach(i => { casMap[i.displayName.trim()] = parseFloat(i.value) || 0; });
+    const balMap = {}; balItems.forEach(i => { balMap[i.displayName.trim()] = parseFloat(i.value) || 0; });
+    const opCF   = casMap["Cashfrom Operating Activities"] || 0;
+    const shares  = balMap["Total Common Shares Outstanding"] || balMap["Diluted Weighted Average Shares"] || 0;
+    if (opCF > 0 && shares > 0) {
+      cashFlowPerShare = parseFloat((opCF / shares).toFixed(2));
+    }
+    // Distribution coverage = operating CF / total dividends paid
+    const divPaid = Math.abs(casMap["Total Cash Dividends Paid"] || 0);
+    if (opCF > 0 && divPaid > 0 && !distPerShare5yr) {
+      // Also derive distPerShare5yr from actual dividends paid / shares
+      distPerShare5yr = distPerShare5yr || parseFloat((divPaid / shares).toFixed(2));
+    }
+  }
 
   const stockFundamentals = {
     source: "indianapi",
