@@ -199,123 +199,101 @@ const helpScreen = {
         <div id="glossary-list" class="glossary-list"></div>
         </div><!-- end help-buffett-panel -->
 
-        <!-- ══ REIT / INVIT TAB ════════════════════════════════════════ -->
-        <div id="help-reit-panel" style="display:none;">
-          <div class="muted" style="font-size:11px; margin-bottom:12px; padding:8px 12px; background:var(--color-bg); border-radius:var(--radius-md); border-left:3px solid var(--color-green);">
-            ⚠ Data as of ${REIT_DATA.lastUpdated}. Yields and capital values are indicative based on historical performance — verify before investing. Past performance is not a guarantee of future returns.
-          </div>
-
-          <!-- What are REITs & InvITs -->
-          <div class="section-label collapsible-header" id="reit-what-header" style="cursor:pointer;display:flex;justify-content:space-between;">
-            What are REITs & InvITs? <span class="muted" style="font-size:11px;" id="reit-what-chev">▼ collapse</span>
-          </div>
-          <div id="reit-what-panel" style="display:block;">
-            <div class="card" style="font-size:13px; line-height:1.7; margin-bottom:14px;">
-              <p style="margin:0 0 10px;"><strong>REIT (Real Estate Investment Trust)</strong> — a listed entity that owns income-generating commercial real estate: office parks, malls, warehouses. By law it must distribute at least 90% of its income to unit-holders every quarter. You earn rent without owning property directly.</p>
-              <p style="margin:0 0 10px;"><strong>InvIT (Infrastructure Investment Trust)</strong> — same structure, but owns infrastructure assets: highways, power transmission lines, gas pipelines. Income comes from tolls, tariffs, and capacity charges rather than rent.</p>
-              <p style="margin:0 0 10px;"><strong>How you invest:</strong> Buy units on the stock exchange like shares. Minimum is 1 unit (typically ₹200–₹500 after SEBI's 2023 reforms). Units trade daily — you can exit anytime at market price.</p>
-              <p style="margin:0 0 10px;"><strong>Two sources of return:</strong> (1) Quarterly distributions — your "rental income." (2) Unit price appreciation as assets grow in value over time. Total return = distributions + price change.</p>
-              <p style="margin:0 0 0;"><strong>Key difference from stocks:</strong> You're not betting on business growth or market share. You're buying a predictable stream of income from physical assets with long-term contracts. Lower growth potential than quality equity, but more stable income than FD with better inflation protection.</p>
-            </div>
-          </div>
-
-          <!-- Comparison table -->
-          <div class="section-label collapsible-header" id="reit-compare-header" style="cursor:pointer;display:flex;justify-content:space-between;">
-            ₹1L investment comparison <span class="muted" style="font-size:11px;" id="reit-compare-chev">▶ expand</span>
-          </div>
-          <div id="reit-compare-panel" style="display:none;">
-            <div class="card" style="padding:0; overflow:hidden; margin-bottom:6px;">
-              <div style="overflow-x:auto;">
-              <table style="width:100%; min-width:420px; border-collapse:collapse; font-size:12px;">
-                <thead>
-                  <tr style="background:var(--color-bg);">
-                    <th style="padding:8px 10px; text-align:left; font-weight:500; color:var(--color-text-secondary); border-bottom:1px solid var(--color-border); width:38%;">Factor</th>
-                    ${REIT_DATA.columns.map(c => `
-                    <th style="padding:8px 8px; text-align:right; font-weight:600; border-bottom:1px solid var(--color-border);">
-                      ${c.label}<br><span style="font-size:10px; font-weight:400; color:var(--color-text-tertiary);">${c.example}</span>
-                    </th>`).join("")}
-                  </tr>
-                </thead>
-                <tbody>
-                  ${REIT_DATA.rows.map((row, i) => {
-                    const hl = row.highlight;
-                    let tr = "<tr style=\"border-bottom:0.5px solid var(--color-border);" + (i%2===0?"":"background:rgba(0,0,0,0.02);") + "\">";
-                    tr += "<td style=\"padding:7px 10px;color:var(--color-text-secondary);\">" + row.label + "</td>";
-                    REIT_DATA.columns.forEach(c => {
-                      const win = hl === c.key;
-                      tr += "<td style=\"padding:7px 8px;text-align:right;" + (win?"color:var(--color-green);font-weight:600;":"") + "\">" + (row[c.key]||"—") + "</td>";
-                    });
-                    return tr + "</tr>";
-                  }).join("")}
-                </tbody>
-              </table>
-            </div>
-            </div><!-- end card -->
-            <div class="muted" style="font-size:11px; margin-bottom:14px;">* Capital appreciation figures assume REIT ~3.5% p.a. price growth, InvIT ~1.5% p.a. Green = better value on that row. FD capital stays ₹1L — no growth. DICGC insurance covers up to ₹5L per bank.</div>
-          </div>
-
-          <!-- Taxation -->
-          <div class="section-label collapsible-header" id="reit-tax-header" style="cursor:pointer;display:flex;justify-content:space-between;">
-            Taxation <span class="muted" style="font-size:11px;" id="reit-tax-chev">▶ expand</span>
-          </div>
-          <div id="reit-tax-panel" style="display:none;">
-            <div class="card" style="padding:0; overflow:hidden; margin-bottom:6px;">
-              <div style="overflow-x:auto;">
-              <table style="width:100%; border-collapse:collapse; font-size:12px;">
-                <thead>
-                  <tr style="background:var(--color-bg);">
-                    <th style="padding:8px 10px; text-align:left; font-weight:500; color:var(--color-text-secondary); border-bottom:1px solid var(--color-border);">Component</th>
-                    <th style="padding:8px 8px; text-align:left; font-weight:600; border-bottom:1px solid var(--color-border);">REIT</th>
-                    <th style="padding:8px 8px; text-align:left; font-weight:600; border-bottom:1px solid var(--color-border);">InvIT</th>
-                    <th style="padding:8px 8px; text-align:left; font-weight:500; color:var(--color-text-secondary); border-bottom:1px solid var(--color-border);">Note</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${REIT_DATA.taxation.map((t,i) =>
-                    "<tr style=\"border-bottom:0.5px solid var(--color-border);" + (i%2===0?"":"background:rgba(0,0,0,0.02);") + "\">" +
-                    "<td style=\"padding:7px 10px;font-weight:500;\">" + t.component + "</td>" +
-                    "<td style=\"padding:7px 8px;\">" + t.reit + "</td>" +
-                    "<td style=\"padding:7px 8px;\">" + t.invit + "</td>" +
-                    "<td style=\"padding:7px 8px;color:var(--color-text-tertiary);\">" + t.note + "</td></tr>"
-                  ).join("")}
-                </tbody>
-              </table>
-            </div>
-            </div><!-- end card -->
-            <div class="muted" style="font-size:11px; margin-bottom:14px;">Each quarterly distribution is split into components (dividend / interest / return of capital) declared by the trust. Check the distribution notice to know the exact breakdown for tax filing.</div>
-          </div>
-
-          <!-- Instruments -->
-          <div class="section-label collapsible-header" id="reit-inst-header" style="cursor:pointer;display:flex;justify-content:space-between;">
-            Listed REITs & InvITs <span class="muted" style="font-size:11px;" id="reit-inst-chev">▶ expand</span>
-          </div>
-          <div id="reit-inst-panel" style="display:none; margin-bottom:16px;">
-            ${["REIT","InvIT"].map(type => {
-              const list = REIT_DATA.instruments.filter(i => i.type === type);
-              return `
-                <div class="section-label" style="margin-top:8px; margin-bottom:6px;">${type}s</div>
-                ${list.map(inst => `
-                  <div class="card" style="margin-bottom:8px;">
-                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-                      <div style="flex:1;min-width:0;">
-                        <div style="font-size:13px;font-weight:600;">${inst.name}</div>
-                        <div class="muted" style="font-size:11px;">${inst.assets} · ${inst.sponsor}</div>
-                      </div>
-                      <div style="text-align:right;flex-shrink:0;">
-                        <div style="font-size:14px;font-weight:600;color:var(--color-green);">${inst.trailYield}</div>
-                        <div class="muted" style="font-size:10px;">trailing yield</div>
-                      </div>
-                    </div>
-                    <div style="margin-top:8px;padding-top:6px;border-top:0.5px solid var(--color-border);font-size:11px;color:var(--color-text-secondary);">⚠ ${inst.risk}</div>
-                  </div>`).join("")}`;
-            }).join("")}
-          </div>
-        </div><!-- end help-reit-panel -->
+        <div id="help-reit-panel" style="display:none;"></div>
 
       </div>`;
   },
 
   async afterRender() {
+    // ── REIT panel — built in afterRender to avoid nested backtick issues ──
+    function buildReitPanel() {
+      const d = REIT_DATA;
+      const disclaimer = '<div class="muted" style="font-size:11px;margin-bottom:12px;padding:8px 12px;background:var(--color-bg);border-radius:var(--radius-md);border-left:3px solid var(--color-green);">'
+        + '⚠ Data as of ' + d.lastUpdated + '. Yields and capital values are indicative based on historical performance — verify before investing. Past performance is not a guarantee of future returns.</div>';
+
+      // Section 1: What are REITs — expanded by default
+      const whatSection = '<div class="section-label collapsible-header" id="reit-what-header" style="cursor:pointer;display:flex;justify-content:space-between;">What are REITs &amp; InvITs? <span class="muted" style="font-size:11px;" id="reit-what-chev">▼ collapse</span></div>'
+        + '<div id="reit-what-panel" style="display:block;"><div class="card" style="font-size:13px;line-height:1.7;margin-bottom:14px;">'
+        + '<p style="margin:0 0 10px;"><strong>REIT (Real Estate Investment Trust)</strong> — a listed entity that owns income-generating commercial real estate: office parks, malls, warehouses. By law it must distribute at least 90% of its income to unit-holders every quarter. You earn rent without owning property directly.</p>'
+        + '<p style="margin:0 0 10px;"><strong>InvIT (Infrastructure Investment Trust)</strong> — same structure, but owns infrastructure assets: highways, power transmission lines, gas pipelines. Income comes from tolls, tariffs, and capacity charges rather than rent.</p>'
+        + '<p style="margin:0 0 10px;"><strong>How you invest:</strong> Buy units on the stock exchange like shares. Minimum is 1 unit (typically ₹200–₹500 after SEBI\'s 2023 reforms). Units trade daily — you can exit anytime at market price.</p>'
+        + '<p style="margin:0 0 10px;"><strong>Two sources of return:</strong> (1) Quarterly distributions — your "rental income." (2) Unit price appreciation as assets grow in value over time. Total return = distributions + price change.</p>'
+        + '<p style="margin:0 0 0;"><strong>Key difference from stocks:</strong> You\'re not betting on business growth or market share. You\'re buying a predictable stream of income from physical assets with long-term contracts. Lower growth potential than quality equity, but more stable income than FD with better inflation protection.</p>'
+        + '</div></div>';
+
+      // Section 2: Comparison table
+      const colHeaders = d.columns.map(c =>
+        '<th style="padding:8px 8px;text-align:right;font-weight:600;border-bottom:1px solid var(--color-border);">'
+        + c.label + '<br><span style="font-size:10px;font-weight:400;color:var(--color-text-tertiary);">' + c.example + '</span></th>'
+      ).join('');
+
+      const tableRows = d.rows.map((row, i) => {
+        const bg = i % 2 === 0 ? '' : 'background:rgba(0,0,0,0.02);';
+        let tr = '<tr style="border-bottom:0.5px solid var(--color-border);' + bg + '">'
+          + '<td style="padding:7px 10px;color:var(--color-text-secondary);">' + row.label + '</td>';
+        d.columns.forEach(c => {
+          const win = row.highlight === c.key;
+          tr += '<td style="padding:7px 8px;text-align:right;' + (win ? 'color:var(--color-green);font-weight:600;' : '') + '">' + (row[c.key] || '—') + '</td>';
+        });
+        return tr + '</tr>';
+      }).join('');
+
+      const compareSection = '<div class="section-label collapsible-header" id="reit-compare-header" style="cursor:pointer;display:flex;justify-content:space-between;">₹1L investment comparison <span class="muted" style="font-size:11px;" id="reit-compare-chev">▶ expand</span></div>'
+        + '<div id="reit-compare-panel" style="display:none;">'
+        + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:6px;"><div style="overflow-x:auto;">'
+        + '<table style="width:100%;min-width:420px;border-collapse:collapse;font-size:12px;"><thead>'
+        + '<tr style="background:var(--color-bg);"><th style="padding:8px 10px;text-align:left;font-weight:500;color:var(--color-text-secondary);border-bottom:1px solid var(--color-border);width:38%;">Factor</th>'
+        + colHeaders + '</tr></thead><tbody>' + tableRows + '</tbody></table></div></div>'
+        + '<div class="muted" style="font-size:11px;margin-bottom:14px;">* Capital appreciation figures assume REIT ~3.5% p.a. price growth, InvIT ~1.5% p.a. Green = better value on that row. FD capital stays ₹1L — no growth. DICGC insurance covers up to ₹5L per bank.</div>'
+        + '</div>';
+
+      // Section 3: Taxation
+      const taxRows = d.taxation.map((t, i) => {
+        const bg = i % 2 === 0 ? '' : 'background:rgba(0,0,0,0.02);';
+        return '<tr style="border-bottom:0.5px solid var(--color-border);' + bg + '">'
+          + '<td style="padding:7px 10px;font-weight:500;">' + t.component + '</td>'
+          + '<td style="padding:7px 8px;">' + t.reit + '</td>'
+          + '<td style="padding:7px 8px;">' + t.invit + '</td>'
+          + '<td style="padding:7px 8px;color:var(--color-text-tertiary);">' + t.note + '</td></tr>';
+      }).join('');
+
+      const taxSection = '<div class="section-label collapsible-header" id="reit-tax-header" style="cursor:pointer;display:flex;justify-content:space-between;">Taxation <span class="muted" style="font-size:11px;" id="reit-tax-chev">▶ expand</span></div>'
+        + '<div id="reit-tax-panel" style="display:none;">'
+        + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:6px;"><div style="overflow-x:auto;">'
+        + '<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead>'
+        + '<tr style="background:var(--color-bg);">'
+        + '<th style="padding:8px 10px;text-align:left;font-weight:500;color:var(--color-text-secondary);border-bottom:1px solid var(--color-border);">Component</th>'
+        + '<th style="padding:8px 8px;text-align:left;font-weight:600;border-bottom:1px solid var(--color-border);">REIT</th>'
+        + '<th style="padding:8px 8px;text-align:left;font-weight:600;border-bottom:1px solid var(--color-border);">InvIT</th>'
+        + '<th style="padding:8px 8px;text-align:left;font-weight:500;color:var(--color-text-secondary);border-bottom:1px solid var(--color-border);">Note</th>'
+        + '</tr></thead><tbody>' + taxRows + '</tbody></table></div></div>'
+        + '<div class="muted" style="font-size:11px;margin-bottom:14px;">Each quarterly distribution is split into components (dividend / interest / return of capital) declared by the trust. Check the distribution notice to know the exact breakdown for tax filing.</div>'
+        + '</div>';
+
+      // Section 4: Instruments
+      let instCards = '';
+      ['REIT','InvIT'].forEach(type => {
+        instCards += '<div class="section-label" style="margin-top:8px;margin-bottom:6px;">' + type + 's</div>';
+        d.instruments.filter(i => i.type === type).forEach(inst => {
+          instCards += '<div class="card" style="margin-bottom:8px;">'
+            + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'
+            + '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;">' + inst.name + '</div>'
+            + '<div class="muted" style="font-size:11px;">' + inst.assets + ' · ' + inst.sponsor + '</div></div>'
+            + '<div style="text-align:right;flex-shrink:0;"><div style="font-size:14px;font-weight:600;color:var(--color-green);">' + inst.trailYield + '</div>'
+            + '<div class="muted" style="font-size:10px;">trailing yield</div></div></div>'
+            + '<div style="margin-top:8px;padding-top:6px;border-top:0.5px solid var(--color-border);font-size:11px;color:var(--color-text-secondary);">⚠ ' + inst.risk + '</div>'
+            + '</div>';
+        });
+      });
+
+      const instSection = '<div class="section-label collapsible-header" id="reit-inst-header" style="cursor:pointer;display:flex;justify-content:space-between;">Listed REITs &amp; InvITs <span class="muted" style="font-size:11px;" id="reit-inst-chev">▶ expand</span></div>'
+        + '<div id="reit-inst-panel" style="display:none;margin-bottom:16px;">' + instCards + '</div>';
+
+      document.getElementById('help-reit-panel').innerHTML = disclaimer + whatSection + compareSection + taxSection + instSection;
+    }
+
+    buildReitPanel();
+
     // ── Tab toggle ────────────────────────────────────────────────────
     const buffettBtn   = document.getElementById("help-tab-buffett");
     const reitBtn      = document.getElementById("help-tab-reit");
