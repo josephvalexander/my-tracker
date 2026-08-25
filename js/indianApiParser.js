@@ -178,6 +178,14 @@ function parseIndianApiResponse(data) {
   const week52High = parseFloat(reusable.yhigh) || parseFloat(data.yearHigh) || null;
   const week52Low  = parseFloat(reusable.ylow)  || parseFloat(data.yearLow)  || null;
 
+  // REIT/InvIT specific fields
+  const distributionYield = parseFloat(reusable.currentDividendYieldCommonStockPrimaryIssueLTM) || null;
+  const gearing           = parseFloat(reusable.totalDebtPerTotalEquityMostRecentQuarter) || null;
+  const interestCoverage  = parseFloat(getMetric(data.keyMetrics, "netInterestCoverageMostRecentFiscalYear")) || null;
+  const cashFlowPerShare  = parseFloat(getMetric(data.keyMetrics, "cashFlowPerShareTrailing12Month")) || null;
+  const distPerShare5yr   = parseFloat(getMetric(data.keyMetrics, "dividendperShare5YearAverage")) || null;
+  const operatingMargin   = parseFloat(getMetric(data.keyMetrics, "operatingMarginTrailing12Month")) || null;
+
   const priceContext = {
     source: "indianapi",
     lastUpdated: new Date().toISOString().slice(0, 10),
@@ -185,6 +193,12 @@ function parseIndianApiResponse(data) {
     week52Low,
     peTTM,
     sectorPE,
+    distributionYield,
+    gearing,
+    interestCoverage,
+    cashFlowPerShare,
+    distPerShare5yr,
+    operatingMargin,
   };
 
   // Current price: prefer reusable.price (live intraday), fall back to currentPrice object

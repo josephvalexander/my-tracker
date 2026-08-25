@@ -154,7 +154,8 @@ const stockDetailScreen = {
       return `<div class="screen-padding"><div class="empty-state">Stock not found.</div></div>`;
     }
 
-    const verdict = deriveVerdict(stock);
+    const isReit = stock.board === "reit";
+    const verdict = isReit ? null : deriveVerdict(stock);
     const roe = roe5yAvg(stock);
     const roce = roce5yAvg(stock);
     const cagr = epsCagr(stock);
@@ -172,13 +173,45 @@ const stockDetailScreen = {
     const latestQPeriod = latestQ?.periods?.slice(-1)?.[0] ?? null;
     const latestShareholding = stock.shareholding?.history?.slice(-1)?.[0] ?? null;
 
+    // REIT quality verdict card
+    function reitQualityCard(s) {
+      const q = reitQualityVerdict(s);
+      const pc = s.priceContext || {};
+      const annualDist = (s.corporateActions?.dividends || [])
+        .filter(d => {
+          if (!d.recordDate) return false;
+          const ago = (Date.now() - new Date(d.recordDate)) / 86400000;
+          return ago >= 0 && ago <= 400;
+        })
+        .reduce((sum, d) => sum + (d.amount || 0), 0);
+      const distCoverage = (pc.cashFlowPerShare && annualDist) ? (pc.cashFlowPerShare / annualDist).toFixed(2) + "x" : "—";
+      const bannerCls = q.isGood ? "verdict-yes" : "verdict-no";
+
+      return `
+        <div class="verdict-banner ${bannerCls}">
+          <div class="verdict-question">REIT / InvIT income quality</div>
+          <div class="verdict-value">${q.verdict}</div>
+          <div class="verdict-flags">${q.flags.map(f => `<span class="verdict-flag">✗ ${f}</span>`).join("")}</div>
+          <div class="verdict-passes">${q.passes.map(p => `<span class="verdict-pass">✓ ${p}</span>`).join("")}</div>
+        </div>
+        <div class="section-label">Income metrics</div>
+        <div class="card">
+          ${metricRow("Distribution yield (LTM)", pc.distributionYield, pc.distributionYield ? pc.distributionYield.toFixed(2)+"%" : "—", pc.distributionYield >= 5 ? "--color-green" : "--color-red")}
+          ${metricRow("Annual distribution per unit", annualDist || null, annualDist ? "₹"+annualDist.toFixed(2) : "—", "--color-text")}
+          ${metricRow("Distribution coverage", null, distCoverage, distCoverage !== "—" && parseFloat(distCoverage) >= 1 ? "--color-green" : "--color-red")}
+          ${metricRow("Gearing (D/E)", pc.gearing, pc.gearing != null ? pc.gearing.toFixed(2)+"x" : "—", pc.gearing > 1.0 ? "--color-red" : "--color-green")}
+          ${metricRow("Interest coverage", pc.interestCoverage, pc.interestCoverage != null ? pc.interestCoverage.toFixed(2)+"x" : "—", pc.interestCoverage < 1.5 ? "--color-red" : "--color-green")}
+          ${metricRow("Operating margin", pc.operatingMargin, pc.operatingMargin != null ? pc.operatingMargin.toFixed(1)+"%" : "—", "--color-text")}
+        </div>`;
+    }
+
     return `
       <div class="screen-padding">
         <div class="detail-header">
           <button class="back-btn" onclick="window.location.hash='#watchlist'">&larr;</button>
           <div class="detail-title">
             <div class="detail-name">${stock.name || stock.ticker}</div>
-            <div class="detail-meta">${stock.ticker} · ${stock.sector || "Sector not set"} · NSE</div>
+            <div class="detail-meta">${stock.ticker} · ${isReit ? (stock.reitType||"REIT")+" · "+(stock.reitAssetClass||"") : (stock.sector || "Sector not set") + " · NSE"}</div>
           </div>
           <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
             <div class="price-main">${formatCurrency(stock.fundamentals?.currentPrice)}</div>
@@ -188,8 +221,9 @@ const stockDetailScreen = {
 
         ${priceContextStrip(stock)}
         ${nseRefreshSection(stock)}
-        ${verdictBanner(verdict)}
+        ${isReit ? reitQualityCard(stock) : verdictBanner(verdict)}
 
+        ${isReit ? "" : `
         <div class="section-label">Business <span class="section-label-note">(AI-drafted or manual — edit on the edit screen)</span></div>
         <div class="card">${stock.qualitative?.business || '<span class="muted">Not set yet — add this from the edit screen.</span>'}</div>
 
@@ -197,11 +231,12 @@ const stockDetailScreen = {
         <div class="card">
           ${stock.qualitative?.moatDescription || '<span class="muted">Not set yet.</span>'}
           <div class="tag-row">${(stock.qualitative?.moatTags || []).map((t) => `<span class="tag">${t.replace(/_/g, " ")}</span>`).join("")}</div>
-        </div>
+        </div>`}
 
         <div class="section-label">Market position <span class="section-label-note">(AI-drafted or manual)</span></div>
         <div class="card">${stock.qualitative?.marketPosition || '<span class="muted">Not set yet.</span>'}</div>
 
+        ${isReit ? "" : `
         <div class="section-label">Profitability & capital efficiency</div>
         <div class="card metric-card">
           ${metricRow("ROE (5y avg)", roe, formatPct(roe), colorForMetric(roe, DEFAULT_RULES.roe))}
@@ -278,6 +313,7 @@ const stockDetailScreen = {
           ${metricRow("Promoter pledging", latestShareholding?.pledged, latestShareholding?.pledged != null ? formatPct(latestShareholding.pledged, 1) : "—  not in indianapi data", latestShareholding?.pledged != null ? colorForMetric(latestShareholding.pledged, DEFAULT_RULES.promoterPledging) : "neutral")}
           ${metricRow("Buffett retained earnings ratio", rer, rer !== null ? `${rer.toFixed(2)}x` : "N/A", colorForMetric(rer, DEFAULT_RULES.retainedEarningsRatio))}
         </div>
+        `}<!-- end equity-only sections -->
 
         <div class="section-label">Corporate actions</div>
         <div class="card">

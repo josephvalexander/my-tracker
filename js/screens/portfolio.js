@@ -50,9 +50,9 @@ const portfolioScreen = {
           </div>
         </div>
         <div class="toggle-row" style="margin-bottom:12px;">
-          <button id="af-all"       class="toggle-btn">All</button>
-          <button id="af-mainboard" class="toggle-btn toggle-btn-active">Mainboard</button>
-          <button id="af-sme"       class="toggle-btn">SME / Microcap</button>
+          <button class="af-chip af-chip-active" data-filter="mainboard">Mainboard</button>
+          <button class="af-chip" data-filter="sme">SME</button>
+          <button class="af-chip" data-filter="reit">REIT / InvIT</button>
         </div>
         <div class="section-label">Buffett checklist — held stocks</div>
         <div id="portfolio-summary" class="metric-grid-3"></div>
@@ -112,21 +112,25 @@ const portfolioScreen = {
       })
       .filter(Boolean);
 
-    let activeFilter = "mainboard";
+    const activeFilters = new Set(["mainboard"]);
 
     function applyFilter(items) {
-      if (activeFilter === "all")       return items;
-      if (activeFilter === "mainboard") return items.filter(h => !h.stock.board || h.stock.board === "mainboard");
-      return items.filter(h => h.stock.board === "sme" || h.stock.board === "microcap");
+      return items.filter(h => {
+        const board = h.stock?.board || "mainboard";
+        if (board === "reit")      return activeFilters.has("reit");
+        if (board === "sme" || board === "microcap") return activeFilters.has("sme");
+        return activeFilters.has("mainboard");
+      });
     }
 
-    // ── Toggle wiring ────────────────────────────────────────────────
-    ["all","mainboard","sme"].forEach(f => {
-      document.getElementById(`af-${f}`).addEventListener("click", () => {
-        activeFilter = f;
-        document.querySelectorAll("#af-all,#af-mainboard,#af-sme").forEach(b => b.classList.remove("toggle-btn-active"));
-        document.getElementById(`af-${f}`).classList.add("toggle-btn-active");
-        buildAnalytics(); // async, but fire-and-forget is fine here
+    // ── Chip toggle wiring ────────────────────────────────────────────
+    document.querySelectorAll(".af-chip").forEach(chip => {
+      chip.addEventListener("click", () => {
+        const f = chip.dataset.filter;
+        if (activeFilters.has(f)) { if (activeFilters.size > 1) activeFilters.delete(f); }
+        else activeFilters.add(f);
+        chip.classList.toggle("af-chip-active", activeFilters.has(f));
+        buildAnalytics();
       });
     });
 
@@ -167,7 +171,9 @@ const portfolioScreen = {
     const yoy  = revenueCount > 0 && totalRevYoY  > 0 ? ((totalRevQ - totalRevYoY)  / totalRevYoY  * 100) : null;
 
     // Load all snapshots for the current filter
-    const snapKey      = activeFilter === "mainboard" ? "mainboard" : activeFilter === "sme" ? "sme" : "all";
+    const snapKey = activeFilters.size > 1 ? "all"
+      : activeFilters.has("mainboard") ? "mainboard"
+      : activeFilters.has("sme") ? "sme" : "all";
     const allSnapshots = (await MetaStore.getSnapshots()) || {};
     const allSnaps     = (allSnapshots[snapKey] || []).sort((a,b) => a.date.localeCompare(b.date));
 
@@ -294,7 +300,7 @@ const portfolioScreen = {
 
     let passCount = 0;
     const triageItems = [];
-    heldStocks.forEach(s => {
+    heldStocks.filter(s => s.board !== "reit").forEach(s => {
       const verdict = deriveVerdict(s);
       if (verdict.verdict === "Yes") passCount++;
       if (verdict.verdict === "No") {

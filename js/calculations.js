@@ -612,15 +612,41 @@ function normalizeSector(raw) {
  * Use capOverride on each stock to set the correct SEBI category when precision matters.
  */
 function capCategory(stock) {
-  if (stock?.capOverride) return stock.capOverride; // explicit manual override wins
+  if (stock?.capOverride) return stock.capOverride;
   const board = stock?.board || "mainboard";
   if (board === "sme")      return "SME";
   if (board === "microcap") return "Microcap";
+  if (board === "reit")     return stock?.reitType === "InvIT" ? "InvIT" : "REIT";
   const mc = stock?.fundamentals?.marketCap;
   if (!mc) return "Unknown";
   if (mc >= 106300) return "Large cap";
   if (mc >= 33500)  return "Mid cap";
   return "Small cap";
+}
+
+/** REIT/InvIT quality verdict — replaces Buffett checklist for income instruments */
+function reitQualityVerdict(stock) {
+  const pc = stock.priceContext || {};
+  const flags = [], passes = [];
+
+  if (pc.gearing != null) {
+    if (pc.gearing > 1.0) flags.push("Gearing " + pc.gearing.toFixed(2) + "x > 1.0");
+    else passes.push("Gearing " + pc.gearing.toFixed(2) + "x ≤ 1.0");
+  }
+  if (pc.interestCoverage != null) {
+    if (pc.interestCoverage < 1.5) flags.push("Interest coverage " + pc.interestCoverage.toFixed(2) + "x < 1.5");
+    else passes.push("Interest coverage " + pc.interestCoverage.toFixed(2) + "x");
+  }
+  if (pc.cashFlowPerShare && pc.distPerShare5yr) {
+    const cov = pc.cashFlowPerShare / pc.distPerShare5yr;
+    if (cov < 1.0) flags.push("Distribution coverage " + cov.toFixed(2) + "x < 1.0");
+    else passes.push("Dist coverage " + cov.toFixed(2) + "x");
+  }
+  if (pc.distributionYield != null) {
+    if (pc.distributionYield < 5) flags.push("Yield " + pc.distributionYield.toFixed(2) + "% < 5%");
+    else passes.push("Yield " + pc.distributionYield.toFixed(2) + "%");
+  }
+  return { verdict: flags.length === 0 ? "Income quality: Good" : flags.length + " concern" + (flags.length===1?"":"s"), passes, flags, isGood: flags.length === 0 };
 }
 
 function isMainboard(stock) {
@@ -665,6 +691,7 @@ const calculationsExports = {
   capCategory,
   isMainboard,
   boardLabel,
+  reitQualityVerdict,
 };
 
 if (typeof module !== "undefined" && module.exports) {

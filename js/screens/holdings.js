@@ -425,9 +425,9 @@ const holdingsScreen = {
           <button id="add-holding-btn" class="btn btn-small">+ Add position</button>
         </div>
         <div class="toggle-row" style="margin-bottom:8px;">
-          <button id="filter-all"       class="toggle-btn">All</button>
-          <button id="filter-mainboard" class="toggle-btn toggle-btn-active">Mainboard</button>
-          <button id="filter-sme"       class="toggle-btn">SME / Microcap</button>
+          <button class="h-chip h-chip-active" data-filter="mainboard">Mainboard</button>
+          <button class="h-chip" data-filter="sme">SME</button>
+          <button class="h-chip" data-filter="reit">REIT / InvIT</button>
         </div>
         <div id="holdings-summary" class="metric-grid-4"></div>
         <div id="holdings-list" class="stock-list"></div>
@@ -447,17 +447,15 @@ const holdingsScreen = {
       `· ${holdings.length} position${holdings.length===1?"":"s"}`;
     document.getElementById("add-holding-btn").addEventListener("click", () => { window.location.hash="#addHolding"; });
 
-    let activeFilter = "mainboard";
+    let activeFilters = new Set(["mainboard"]);
 
     function filterHoldings() {
-      if (activeFilter==="all") return holdings;
-      if (activeFilter==="mainboard") return holdings.filter(h => {
-        const s = allStocks.find(x=>x.ticker===h.ticker);
-        return isMainboard(s||{});
-      });
       return holdings.filter(h => {
         const s = allStocks.find(x=>x.ticker===h.ticker);
-        return s?.board==="sme" || s?.board==="microcap";
+        const board = s?.board || "mainboard";
+        if (board === "reit")      return activeFilters.has("reit");
+        if (board === "sme" || board === "microcap") return activeFilters.has("sme");
+        return activeFilters.has("mainboard");
       });
     }
 
@@ -465,7 +463,7 @@ const holdingsScreen = {
       const filtered = filterHoldings();
       if (filtered.length===0) {
         document.getElementById("holdings-summary").innerHTML="";
-        document.getElementById("holdings-list").innerHTML=`<div class="empty-state">No ${activeFilter==="all"?"":"matching "}holdings yet.</div>`;
+        document.getElementById("holdings-list").innerHTML=`<div class="empty-state">No holdings match the selected filters.</div>`;
         return;
       }
       const summary = buildHoldingsSummary(filtered, priceMap, divMap);
@@ -476,11 +474,12 @@ const holdingsScreen = {
       wireDividendModal(filtered, divMap);
     }
 
-    ["all","mainboard","sme"].forEach(f => {
-      document.getElementById(`filter-${f}`).addEventListener("click", () => {
-        activeFilter=f;
-        document.querySelectorAll(".toggle-btn").forEach(b=>b.classList.remove("toggle-btn-active"));
-        document.getElementById(`filter-${f}`).classList.add("toggle-btn-active");
+    document.querySelectorAll(".h-chip").forEach(chip => {
+      chip.addEventListener("click", () => {
+        const f = chip.dataset.filter;
+        if (activeFilters.has(f)) { if (activeFilters.size > 1) activeFilters.delete(f); }
+        else activeFilters.add(f);
+        chip.classList.toggle("h-chip-active", activeFilters.has(f));
         applyFilter();
       });
     });
@@ -492,5 +491,3 @@ const holdingsScreen = {
     applyFilter();
   },
 };
-
-registerScreen("holdings", holdingsScreen);

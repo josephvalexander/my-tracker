@@ -16,6 +16,59 @@ function metricChip(label, value, formatted, colorClass) {
     </div>`;
 }
 
+function reitRow(stock) {
+  const cmp = stock.fundamentals?.currentPrice ?? null;
+  const pc  = stock.priceContext || {};
+
+  let watchlistPrice = stock.watchlistPrice ?? null;
+  if (!watchlistPrice && cmp) {
+    watchlistPrice = cmp;
+    StockStore.get(stock.ticker).then(fresh => {
+      if (fresh && !fresh.watchlistPrice) { fresh.watchlistPrice = cmp; StockStore.set(stock.ticker, fresh); }
+    });
+  }
+  const sinceAdded = (cmp && watchlistPrice) ? ((cmp - watchlistPrice) / watchlistPrice) * 100 : null;
+  const sinceColor = sinceAdded === null ? "--color-text-tertiary" : sinceAdded >= 0 ? "--color-green" : "--color-red";
+  const sinceText  = sinceAdded !== null ? `${sinceAdded >= 0 ? "+" : ""}${sinceAdded.toFixed(1)}%` : "—";
+  const addedDateText = stock.addedDate
+    ? new Date(stock.addedDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : null;
+  const alertBadge = (stock.alertPrice && cmp && cmp < stock.alertPrice)
+    ? `<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:var(--color-red);color:#fff;vertical-align:middle;margin-left:4px;">⚠ alert</span>` : "";
+
+  const yieldVal = pc.distributionYield;
+  const yieldColor = yieldVal >= 7 ? "--color-green" : yieldVal >= 5 ? "--color-text" : "--color-red";
+
+  // Last quarterly distribution: sum all components for the most recent record date
+  let lastDist = null;
+  const divs = stock.corporateActions?.dividends || [];
+  if (divs.length > 0) {
+    const latestDate = divs.reduce((max, d) => d.recordDate > max ? d.recordDate : max, "");
+    lastDist = divs.filter(d => d.recordDate === latestDate).reduce((s, d) => s + (d.amount || 0), 0);
+  }
+
+  return `
+    <div class="stock-row" data-ticker="${stock.ticker}">
+      <div class="stock-row-grid">
+        <div class="stock-identity">
+          <div class="stock-name">${stock.name || stock.ticker}</div>
+          <div class="stock-meta">${stock.reitType || "REIT"} · ${stock.reitAssetClass || ""}${alertBadge}</div>
+        </div>
+        ${metricChip("Yield", yieldVal, yieldVal ? yieldVal.toFixed(1)+"%" : "—", yieldColor)}
+        ${metricChip("Dist", lastDist, lastDist ? "₹"+lastDist.toFixed(2)+"/qtr" : "—", "--color-text")}
+        ${metricChip("Gear", pc.gearing, pc.gearing != null ? pc.gearing.toFixed(2)+"x" : "—", pc.gearing > 1.0 ? "--color-red" : "--color-green")}
+        <div class="stock-price">
+          <div class="price-main">${formatCurrency(cmp)}</div>
+        </div>
+        <button class="row-menu-btn" data-menu-ticker="${stock.ticker}" aria-label="Row options">&#8942;</button>
+      </div>
+      <div class="since-added-row">
+        <span class="muted">Since watchlisted</span>
+        <span style="color:var(${sinceColor}); font-weight:500;">${sinceText}</span>
+        ${addedDateText ? `<span class="muted">· added ${addedDateText}</span>` : ""}
+      </div>
+    </div>`;
+}
+
 function stockRow(stock) {
   const roe = roe5yAvg(stock);
   const de = debtToEquity(stock);
@@ -100,6 +153,11 @@ const watchlistScreen = {
         <div id="alert-banner" style="display:none; margin-bottom:8px; padding:8px 12px; background:var(--color-red-bg); border:0.5px solid var(--color-red); border-radius:var(--radius-md); font-size:12px; color:var(--color-red);"></div>
         <div id="refresh-progress" class="muted" style="font-size:11px; min-height:16px; margin-bottom:4px;"></div>
         <div id="drive-status-line" class="drive-status-line" style="display:flex; align-items:center; justify-content:space-between;"></div>
+        <div style="display:flex; gap:6px; margin:8px 0 4px; flex-wrap:wrap;" id="wl-filter-chips">
+          <button class="wl-chip wl-chip-active" data-filter="mainboard">Mainboard</button>
+          <button class="wl-chip wl-chip-active" data-filter="sme">SME</button>
+          <button class="wl-chip wl-chip-active" data-filter="reit">REIT / InvIT</button>
+        </div>
         <div id="watchlist-list" class="stock-list">
           <div class="loading">Loading...</div>
         </div>
@@ -224,6 +282,18 @@ const watchlistScreen = {
 
     const listEl = document.getElementById("watchlist-list");
 
+    // ── Multi-select filter chips ─────────────────────────────────────
+    const activeFilters = new Set(["mainboard","sme","reit"]);
+    document.querySelectorAll(".wl-chip").forEach(chip => {
+      chip.addEventListener("click", () => {
+        const f = chip.dataset.filter;
+        if (activeFilters.has(f)) activeFilters.delete(f);
+        else activeFilters.add(f);
+        chip.classList.toggle("wl-chip-active", activeFilters.has(f));
+        renderList(document.getElementById("watchlist-sort")?.value || "default");
+      });
+    });
+
     // ── Alert banner — stocks below alert price ───────────────────────
     function showAlertBanner(alertStocks) {
       if (alertStocks.length === 0) {
@@ -303,18 +373,25 @@ const watchlistScreen = {
       }
       let mainboard = stocks.filter(s => !s.board || s.board === "mainboard");
       let satellite = stocks.filter(s => s.board === "sme" || s.board === "microcap");
+      let reitList  = stocks.filter(s => s.board === "reit");
       mainboard = sortStocks(mainboard, sortMode);
       satellite = sortStocks(satellite, sortMode);
+      reitList  = sortStocks(reitList,  sortMode);
 
       let html = "";
-      if (mainboard.length > 0) {
+      if (activeFilters.has("mainboard") && mainboard.length > 0) {
         html += `<div class="watchlist-group-header">Mainboard <span class="muted">${mainboard.length}</span></div>`;
         html += mainboard.map(stockRow).join("");
       }
-      if (satellite.length > 0) {
+      if (activeFilters.has("sme") && satellite.length > 0) {
         html += `<div class="watchlist-group-header" style="margin-top:12px;">SME / Microcap <span class="muted">${satellite.length}</span></div>`;
         html += satellite.map(stockRow).join("");
       }
+      if (activeFilters.has("reit") && reitList.length > 0) {
+        html += `<div class="watchlist-group-header" style="margin-top:12px;">REIT / InvIT <span class="muted">${reitList.length}</span></div>`;
+        html += reitList.map(reitRow).join("");
+      }
+      if (!html) html = `<div class="empty-state muted">No stocks match the selected filters.</div>`;
       listEl.innerHTML = html;
       wireRowEvents();
     }

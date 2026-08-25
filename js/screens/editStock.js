@@ -28,10 +28,24 @@ const editStockScreen = {
 
         <div class="section-label">Board</div>
         <div class="card">
-          <div style="display:flex; gap:20px;">
+          <div style="display:flex; gap:20px; flex-wrap:wrap;">
             <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="edit-board" value="mainboard" ${(!stock.board || stock.board==="mainboard") ? "checked" : ""}/> Mainboard</label>
             <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="edit-board" value="sme" ${stock.board==="sme" ? "checked" : ""}/> SME</label>
             <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="edit-board" value="microcap" ${stock.board==="microcap" ? "checked" : ""}/> Microcap</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="edit-board" value="reit" ${stock.board==="reit" ? "checked" : ""}/> REIT / InvIT</label>
+          </div>
+          <div id="reit-subtype-row" style="margin-top:10px; display:${stock.board==="reit"?"flex":"none"}; gap:20px;">
+            <label style="font-size:12px; color:var(--color-text-secondary);">Sub-type:</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="edit-reit-type" value="REIT" ${(!stock.reitType || stock.reitType==="REIT") ? "checked" : ""}/> REIT</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="edit-reit-type" value="InvIT" ${stock.reitType==="InvIT" ? "checked" : ""}/> InvIT</label>
+          </div>
+          <div id="reit-asset-row" style="margin-top:10px; display:${stock.board==="reit"?"flex":"none"}; gap:10px; align-items:center;">
+            <label style="font-size:12px; color:var(--color-text-secondary);">Asset class:</label>
+            <select id="reit-asset-class" style="font-size:12px; padding:4px 8px; border:0.5px solid var(--color-border); border-radius:6px; background:var(--color-bg); color:var(--color-text);">
+              ${["Office","Retail","Warehouse","Mixed","Highways","Power Transmission","Gas Pipelines","Renewables","Mixed Infrastructure"].map(a =>
+                `<option value="${a}" ${stock.reitAssetClass===a?"selected":""}>${a}</option>`
+              ).join("")}
+            </select>
           </div>
         </div>
 
@@ -81,9 +95,22 @@ const editStockScreen = {
   async afterRender(params) {
     const ticker = params[0];
 
+    // Show/hide REIT sub-fields when board radio changes
+    document.querySelectorAll('input[name="edit-board"]').forEach(radio => {
+      radio.addEventListener("change", () => {
+        const isReit = document.querySelector('input[name="edit-board"]:checked')?.value === "reit";
+        document.getElementById("reit-subtype-row").style.display = isReit ? "flex" : "none";
+        document.getElementById("reit-asset-row").style.display   = isReit ? "flex" : "none";
+      });
+    });
+
     document.getElementById("save-edit-btn").addEventListener("click", async () => {
       const current = await StockStore.get(ticker);
       current.board = document.querySelector('input[name="edit-board"]:checked')?.value || "mainboard";
+      if (current.board === "reit") {
+        current.reitType       = document.querySelector('input[name="edit-reit-type"]:checked')?.value || "REIT";
+        current.reitAssetClass = document.getElementById("reit-asset-class")?.value || "Office";
+      }
       const allocVal = parseFloat(document.getElementById("target-alloc-input").value);
       current.targetAllocation = !isNaN(allocVal) ? allocVal : null;
       const alertVal = parseFloat(document.getElementById("alert-price-input").value);

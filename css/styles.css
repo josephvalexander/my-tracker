@@ -126,6 +126,10 @@ body {
 .chip-neutral { color: var(--color-text); }
 
 .since-added-row { display: flex; align-items: center; gap: 6px; padding-top: 6px; margin-top: 6px; border-top: 0.5px solid var(--color-border); font-size: 11px; }
+.wl-chip { padding: 3px 10px; border-radius: 12px; font-size: 11px; border: 0.5px solid var(--color-border); background: var(--color-bg); color: var(--color-text-secondary); cursor: pointer; }
+.wl-chip.wl-chip-active { background: var(--color-text); color: var(--color-surface); border-color: var(--color-text); }
+.h-chip, .af-chip { padding: 3px 10px; border-radius: 12px; font-size: 11px; border: 0.5px solid var(--color-border); background: var(--color-bg); color: var(--color-text-secondary); cursor: pointer; }
+.h-chip.h-chip-active, .af-chip.af-chip-active { background: var(--color-text); color: var(--color-surface); border-color: var(--color-text); }
 .stock-price { text-align: right; }
 .price-main { font-size: 14px; font-weight: 600; }
 .price-sub { font-size: 11px; color: var(--color-text-tertiary); }
