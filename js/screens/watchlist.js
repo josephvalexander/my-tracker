@@ -52,15 +52,15 @@ function stockRow(stock) {
     : null;
 
   const alertBadge = (stock.alertPrice && cmp && cmp < stock.alertPrice)
-    ? `<span style="font-size:9px; padding:1px 5px; border-radius:8px; background:var(--color-red); color:#fff; margin-left:4px;">⚠ alert</span>`
+    ? `<span style="font-size:9px; padding:1px 5px; border-radius:8px; background:var(--color-red); color:#fff; vertical-align:middle; margin-left:4px;">⚠ alert</span>`
     : "";
 
   return `
     <div class="stock-row" data-ticker="${stock.ticker}">
       <div class="stock-row-grid">
         <div class="stock-identity">
-          <div class="stock-name">${stock.name || stock.ticker}${alertBadge}</div>
-          <div class="stock-meta">${capCategory(stock)} · ${normalizeSector(stock.sector)}</div>
+          <div class="stock-name">${stock.name || stock.ticker}</div>
+          <div class="stock-meta">${capCategory(stock)} · ${normalizeSector(stock.sector)}${alertBadge}</div>
         </div>
         ${metricChip("ROE", roe, formatPct(roe), roeColor)}
         ${metricChip("D/E", de, formatRatio(de), deColor)}
@@ -225,15 +225,26 @@ const watchlistScreen = {
     const listEl = document.getElementById("watchlist-list");
 
     // ── Alert banner — stocks below alert price ───────────────────────
+    function showAlertBanner(alertStocks) {
+      if (alertStocks.length === 0) {
+        alertBanner.style.display = "none";
+        return;
+      }
+      alertBanner.style.display = "flex";
+      alertBanner.style.alignItems = "flex-start";
+      alertBanner.style.gap = "8px";
+      alertBanner.innerHTML =
+        `<span style="flex:1;">⚠ ${alertStocks.length} stock${alertStocks.length===1?"":"s"} below alert price: ` +
+        alertStocks.map(s => `<strong>${s.name||s.ticker}</strong> ₹${s.fundamentals.currentPrice?.toLocaleString("en-IN")} &lt; ₹${s.alertPrice.toLocaleString("en-IN")}`).join(", ") +
+        `</span><button style="background:none;border:none;cursor:pointer;color:var(--color-red);font-size:14px;line-height:1;flex-shrink:0;padding:0;" title="Dismiss">✕</button>`;
+      alertBanner.querySelector("button").addEventListener("click", () => {
+        alertBanner.style.display = "none";
+      });
+    }
+
     const alertBanner  = document.getElementById("alert-banner");
     const alertStocks  = stocks.filter(s => s.alertPrice && s.fundamentals?.currentPrice && s.fundamentals.currentPrice < s.alertPrice);
-    if (alertStocks.length > 0) {
-      alertBanner.style.display = "block";
-      alertBanner.innerHTML = `⚠ ${alertStocks.length} stock${alertStocks.length===1?"":"s"} below alert price: ` +
-        alertStocks.map(s => `<strong>${s.name||s.ticker}</strong> ₹${s.fundamentals.currentPrice?.toLocaleString("en-IN")} &lt; ₹${s.alertPrice.toLocaleString("en-IN")}`).join(", ");
-    } else {
-      alertBanner.style.display = "none";
-    }
+    showAlertBanner(alertStocks);
 
     // ── Sort function ─────────────────────────────────────────────────
     function sortStocks(arr, mode) {
@@ -407,13 +418,7 @@ const watchlistScreen = {
       renderList((document.getElementById("watchlist-sort") || {value:"default"}).value);
       // Refresh alert banner with new prices
       const freshAlerts = stocks.filter(s => s.alertPrice && s.fundamentals?.currentPrice && s.fundamentals.currentPrice < s.alertPrice);
-      if (freshAlerts.length > 0) {
-        alertBanner.style.display = "block";
-        alertBanner.innerHTML = `⚠ ${freshAlerts.length} stock${freshAlerts.length===1?"":"s"} below alert price: ` +
-          freshAlerts.map(s => `<strong>${s.name||s.ticker}</strong> ₹${s.fundamentals.currentPrice?.toLocaleString("en-IN")} &lt; ₹${s.alertPrice.toLocaleString("en-IN")}`).join(", ");
-      } else {
-        alertBanner.style.display = "none";
-      }
+      showAlertBanner(freshAlerts);
     });
   },
 };
