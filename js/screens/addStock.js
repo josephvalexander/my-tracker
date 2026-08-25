@@ -225,6 +225,18 @@ const addStockScreen = {
             <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="board" value="mainboard" checked /> Mainboard</label>
             <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="board" value="sme" /> SME</label>
             <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="board" value="microcap" /> Microcap</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="board" value="reit" /> REIT / InvIT</label>
+          </div>
+          <div id="add-reit-subtype-row" style="display:none; gap:20px; margin-top:10px;">
+            <label style="font-size:12px; color:var(--color-text-secondary);">Sub-type:</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="add-reit-type" value="REIT" checked /> REIT</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="add-reit-type" value="InvIT" /> InvIT</label>
+          </div>
+          <div id="add-reit-asset-row" style="display:none; gap:10px; align-items:center; margin-top:6px;">
+            <label style="font-size:12px; color:var(--color-text-secondary);">Asset class:</label>
+            <select id="add-reit-asset-class" style="font-size:12px; padding:4px 8px; border:0.5px solid var(--color-border); border-radius:6px; background:var(--color-bg); color:var(--color-text);">
+              ${["Office","Retail","Warehouse","Mixed","Highways","Power Transmission","Gas Pipelines","Renewables","Mixed Infrastructure"].map(a => `<option value="${a}">${a}</option>`).join("")}
+            </select>
           </div>
         </div>
 
@@ -245,11 +257,21 @@ const addStockScreen = {
   },
 
   async afterRender() {
+    // Show/hide REIT sub-fields when board changes
+    document.querySelectorAll('input[name="board"]').forEach(radio => {
+      radio.addEventListener("change", () => {
+        const isReit = document.querySelector('input[name="board"]:checked')?.value === "reit";
+        document.getElementById("add-reit-subtype-row").style.display = isReit ? "flex" : "none";
+        document.getElementById("add-reit-asset-row").style.display   = isReit ? "flex" : "none";
+      });
+    });
     document.getElementById("create-stock-btn").addEventListener("click", async () => {
       const ticker    = document.getElementById("ticker-input").value.trim().toUpperCase();
       const nameInput = document.getElementById("name-input").value.trim();
       const searchName = ticker;
       const board     = document.querySelector('input[name="board"]:checked')?.value || "mainboard";
+      const reitType  = board === "reit" ? (document.querySelector('input[name="add-reit-type"]:checked')?.value || "REIT") : undefined;
+      const reitAssetClass = board === "reit" ? (document.getElementById("add-reit-asset-class")?.value || "Office") : undefined;
       const statusEl = document.getElementById("fetch-status");
 
       if (!ticker) { alert("Ticker is required."); return; }
@@ -272,7 +294,9 @@ const addStockScreen = {
 
       // Create the stock record immediately
       const stock = {
-        ticker, name: nameInput || ticker, sector: null, board, status: "active",
+        ticker, name: nameInput || ticker, sector: null, board,
+        ...(reitType ? { reitType, reitAssetClass } : {}),
+        status: "active",
         addedDate: new Date().toISOString().slice(0, 10),
         archivedDate: null, archiveReason: null,
         qualitative: { business: "", moatDescription: "", moatTags: [], marketPosition: "", marketPositionTag: "" },
