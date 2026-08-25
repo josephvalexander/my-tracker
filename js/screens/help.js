@@ -207,9 +207,9 @@ const helpScreen = {
 
           <!-- What are REITs & InvITs -->
           <div class="section-label collapsible-header" id="reit-what-header" style="cursor:pointer;display:flex;justify-content:space-between;">
-            What are REITs & InvITs? <span class="muted" style="font-size:11px;" id="reit-what-chev">▶ expand</span>
+            What are REITs & InvITs? <span class="muted" style="font-size:11px;" id="reit-what-chev">▼ collapse</span>
           </div>
-          <div id="reit-what-panel" style="display:none;">
+          <div id="reit-what-panel" style="display:block;">
             <div class="card" style="font-size:13px; line-height:1.7; margin-bottom:14px;">
               <p style="margin:0 0 10px;"><strong>REIT (Real Estate Investment Trust)</strong> — a listed entity that owns income-generating commercial real estate: office parks, malls, warehouses. By law it must distribute at least 90% of its income to unit-holders every quarter. You earn rent without owning property directly.</p>
               <p style="margin:0 0 10px;"><strong>InvIT (Infrastructure Investment Trust)</strong> — same structure, but owns infrastructure assets: highways, power transmission lines, gas pipelines. Income comes from tolls, tariffs, and capacity charges rather than rent.</p>
@@ -238,14 +238,14 @@ const helpScreen = {
                 </thead>
                 <tbody>
                   ${REIT_DATA.rows.map((row, i) => {
-                    const isHighlight = row.highlight;
-                    return `<tr style="border-bottom:0.5px solid var(--color-border); ${i%2===0?"":"background:var(--color-bg);"}">
-                      <td style="padding:7px 10px; color:var(--color-text-secondary);">${row.label}</td>
-                      ${REIT_DATA.columns.map(c => {
-                        const isWinner = isHighlight === c.key;
-                        return `<td style="padding:7px 8px; text-align:right; ${isWinner?"color:var(--color-green);font-weight:600;":""}">${row[c.key]||"—"}</td>`;
-                      }).join("")}
-                    </tr>`;
+                    const hl = row.highlight;
+                    let tr = "<tr style=\"border-bottom:0.5px solid var(--color-border);" + (i%2===0?"":"background:rgba(0,0,0,0.02);") + "\">";
+                    tr += "<td style=\"padding:7px 10px;color:var(--color-text-secondary);\">" + row.label + "</td>";
+                    REIT_DATA.columns.forEach(c => {
+                      const win = hl === c.key;
+                      tr += "<td style=\"padding:7px 8px;text-align:right;" + (win?"color:var(--color-green);font-weight:600;":"") + "\">" + (row[c.key]||"—") + "</td>";
+                    });
+                    return tr + "</tr>";
                   }).join("")}
                 </tbody>
               </table>
@@ -271,13 +271,13 @@ const helpScreen = {
                   </tr>
                 </thead>
                 <tbody>
-                  ${REIT_DATA.taxation.map((t,i) => `
-                  <tr style="border-bottom:0.5px solid var(--color-border); ${i%2===0?"":"background:var(--color-bg);"}>
-                    <td style="padding:7px 10px; font-weight:500;">${t.component}</td>
-                    <td style="padding:7px 8px;">${t.reit}</td>
-                    <td style="padding:7px 8px;">${t.invit}</td>
-                    <td style="padding:7px 8px; color:var(--color-text-tertiary);">${t.note}</td>
-                  </tr>`).join("")}
+                  ${REIT_DATA.taxation.map((t,i) =>
+                    "<tr style=\"border-bottom:0.5px solid var(--color-border);" + (i%2===0?"":"background:rgba(0,0,0,0.02);") + "\">" +
+                    "<td style=\"padding:7px 10px;font-weight:500;\">" + t.component + "</td>" +
+                    "<td style=\"padding:7px 8px;\">" + t.reit + "</td>" +
+                    "<td style=\"padding:7px 8px;\">" + t.invit + "</td>" +
+                    "<td style=\"padding:7px 8px;color:var(--color-text-tertiary);\">" + t.note + "</td></tr>"
+                  ).join("")}
                 </tbody>
               </table>
             </div>
