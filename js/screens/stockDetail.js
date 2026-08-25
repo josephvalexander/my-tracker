@@ -190,27 +190,67 @@ const stockDetailScreen = {
         .filter(d => {
           if (!d.recordDate) return false;
           const ago = (Date.now() - new Date(d.recordDate)) / 86400000;
-          return ago >= 0 && ago <= 400;
+          return ago >= 0 && ago <= 366; // strict 12-month window
         })
         .reduce((sum, d) => sum + (d.amount || 0), 0);
-      const distCoverage = (pc.cashFlowPerShare && annualDist) ? (pc.cashFlowPerShare / annualDist).toFixed(2) + "x" : "—";
+      const distCoverageNum = (pc.cashFlowPerShare && annualDist) ? pc.cashFlowPerShare / annualDist : null;
+      const distCoverageStr = distCoverageNum !== null ? distCoverageNum.toFixed(2) + "x" : "—";
       const bannerCls = q.isGood ? "verdict-yes" : "verdict-no";
+
+      // Build check chips — one per criterion, matching equity verdict style
+      const checks = [
+        {
+          label: `Yield ${pc.distributionYield != null ? pc.distributionYield.toFixed(2)+"%" : "?"}`,
+          sublabel: "≥ 5%",
+          pass: pc.distributionYield != null ? pc.distributionYield >= 5 : null,
+        },
+        {
+          label: `Gearing ${pc.gearing != null ? pc.gearing.toFixed(2)+"x" : "?"}`,
+          sublabel: "≤ 1.0x",
+          pass: pc.gearing != null ? pc.gearing <= 1.0 : null,
+        },
+        {
+          label: `Int. cover ${pc.interestCoverage != null ? pc.interestCoverage.toFixed(2)+"x" : "?"}`,
+          sublabel: "≥ 1.5x",
+          pass: pc.interestCoverage != null ? pc.interestCoverage >= 1.5 : null,
+        },
+        {
+          label: `Dist. cover ${distCoverageNum !== null ? distCoverageStr : "?"}`,
+          sublabel: "≥ 1.0x",
+          pass: distCoverageNum !== null ? distCoverageNum >= 1.0 : null,
+        },
+      ];
+
+      const chips = checks.map(c => {
+        if (c.pass === null) return `<span class="chip-small chip-small-unknown" title="${c.sublabel}">? ${c.label}</span>`;
+        return `<span class="chip-small ${c.pass ? "chip-small-pass" : "chip-small-fail"}" title="${c.sublabel}">${c.pass ? "✓" : "✗"} ${c.label}</span>`;
+      }).join("");
+
+      const concernCount = checks.filter(c => c.pass === false).length;
+      const unknownCount = checks.filter(c => c.pass === null).length;
+      const subline = q.isGood
+        ? "All income quality criteria met"
+        : concernCount === 1
+          ? "1 concern — review before investing"
+          : `${concernCount} concerns — review before investing`;
 
       return `
         <div class="verdict-banner ${bannerCls}">
-          <div class="verdict-question">REIT / InvIT income quality</div>
-          <div class="verdict-value">${q.verdict}</div>
-          <div class="verdict-flags">${q.flags.map(f => `<span class="verdict-flag">✗ ${f}</span>`).join("")}</div>
-          <div class="verdict-passes">${q.passes.map(p => `<span class="verdict-pass">✓ ${p}</span>`).join("")}</div>
+          <div class="verdict-question">Income quality · ${s.reitType || "REIT"} / ${s.reitAssetClass || ""}</div>
+          <div class="verdict-answer">
+            <span class="verdict-word">${q.isGood ? "Good" : "Caution"}</span>
+            <span class="verdict-detail">${subline}${unknownCount > 0 ? ` · ${unknownCount} metric${unknownCount > 1 ? "s" : ""} unavailable` : ""}</span>
+          </div>
+          <div class="verdict-chips">${chips}</div>
         </div>
         <div class="section-label">Income metrics</div>
         <div class="card">
-          ${metricRow("Distribution yield (LTM)", pc.distributionYield, pc.distributionYield ? pc.distributionYield.toFixed(2)+"%" : "—", pc.distributionYield >= 5 ? "--color-green" : "--color-red")}
-          ${metricRow("Annual distribution per unit", annualDist || null, annualDist ? "₹"+annualDist.toFixed(2) : "—", "--color-text")}
-          ${metricRow("Distribution coverage", null, distCoverage, distCoverage !== "—" && parseFloat(distCoverage) >= 1 ? "--color-green" : "--color-red")}
-          ${metricRow("Gearing (D/E)", pc.gearing, pc.gearing != null ? pc.gearing.toFixed(2)+"x" : "—", pc.gearing > 1.0 ? "--color-red" : "--color-green")}
-          ${metricRow("Interest coverage", pc.interestCoverage, pc.interestCoverage != null ? pc.interestCoverage.toFixed(2)+"x" : "—", pc.interestCoverage < 1.5 ? "--color-red" : "--color-green")}
-          ${metricRow("Operating margin", pc.operatingMargin, pc.operatingMargin != null ? pc.operatingMargin.toFixed(1)+"%" : "—", "--color-text")}
+          ${metricRow("Distribution yield (LTM)", pc.distributionYield, pc.distributionYield ? pc.distributionYield.toFixed(2)+"%" : "—", pc.distributionYield != null ? (pc.distributionYield >= 5 ? "green" : "red") : null)}
+          ${metricRow("Annual distribution / unit (LTM)", annualDist || null, annualDist ? "₹"+annualDist.toFixed(2) : "—", null)}
+          ${metricRow("Distribution coverage (CFO/dist)", distCoverageNum, distCoverageStr, distCoverageNum !== null ? (distCoverageNum >= 1 ? "green" : "red") : null)}
+          ${metricRow("Gearing (D/E)", pc.gearing, pc.gearing != null ? pc.gearing.toFixed(2)+"x" : "—", pc.gearing != null ? (pc.gearing <= 1.0 ? "green" : "red") : null)}
+          ${metricRow("Interest coverage", pc.interestCoverage, pc.interestCoverage != null ? pc.interestCoverage.toFixed(2)+"x" : "—", pc.interestCoverage != null ? (pc.interestCoverage >= 1.5 ? "green" : "red") : null)}
+          ${metricRow("Operating margin", pc.operatingMargin, pc.operatingMargin != null ? pc.operatingMargin.toFixed(1)+"%" : "—", null)}
         </div>`;
     }
 
@@ -484,7 +524,11 @@ const stockDetailScreen = {
         if (result.quoteInfo) {
           stock.fundamentals = stock.fundamentals || {};
           if (result.quoteInfo.currentPrice) stock.fundamentals.currentPrice = result.quoteInfo.currentPrice;
-          if (result.quoteInfo.marketCap) stock.fundamentals.marketCap = result.quoteInfo.marketCap;
+          // Only use Yahoo's marketCap if we don't already have one from indianapi —
+          // Yahoo returns null or wrong values for InvITs/REITs (e.g. PGINVIT shows 91 Cr).
+          if (result.quoteInfo.marketCap && !stock.fundamentals.marketCap) {
+            stock.fundamentals.marketCap = result.quoteInfo.marketCap;
+          }
           if (result.quoteInfo.name && (!stock.name || stock.name === stock.ticker)) stock.name = result.quoteInfo.name;
           if (result.quoteInfo.sector && !stock.sector) stock.sector = result.quoteInfo.sector;
 

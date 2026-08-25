@@ -277,8 +277,10 @@ function parseIndianApiResponse(data) {
     const balMap = {}; balItems.forEach(i => { balMap[i.displayName.trim()] = parseFloat(i.value) || 0; });
     const sharesOutstanding = balMap["Total Common Shares Outstanding"] || 0;
     if (sharesOutstanding > 0) {
-      // Shares in Cr × price → Cr market cap
-      marketCap = parseFloat((sharesOutstanding * currentPrice / 100).toFixed(2)) || null;
+      // BAL "Total Common Shares Outstanding" is in crore units for InvITs/REITs.
+      // Market cap (₹ Cr) = shares_in_Cr × price_in_₹
+      // (No division needed — shares are already in Cr, not lakh or absolute count)
+      marketCap = parseFloat((sharesOutstanding * currentPrice).toFixed(2)) || null;
     }
   }
 
@@ -431,16 +433,35 @@ function buildShareholdingHistory(rawShareholding) {
 function parseCorporateActions(raw) {
   if (!raw) return { dividends: [], splits: [], bonus: [] };
 
+  // REITs/InvITs split each distribution into sub-components (Interest, Taxable
+  // Dividend, Exempt Dividend, Repayment of Capital, Treasury Income) — each with
+  // the same recordDate but different `interimOrFinal` and `value`.
+  // Merge them by recordDate so downstream code sees one record per distribution date.
+  const rawDivs = raw.dividend ?? [];
+  const divByDate = {};
+  rawDivs.forEach((d) => {
+    const key = d.recordDate || d.dateOfAnnouncement || `no-date-${Math.random()}`;
+    if (!divByDate[key]) {
+      divByDate[key] = {
+        type: "Distribution",
+        amount: 0,
+        percentage: d.percentage,
+        recordDate: d.recordDate,
+        xdDate: d.xdDate,
+        announced: d.dateOfAnnouncement,
+        remarks: d.remarks,          // keep first record's full remarks (has the total)
+      };
+    }
+    divByDate[key].amount += parseFloat(d.value) || 0;
+  });
+  // Round merged amounts to avoid floating-point noise (e.g. 2.9999 → 3.00)
+  const mergedDividends = Object.values(divByDate).map((d) => ({
+    ...d,
+    amount: parseFloat(d.amount.toFixed(4)),
+  }));
+
   return {
-    dividends: (raw.dividend ?? []).map((d) => ({
-      type: d.interimOrFinal || "Dividend",
-      amount: d.value,
-      percentage: d.percentage,
-      recordDate: d.recordDate,
-      xdDate: d.xdDate,
-      announced: d.dateOfAnnouncement,
-      remarks: d.remarks,
-    })),
+    dividends: mergedDividends,
     splits: (raw.splits ?? []).map((s) => ({
       ratio: s.ratio || s.remarks,
       recordDate: s.recordDate,
