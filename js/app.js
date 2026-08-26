@@ -15,6 +15,20 @@
  * "light" or "dark" sets the attribute to override the media query.
  * Exposed globally so settings.js can call it on toggle.
  */
+/**
+ * Persistent UI state — survives screen navigation within a session.
+ * Screens read/write here instead of local variables so filter selections
+ * are remembered when navigating into detail views and back, or switching tabs.
+ * Defaults match each screen's original behaviour.
+ */
+window.uiState = window.uiState || {
+  watchlistFilters: new Set(["mainboard", "sme", "reit"]),
+  watchlistSort:    "default",
+  holdingsFilters:  new Set(["mainboard"]),
+  holdingsXirr:     false,
+  analyticsFilters: new Set(["mainboard"]),
+};
+
 function applyTheme(theme) {
   if (theme === "light") {
     document.documentElement.setAttribute("data-theme", "light");
