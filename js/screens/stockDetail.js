@@ -536,12 +536,14 @@ const stockDetailScreen = {
           // (peTTM, week52High/Low from the fundamentals fetch) are preserved.
           // Previously this block rebuilt priceContext from scratch and silently
           // dropped peTTM every time "Fetch live price" was clicked.
+          // For REIT/InvIT: Yahoo Finance returns incorrect 52w data — keep indianapi values.
+          const isReitBoard = stock.board === "reit";
           stock.priceContext = {
             ...stock.priceContext,
             source: result.quoteInfo.source === "bse" ? "bse_live" : "yahoo_finance",
             lastUpdated: today,
-            ...(result.quoteInfo.week52High && { week52High: result.quoteInfo.week52High }),
-            ...(result.quoteInfo.week52Low  && { week52Low:  result.quoteInfo.week52Low  }),
+            ...(!isReitBoard && result.quoteInfo.week52High && { week52High: result.quoteInfo.week52High }),
+            ...(!isReitBoard && result.quoteInfo.week52Low  && { week52Low:  result.quoteInfo.week52Low  }),
             ...(result.quoteInfo.todayLow   && { todayLow:   result.quoteInfo.todayLow   }),
             ...(result.quoteInfo.todayHigh  && { todayHigh:  result.quoteInfo.todayHigh  }),
             ...(result.quoteInfo.previousClose && { previousClose: result.quoteInfo.previousClose }),

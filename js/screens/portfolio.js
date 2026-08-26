@@ -50,9 +50,9 @@ const portfolioScreen = {
           </div>
         </div>
         <div class="toggle-row" style="margin-bottom:12px;">
-          <button class="af-chip ${window.uiState.analyticsFilters.has('mainboard') ? 'af-chip-active' : ''}" data-filter="mainboard">Mainboard</button>
-          <button class="af-chip ${window.uiState.analyticsFilters.has('sme') ? 'af-chip-active' : ''}" data-filter="sme">SME</button>
-          <button class="af-chip ${window.uiState.analyticsFilters.has('reit') ? 'af-chip-active' : ''}" data-filter="reit">REIT / InvIT</button>
+          <button class="af-chip af-chip-active" data-filter="mainboard">Mainboard</button>
+          <button class="af-chip" data-filter="sme">SME</button>
+          <button class="af-chip" data-filter="reit">REIT / InvIT</button>
         </div>
         <div class="section-label">Buffett checklist — held stocks</div>
         <div id="portfolio-summary" class="metric-grid-3"></div>
@@ -112,7 +112,7 @@ const portfolioScreen = {
       })
       .filter(Boolean);
 
-    const activeFilters = window.uiState.analyticsFilters; // persisted across navigation
+    const activeFilters = new Set(["mainboard"]);
 
     function applyFilter(items) {
       return items.filter(h => {
@@ -172,7 +172,8 @@ const portfolioScreen = {
 
     // Load all snapshots for the current filter
     const snapKey = activeFilters.size === 1 && activeFilters.has("mainboard") ? "mainboard"
-      : activeFilters.size === 1 && activeFilters.has("sme") ? "sme"
+      : activeFilters.size === 1 && activeFilters.has("sme")  ? "sme"
+      : activeFilters.size === 1 && activeFilters.has("reit") ? "reit"
       : "all";
     const allSnapshots = (await MetaStore.getSnapshots()) || {};
     const allSnaps     = (allSnapshots[snapKey] || []).sort((a,b) => a.date.localeCompare(b.date));

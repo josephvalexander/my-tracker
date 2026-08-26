@@ -226,6 +226,7 @@ async function savePortfolioSnapshot() {
       all:       computeValue(null),
       mainboard: computeValue(s => !s.board || s.board === "mainboard"),
       sme:       computeValue(s => s.board === "sme" || s.board === "microcap"),
+      reit:      computeValue(s => s.board === "reit"),
     };
 
     // Fetch index values for benchmark comparison
@@ -240,8 +241,8 @@ async function savePortfolioSnapshot() {
       nifty  = nr?.current ?? null;
     } catch { /* non-critical */ }
 
-    const existing = (await MetaStore.getSnapshots()) || { all: [], mainboard: [], sme: [], index: [] };
-    for (const filter of ["all", "mainboard", "sme"]) {
+    const existing = (await MetaStore.getSnapshots()) || { all: [], mainboard: [], sme: [], reit: [], index: [] };
+    for (const filter of ["all", "mainboard", "sme", "reit"]) {
       const arr = (existing[filter] || []).filter(s => s.date !== today);
       if (values[filter] > 0) arr.push({ date: today, value: Math.round(values[filter]) });
       existing[filter] = arr.sort((a, b) => a.date.localeCompare(b.date)).slice(-400);

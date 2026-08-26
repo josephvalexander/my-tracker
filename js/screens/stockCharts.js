@@ -26,6 +26,7 @@ const stockChartsScreen = {
       return `<div class="screen-padding"><div class="empty-state">Stock not found.</div></div>`;
     }
     const hasAnnual = (stock.fundamentals?.annual?.years?.length ?? 0) > 0;
+    const isReit = stock.board === "reit";
 
     return `
       <div class="screen-padding">
@@ -40,15 +41,15 @@ const stockChartsScreen = {
           <button id="toggle-quarterly" class="toggle-btn">Quarterly</button>
         </div>
 
-        <div class="chart-section-label">Revenue & net profit <span class="muted">₹ Cr</span></div>
+        <div class="chart-section-label">${isReit ? "Revenue & distributable income" : "Revenue & net profit"} <span class="muted">₹ Cr</span></div>
         <div class="card chart-card"><canvas id="chart-revenue-pat"></canvas></div>
 
-        <div id="eps-section">
+        <div id="eps-section" ${isReit ? 'style="display:none;"' : ""}>
           <div class="chart-section-label">EPS <span class="muted">₹ per share</span></div>
           <div class="card chart-card"><canvas id="chart-eps"></canvas></div>
         </div>
 
-        <div id="roede-section">
+        <div id="roede-section" ${isReit ? 'style="display:none;"' : ""}>
           <div class="chart-section-label">ROE vs debt/equity</div>
           <div class="card chart-card"><canvas id="chart-roe-de"></canvas></div>
         </div>
@@ -141,8 +142,8 @@ const stockChartsScreen = {
         },
       });
 
-      // ── Annual-only charts ────────────────────────────────────────
-      if (usingQ) {
+      // ── Annual-only charts — skip for REIT/InvIT (not meaningful) ────────────────
+      if (usingQ || stock.board === "reit") {
         if (epsSection)   epsSection.style.display   = "none";
         if (roedeSection) roedeSection.style.display = "none";
       } else {

@@ -289,7 +289,44 @@ const helpScreen = {
       const instSection = '<div class="section-label collapsible-header" id="reit-inst-header" style="cursor:pointer;display:flex;justify-content:space-between;">Listed REITs &amp; InvITs <span class="muted" style="font-size:11px;" id="reit-inst-chev">▶ expand</span></div>'
         + '<div id="reit-inst-panel" style="display:none;margin-bottom:16px;">' + instCards + '</div>';
 
-      document.getElementById('help-reit-panel').innerHTML = disclaimer + whatSection + compareSection + taxSection + instSection;
+
+      // Section 1b: Income quality checklist — this app's REIT evaluation model
+      const checklistSection = '<div class="section-label collapsible-header" id="reit-checklist-header" style="cursor:pointer;display:flex;justify-content:space-between;">This app\'s income quality checklist <span class="muted" style="font-size:11px;" id="reit-checklist-chev">▼ collapse</span></div>'
+        + '<div id="reit-checklist-panel" style="display:block;margin-bottom:4px;">'
+        + '<div class="card" style="font-size:13px;line-height:1.7;margin-bottom:14px;">'
+        + '<p style="margin:0 0 10px;color:var(--color-text-secondary);font-size:12px;">Unlike Buffett\'s equity model — which rewards growth, earnings power, and management quality — REITs and InvITs are evaluated purely on income quality and balance sheet safety. This app runs four checks every time fundamentals are fetched.</p>'
+        + '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px;">'
+        + '<thead><tr style="border-bottom:1px solid var(--color-border);">'
+        + '<th style="padding:8px 10px;text-align:left;font-weight:600;">Criterion</th>'
+        + '<th style="padding:8px 8px;text-align:center;font-weight:600;">Threshold</th>'
+        + '<th style="padding:8px 8px;text-align:left;font-weight:600;">Why it matters</th>'
+        + '</tr></thead><tbody>'
+        + '<tr style="border-bottom:0.5px solid var(--color-border);">'
+        + '<td style="padding:8px 10px;font-weight:600;">Distribution yield</td>'
+        + '<td style="padding:8px 8px;text-align:center;color:var(--color-green);font-weight:600;">≥ 5%</td>'
+        + '<td style="padding:8px 8px;color:var(--color-text-secondary);">Sets a minimum income hurdle. Below 5% you\'re accepting equity-level risk for FD-level returns. Computed from last 12 months of declared distributions ÷ current unit price.</td>'
+        + '</tr>'
+        + '<tr style="background:rgba(0,0,0,0.02);border-bottom:0.5px solid var(--color-border);">'
+        + '<td style="padding:8px 10px;font-weight:600;">Gearing (D/E)</td>'
+        + '<td style="padding:8px 8px;text-align:center;color:var(--color-green);font-weight:600;">≤ 1.0x</td>'
+        + '<td style="padding:8px 8px;color:var(--color-text-secondary);">SEBI caps REIT/InvIT borrowings at 49% of asset value (~1.0x D/E). A gearing above 1.0x signals the trust is near its regulatory ceiling — leaves no headroom for acquisitions or stress.</td>'
+        + '</tr>'
+        + '<tr style="border-bottom:0.5px solid var(--color-border);">'
+        + '<td style="padding:8px 10px;font-weight:600;">Interest coverage</td>'
+        + '<td style="padding:8px 8px;text-align:center;color:var(--color-green);font-weight:600;">≥ 1.5x</td>'
+        + '<td style="padding:8px 8px;color:var(--color-text-secondary);">Operating income ÷ interest expense. Tells you whether the trust earns enough from its assets to comfortably service debt before paying you. Below 1.5x, distributions become vulnerable in a downturn.</td>'
+        + '</tr>'
+        + '<tr style="background:rgba(0,0,0,0.02);">'
+        + '<td style="padding:8px 10px;font-weight:600;">Distribution coverage</td>'
+        + '<td style="padding:8px 8px;text-align:center;color:var(--color-green);font-weight:600;">≥ 1.0x</td>'
+        + '<td style="padding:8px 8px;color:var(--color-text-secondary);">Cash flow from operations ÷ annual distributions paid. A coverage below 1.0x means the trust is paying out more cash than it generates — either drawing down reserves or raising debt to fund distributions. That\'s unsustainable.</td>'
+        + '</tr>'
+        + '</tbody></table>'
+        + '<p style="margin:0 0 8px;font-size:12px;color:var(--color-text-secondary);"><strong>Verdict: Good</strong> — all four pass. <strong>Caution</strong> — one or more fail. The verdict card on the stock detail page shows each criterion with its actual value and a ✓/✗ chip.</p>'
+        + '<p style="margin:0;font-size:11px;color:var(--color-text-tertiary);">Note: distribution coverage shows <strong>?</strong> if annual operating cash flow data is not available from the API (common for newly listed trusts). It does not count against the verdict.</p>'
+        + '</div></div>';
+
+      document.getElementById('help-reit-panel').innerHTML = disclaimer + whatSection + checklistSection + compareSection + taxSection + instSection;
     }
 
     buildReitPanel();
@@ -310,10 +347,11 @@ const helpScreen = {
     });
 
     // ── REIT collapsibles ─────────────────────────────────────────────
-    [["reit-what-header",    "reit-what-chev",    "reit-what-panel"],
-     ["reit-compare-header", "reit-compare-chev", "reit-compare-panel"],
-     ["reit-tax-header",     "reit-tax-chev",     "reit-tax-panel"],
-     ["reit-inst-header",    "reit-inst-chev",    "reit-inst-panel"],
+    [["reit-what-header",      "reit-what-chev",      "reit-what-panel"],
+     ["reit-checklist-header",  "reit-checklist-chev",  "reit-checklist-panel"],
+     ["reit-compare-header",    "reit-compare-chev",    "reit-compare-panel"],
+     ["reit-tax-header",        "reit-tax-chev",        "reit-tax-panel"],
+     ["reit-inst-header",       "reit-inst-chev",       "reit-inst-panel"],
     ].forEach(([hId, cId, pId]) => {
       document.getElementById(hId).addEventListener("click", () => {
         const panel = document.getElementById(pId);
