@@ -245,10 +245,10 @@ const stockChartsScreen = {
           data: {
             labels: shHistory.map((h) => h.quarter),
             datasets: [
-              { label: "Promoter", data: shHistory.map((h) => h.promoter), backgroundColor: C.promoter + "CC", borderColor: C.promoter, borderWidth: 1, borderRadius: 2 },
-              { label: "FII",      data: shHistory.map((h) => h.fii),      backgroundColor: C.fii      + "CC", borderColor: C.fii,      borderWidth: 1, borderRadius: 2 },
-              { label: "DII/MF",  data: shHistory.map((h) => h.dii),      backgroundColor: C.dii      + "CC", borderColor: C.dii,      borderWidth: 1, borderRadius: 2 },
-              { label: "Public",  data: shHistory.map((h) => h.public),   backgroundColor: C.public   + "CC", borderColor: C.public,   borderWidth: 1, borderRadius: 2 },
+              { label: "Promoter", data: shHistory.map((h) => h.promoter ?? 0), backgroundColor: C.promoter + "CC", borderColor: C.promoter, borderWidth: 1, borderRadius: 2 },
+              { label: "FII",      data: shHistory.map((h) => h.fii      ?? 0), backgroundColor: C.fii      + "CC", borderColor: C.fii,      borderWidth: 1, borderRadius: 2 },
+              { label: "DII/MF",  data: shHistory.map((h) => h.dii      ?? 0), backgroundColor: C.dii      + "CC", borderColor: C.dii,      borderWidth: 1, borderRadius: 2 },
+              { label: "Public",  data: shHistory.map((h) => h.public   ?? 0), backgroundColor: C.public   + "CC", borderColor: C.public,   borderWidth: 1, borderRadius: 2 },
             ],
           },
           options: {

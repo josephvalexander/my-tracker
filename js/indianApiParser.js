@@ -400,17 +400,21 @@ function buildShareholdingHistory(rawShareholding) {
       if (!period) continue;
       if (i === 0) entry.quarter = period.holdingDate;
 
-      const pct = parseFloat(period.percentage) || null;
+      // Use 0 (not null) when a record exists but percentage is null/missing —
+      // null causes Chart.js to skip the bar entirely, misaligning grouped bars.
+      const pct = period.percentage != null ? (parseFloat(period.percentage) || 0) : null;
       const name = (cat.categoryName || cat.displayName || "").toLowerCase();
 
-      if (name.includes("promoter")) {
+      if (name.includes("promoter") || name.includes("sponsor")) {
+        // "Sponsor & Sponsor Group" is the REIT/InvIT equivalent of promoter
         entry.promoter = pct;
         entry.quarter = period.holdingDate;
       } else if (name.includes("fii") || name.includes("foreign")) {
         entry.fii = pct;
+        if (!entry.quarter) entry.quarter = period.holdingDate;
       } else if (name === "mf" || name.includes("mutual")) {
         entry.dii = pct; // MF as proxy for DII
-      } else if (name.includes("other") || name.includes("public")) {
+      } else if (name.includes("public")) {
         entry.public = pct;
       }
     }
