@@ -62,6 +62,7 @@ function reitRow(stock) {
         <button class="row-menu-btn" data-menu-ticker="${stock.ticker}" aria-label="Row options">&#8942;</button>
       </div>
       <div class="since-added-row">
+        <button class="fav-btn${stock.isFavorite ? " fav-btn-active" : ""}" data-fav-ticker="${stock.ticker}" title="${stock.isFavorite ? "Remove from favourites" : "Add to favourites"}">${stock.isFavorite ? "★" : "☆"}</button>
         <span class="muted">Since watchlisted</span>
         <span style="color:var(${sinceColor}); font-weight:500;">${sinceText}</span>
         ${addedDateText ? `<span class="muted">· added ${addedDateText}</span>` : ""}
@@ -120,6 +121,7 @@ function stockRow(stock) {
         <button class="row-menu-btn" data-menu-ticker="${stock.ticker}" aria-label="Row options">&#8942;</button>
       </div>
       <div class="since-added-row">
+        <button class="fav-btn${stock.isFavorite ? " fav-btn-active" : ""}" data-fav-ticker="${stock.ticker}" title="${stock.isFavorite ? "Remove from favourites" : "Add to favourites"}">${stock.isFavorite ? "★" : "☆"}</button>
         <span class="muted">Since watchlisted</span>
         <span style="color:var(${sinceColor}); font-weight:500;">${sinceText}</span>
         ${addedDateText ? `<span class="muted">· added ${addedDateText}</span>` : ""}
@@ -153,6 +155,7 @@ const watchlistScreen = {
           ${window.uiState.watchlistFilters.has("mainboard") ? '<button class="wl-chip wl-chip-active" data-filter="mainboard">Mainboard</button>' : '<button class="wl-chip" data-filter="mainboard">Mainboard</button>'}
           ${window.uiState.watchlistFilters.has("sme") ? '<button class="wl-chip wl-chip-active" data-filter="sme">SME</button>' : '<button class="wl-chip" data-filter="sme">SME</button>'}
           ${window.uiState.watchlistFilters.has("reit") ? '<button class="wl-chip wl-chip-active" data-filter="reit">REIT / InvIT</button>' : '<button class="wl-chip" data-filter="reit">REIT / InvIT</button>'}
+          ${window.uiState.watchlistFilters.has("favorites") ? '<button class="wl-chip wl-chip-active" data-filter="favorites">★ Favourites</button>' : '<button class="wl-chip" data-filter="favorites">★ Favourites</button>'}
         </div>
         <div id="watchlist-list" class="stock-list">
           <div class="loading">Loading...</div>
@@ -367,12 +370,27 @@ const watchlistScreen = {
         listEl.innerHTML = `<div class="empty-state">No stocks yet. Tap "+ Add" to start tracking one.</div>`;
         return;
       }
+      const favOnly = activeFilters.has("favorites");
+
       let mainboard = stocks.filter(s => !s.board || s.board === "mainboard");
       let satellite = stocks.filter(s => s.board === "sme" || s.board === "microcap");
       let reitList  = stocks.filter(s => s.board === "reit");
-      mainboard = sortStocks(mainboard, sortMode);
-      satellite = sortStocks(satellite, sortMode);
-      reitList  = sortStocks(reitList,  sortMode);
+
+      // When favourites chip is active, restrict each group to starred stocks only
+      if (favOnly) {
+        mainboard = mainboard.filter(s => s.isFavorite);
+        satellite = satellite.filter(s => s.isFavorite);
+        reitList  = reitList.filter(s => s.isFavorite);
+      }
+
+      // Sort: favourites always bubble to top within their group, then apply sortMode
+      function sortWithFavFirst(arr) {
+        const sorted = sortStocks(arr, sortMode);
+        return [...sorted.filter(s => s.isFavorite), ...sorted.filter(s => !s.isFavorite)];
+      }
+      mainboard = sortWithFavFirst(mainboard);
+      satellite = sortWithFavFirst(satellite);
+      reitList  = sortWithFavFirst(reitList);
 
       let html = "";
       if (activeFilters.has("mainboard") && mainboard.length > 0) {
@@ -387,7 +405,8 @@ const watchlistScreen = {
         html += `<div class="watchlist-group-header" style="margin-top:12px;">REIT / InvIT <span class="muted">${reitList.length}</span></div>`;
         html += reitList.map(reitRow).join("");
       }
-      if (!html) html = `<div class="empty-state muted">No stocks match the selected filters.</div>`;
+      if (favOnly && !html) html = `<div class="empty-state muted">No favourites yet — tap ☆ on any stock to star it.</div>`;
+      else if (!html) html = `<div class="empty-state muted">No stocks match the selected filters.</div>`;
       listEl.innerHTML = html;
       wireRowEvents();
     }
@@ -395,7 +414,7 @@ const watchlistScreen = {
     function wireRowEvents() {
       listEl.querySelectorAll(".stock-row").forEach(row => {
         row.addEventListener("click", (e) => {
-          if (e.target.closest(".row-menu-btn")) return;
+          if (e.target.closest(".row-menu-btn") || e.target.closest(".fav-btn")) return;
           window.location.hash = `#stock/${encodeURIComponent(row.dataset.ticker)}`;
         });
       });
@@ -407,6 +426,22 @@ const watchlistScreen = {
             await deleteStockPermanently(ticker);
             navigate("#watchlist");
           }
+        });
+      });
+      // ── Favourite toggle ─────────────────────────────────────────────────
+      listEl.querySelectorAll(".fav-btn").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const ticker = btn.dataset.favTicker;
+          const fresh = await StockStore.get(ticker);
+          if (!fresh) return;
+          fresh.isFavorite = !fresh.isFavorite;
+          await StockStore.set(ticker, fresh);
+          // Update in-memory stocks array so re-render is instant
+          const idx = stocks.findIndex(s => s.ticker === ticker);
+          if (idx !== -1) stocks[idx].isFavorite = fresh.isFavorite;
+          // Re-render list — keeps scroll position intact
+          renderList(document.getElementById("watchlist-sort")?.value || window.uiState.watchlistSort);
         });
       });
     }

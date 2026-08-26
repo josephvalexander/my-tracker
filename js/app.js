@@ -27,6 +27,8 @@ window.uiState = window.uiState || {
   holdingsFilters:  new Set(["mainboard"]),
   holdingsXirr:     false,
   analyticsFilters: new Set(["mainboard"]),
+  analyticsPeriod:  null,   // null = auto-select on first load
+  analyticsBenchmark: "none",
 };
 
 function applyTheme(theme) {
