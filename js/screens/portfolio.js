@@ -130,6 +130,7 @@ const portfolioScreen = {
         if (activeFilters.has(f)) { if (activeFilters.size > 1) activeFilters.delete(f); }
         else activeFilters.add(f);
         chip.classList.toggle("af-chip-active", activeFilters.has(f));
+        uiStateSave();
         buildAnalytics();
       });
     });
@@ -468,7 +469,7 @@ const portfolioScreen = {
       document.querySelectorAll(".snap-period-btn").forEach(btn => {
         btn.addEventListener("click", ()=>{
           activePeriod=btn.dataset.period;
-          window.uiState.analyticsPeriod = activePeriod;
+          window.uiState.analyticsPeriod = activePeriod; uiStateSave();
           document.querySelectorAll(".snap-period-btn").forEach(b=>{b.style.background="";b.style.color="";});
           btn.style.background="var(--color-text)"; btn.style.color="var(--color-surface)";
           chartInstances=chartInstances.filter(c=>c!==pvChart); drawChart(activePeriod);
@@ -478,7 +479,7 @@ const portfolioScreen = {
       document.querySelectorAll(".bm-btn").forEach(btn => {
         btn.addEventListener("click", ()=>{
           benchmark=btn.dataset.bm;
-          window.uiState.analyticsBenchmark = benchmark;
+          window.uiState.analyticsBenchmark = benchmark; uiStateSave();
           document.querySelectorAll(".bm-btn").forEach(b=>{b.style.background="";b.style.color="";});
           btn.style.background="var(--color-text)"; btn.style.color="var(--color-surface)";
           chartInstances=chartInstances.filter(c=>c!==pvChart); drawChart(activePeriod);

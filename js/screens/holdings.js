@@ -158,8 +158,8 @@ function renderSummaryCard(summary) {
         tA.style.background = "none"; tA.style.color = "var(--color-text-secondary)";
       }
     }
-    tA.addEventListener("click", e => { e.stopPropagation(); window.uiState.holdingsXirr = false; setMode("abs"); });
-    tX.addEventListener("click", e => { e.stopPropagation(); window.uiState.holdingsXirr = true;  setMode("xirr"); });
+    tA.addEventListener("click", e => { e.stopPropagation(); window.uiState.holdingsXirr = false; uiStateSave(); setMode("abs"); });
+    tX.addEventListener("click", e => { e.stopPropagation(); window.uiState.holdingsXirr = true; uiStateSave(); setMode("xirr"); });
     // Restore saved mode immediately after wiring
     setMode(window.uiState.holdingsXirr ? "xirr" : "abs");
   }
@@ -483,6 +483,7 @@ const holdingsScreen = {
         if (activeFilters.has(f)) { if (activeFilters.size > 1) activeFilters.delete(f); }
         else activeFilters.add(f);
         chip.classList.toggle("h-chip-active", activeFilters.has(f));
+        uiStateSave();
         applyFilter();
       });
     });

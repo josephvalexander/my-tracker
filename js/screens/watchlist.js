@@ -239,7 +239,7 @@ const watchlistScreen = {
     function wireSortDropdown() {
       const sel = document.getElementById("watchlist-sort");
       if (!sel) return;
-      sel.addEventListener("change", () => { window.uiState.watchlistSort = sel.value; renderList(sel.value); });
+      sel.addEventListener("change", () => { window.uiState.watchlistSort = sel.value; uiStateSave(); renderList(sel.value); });
     }
 
     const driveLine = document.getElementById("drive-status-line");
@@ -289,7 +289,8 @@ const watchlistScreen = {
         if (activeFilters.has(f)) activeFilters.delete(f);
         else activeFilters.add(f);
         chip.classList.toggle("wl-chip-active", activeFilters.has(f));
-        renderList(document.getElementById("watchlist-sort")?.value || "default");
+        uiStateSave();
+        renderList(document.getElementById("watchlist-sort")?.value || window.uiState.watchlistSort);
       });
     });
 

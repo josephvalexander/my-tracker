@@ -21,13 +21,50 @@
  * are remembered when navigating into detail views and back, or switching tabs.
  * Defaults match each screen's original behaviour.
  */
-window.uiState = window.uiState || {
-  watchlistFilters: new Set(["mainboard", "sme", "reit"]),
-  watchlistSort:    "default",
-  holdingsFilters:  new Set(["mainboard"]),
-  holdingsXirr:     false,
-  analyticsFilters: new Set(["mainboard"]),
-  analyticsPeriod:  null,   // null = auto-select on first load
+// ── UI state persistence ────────────────────────────────────────────────────
+// Saved to localStorage as a plain JSON object; Sets are serialised as arrays.
+// uiStateSave() is called by every screen that mutates uiState.
+const UI_STATE_KEY = "buffett_compos_ui_state";
+
+function uiStateLoad() {
+  try {
+    const raw = localStorage.getItem(UI_STATE_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw);
+    return {
+      watchlistFilters:  new Set(saved.watchlistFilters  ?? ["mainboard", "sme", "reit"]),
+      watchlistSort:     saved.watchlistSort     ?? "default",
+      holdingsFilters:   new Set(saved.holdingsFilters   ?? ["mainboard"]),
+      holdingsXirr:      saved.holdingsXirr      ?? false,
+      analyticsFilters:  new Set(saved.analyticsFilters  ?? ["mainboard"]),
+      analyticsPeriod:   saved.analyticsPeriod   ?? null,
+      analyticsBenchmark: saved.analyticsBenchmark ?? "none",
+    };
+  } catch { return null; }
+}
+
+function uiStateSave() {
+  try {
+    const s = window.uiState;
+    localStorage.setItem(UI_STATE_KEY, JSON.stringify({
+      watchlistFilters:  [...s.watchlistFilters],
+      watchlistSort:     s.watchlistSort,
+      holdingsFilters:   [...s.holdingsFilters],
+      holdingsXirr:      s.holdingsXirr,
+      analyticsFilters:  [...s.analyticsFilters],
+      analyticsPeriod:   s.analyticsPeriod,
+      analyticsBenchmark: s.analyticsBenchmark,
+    }));
+  } catch { /* storage full or private mode — silently ignore */ }
+}
+
+window.uiState = uiStateLoad() || {
+  watchlistFilters:  new Set(["mainboard", "sme", "reit"]),
+  watchlistSort:     "default",
+  holdingsFilters:   new Set(["mainboard"]),
+  holdingsXirr:      false,
+  analyticsFilters:  new Set(["mainboard"]),
+  analyticsPeriod:   null,
   analyticsBenchmark: "none",
 };
 
