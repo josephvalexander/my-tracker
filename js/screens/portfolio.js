@@ -50,9 +50,9 @@ const portfolioScreen = {
           </div>
         </div>
         <div class="toggle-row" style="margin-bottom:12px;">
-          <button class="af-chip af-chip-active" data-filter="mainboard">Mainboard</button>
-          <button class="af-chip" data-filter="sme">SME</button>
-          <button class="af-chip" data-filter="reit">REIT / InvIT</button>
+          <button class="af-chip ${window.uiState.analyticsFilters.has('mainboard') ? 'af-chip-active' : ''}" data-filter="mainboard">Mainboard</button>
+          <button class="af-chip ${window.uiState.analyticsFilters.has('sme') ? 'af-chip-active' : ''}" data-filter="sme">SME</button>
+          <button class="af-chip ${window.uiState.analyticsFilters.has('reit') ? 'af-chip-active' : ''}" data-filter="reit">REIT / InvIT</button>
         </div>
         <div class="section-label">Buffett checklist — held stocks</div>
         <div id="portfolio-summary" class="metric-grid-3"></div>
@@ -112,7 +112,7 @@ const portfolioScreen = {
       })
       .filter(Boolean);
 
-    const activeFilters = new Set(["mainboard"]);
+    const activeFilters = window.uiState.analyticsFilters; // persisted across navigation
 
     function applyFilter(items) {
       return items.filter(h => {
@@ -360,8 +360,12 @@ const portfolioScreen = {
       ].filter(p => p.days===9999 || totalDays>=p.days*0.7);
       if (!PERIODS.length) PERIODS.push({key:"All",label:"All",days:9999});
 
-      let activePeriod = (PERIODS.find(p=>p.days<=30)||PERIODS[0]).key;
-      let benchmark    = "none"; // "none" | "sensex" | "nifty"
+      // Restore saved period if it exists in the available PERIODS list, else auto-select
+      const savedPeriod = window.uiState.analyticsPeriod;
+      let activePeriod = (savedPeriod && PERIODS.find(p => p.key === savedPeriod))
+        ? savedPeriod
+        : (PERIODS.find(p => p.days <= 30) || PERIODS[0]).key;
+      let benchmark = window.uiState.analyticsBenchmark ?? "none"; // "none" | "sensex" | "nifty"
 
       const toggleDiv = document.getElementById("snap-period-toggle");
       if (toggleDiv) {
@@ -369,9 +373,9 @@ const portfolioScreen = {
           `<button class="snap-period-btn btn btn-small" data-period="${p.key}" style="font-size:10px;padding:1px 7px;${p.key===activePeriod?"background:var(--color-text);color:var(--color-surface);":" "}">${p.label}</button>`
         ).join("") +
         `<span style="margin-left:8px;font-size:10px;color:var(--color-text-tertiary);">vs</span>
-         <button class="bm-btn btn btn-small" data-bm="none"   style="font-size:10px;padding:1px 7px;background:var(--color-text);color:var(--color-surface);">None</button>
-         <button class="bm-btn btn btn-small" data-bm="sensex" style="font-size:10px;padding:1px 7px;">SENSEX</button>
-         <button class="bm-btn btn btn-small" data-bm="nifty"  style="font-size:10px;padding:1px 7px;">NIFTY</button>`;
+         <button class="bm-btn btn btn-small" data-bm="none"   style="font-size:10px;padding:1px 7px;${benchmark==='none'   ?'background:var(--color-text);color:var(--color-surface);':''}" >None</button>
+         <button class="bm-btn btn btn-small" data-bm="sensex" style="font-size:10px;padding:1px 7px;${benchmark==='sensex'?'background:var(--color-text);color:var(--color-surface);':''}" >SENSEX</button>
+         <button class="bm-btn btn btn-small" data-bm="nifty"  style="font-size:10px;padding:1px 7px;${benchmark==='nifty'  ?'background:var(--color-text);color:var(--color-surface);':''}" >NIFTY</button>`;
       }
 
       const idxSnaps = (allSnapshots.index || []);
@@ -464,6 +468,7 @@ const portfolioScreen = {
       document.querySelectorAll(".snap-period-btn").forEach(btn => {
         btn.addEventListener("click", ()=>{
           activePeriod=btn.dataset.period;
+          window.uiState.analyticsPeriod = activePeriod;
           document.querySelectorAll(".snap-period-btn").forEach(b=>{b.style.background="";b.style.color="";});
           btn.style.background="var(--color-text)"; btn.style.color="var(--color-surface)";
           chartInstances=chartInstances.filter(c=>c!==pvChart); drawChart(activePeriod);
@@ -473,6 +478,7 @@ const portfolioScreen = {
       document.querySelectorAll(".bm-btn").forEach(btn => {
         btn.addEventListener("click", ()=>{
           benchmark=btn.dataset.bm;
+          window.uiState.analyticsBenchmark = benchmark;
           document.querySelectorAll(".bm-btn").forEach(b=>{b.style.background="";b.style.color="";});
           btn.style.background="var(--color-text)"; btn.style.color="var(--color-surface)";
           chartInstances=chartInstances.filter(c=>c!==pvChart); drawChart(activePeriod);
