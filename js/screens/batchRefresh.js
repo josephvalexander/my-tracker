@@ -85,8 +85,9 @@ const batchRefreshScreen = {
           if (result.quoteInfo.sector) stock.sector = result.quoteInfo.sector;
           stock.priceContext = stock.priceContext || {};
           stock.priceContext.lastUpdated = today;
-          if (result.quoteInfo.week52High) stock.priceContext.week52High = result.quoteInfo.week52High;
-          if (result.quoteInfo.week52Low) stock.priceContext.week52Low = result.quoteInfo.week52Low;
+          // REIT/InvIT: Yahoo returns wrong 52w data — keep indianapi values
+          if (stock.board !== "reit" && result.quoteInfo.week52High) stock.priceContext.week52High = result.quoteInfo.week52High;
+          if (stock.board !== "reit" && result.quoteInfo.week52Low)  stock.priceContext.week52Low  = result.quoteInfo.week52Low;
         }
         await StockStore.set(ticker, stock);
 

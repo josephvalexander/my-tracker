@@ -150,9 +150,9 @@ const watchlistScreen = {
         <div id="refresh-progress" class="muted" style="font-size:11px; min-height:16px; margin-bottom:4px;"></div>
         <div id="drive-status-line" class="drive-status-line" style="display:flex; align-items:center; justify-content:space-between;"></div>
         <div style="display:flex; gap:6px; margin:8px 0 4px; flex-wrap:wrap;" id="wl-filter-chips">
-          ${window.uiState.watchlistFilters.has("mainboard") ? '<button class="wl-chip wl-chip-active" data-filter="mainboard">Mainboard</button>' : '<button class="wl-chip" data-filter="mainboard">Mainboard</button>'}
-          ${window.uiState.watchlistFilters.has("sme") ? '<button class="wl-chip wl-chip-active" data-filter="sme">SME</button>' : '<button class="wl-chip" data-filter="sme">SME</button>'}
-          ${window.uiState.watchlistFilters.has("reit") ? '<button class="wl-chip wl-chip-active" data-filter="reit">REIT / InvIT</button>' : '<button class="wl-chip" data-filter="reit">REIT / InvIT</button>'}
+          <button class="wl-chip wl-chip-active" data-filter="mainboard">Mainboard</button>
+          <button class="wl-chip wl-chip-active" data-filter="sme">SME</button>
+          <button class="wl-chip wl-chip-active" data-filter="reit">REIT / InvIT</button>
         </div>
         <div id="watchlist-list" class="stock-list">
           <div class="loading">Loading...</div>
@@ -236,14 +236,14 @@ const watchlistScreen = {
     function wireSortDropdown() {
       const sel = document.getElementById("watchlist-sort");
       if (!sel) return;
-      sel.addEventListener("change", () => { window.uiState.watchlistSort = sel.value; renderList(sel.value); });
+      sel.addEventListener("change", () => renderList(sel.value));
     }
 
     const driveLine = document.getElementById("drive-status-line");
     const drivePushBtn = document.getElementById("drive-push-btn");
 
     if (settings?.driveConnected) {
-      driveLine.innerHTML = `<i>Drive connected · last pushed ${settings.lastSyncPush ? new Date(settings.lastSyncPush).toLocaleDateString("en-IN") : "never"}</i><select id="watchlist-sort" style="font-size:11px; padding:2px 6px; border:0.5px solid var(--color-border); border-radius:6px; background:var(--color-bg); color:var(--color-text); height:24px;">${[["default","Order added"],["since-asc","Since watchlisted ↑"],["since-desc","Since watchlisted ↓"],["pe-asc","P/E low→high"],["eps-desc","EPS CAGR high→low"],["roe-desc","ROE high→low"],["stale","Stalest first"]].map(([v,l])=>`<option value="${v}"${window.uiState.watchlistSort===v?" selected":""}>${l}</option>`).join("")}</select>`;
+      driveLine.innerHTML = `<i>Drive connected · last pushed ${settings.lastSyncPush ? new Date(settings.lastSyncPush).toLocaleDateString("en-IN") : "never"}</i><select id="watchlist-sort" style="font-size:11px; padding:2px 6px; border:0.5px solid var(--color-border); border-radius:6px; background:var(--color-bg); color:var(--color-text); height:24px;"><option value="default">Order added</option><option value="since-asc">Since watchlisted ↑</option><option value="since-desc">Since watchlisted ↓</option><option value="pe-asc">P/E low→high</option><option value="eps-desc">EPS CAGR high→low</option><option value="roe-desc">ROE high→low</option><option value="stale">Stalest first</option></select>`;
       wireSortDropdown();
       drivePushBtn.style.display = "";
 
@@ -262,7 +262,7 @@ const watchlistScreen = {
           await pushToDrive(token, localData);
           settings.lastSyncPush = new Date().toISOString();
           await MetaStore.setSettings(settings);
-          driveLine.innerHTML = `<i>Drive connected · last pushed just now</i><select id="watchlist-sort" style="font-size:11px; padding:2px 6px; border:0.5px solid var(--color-border); border-radius:6px; background:var(--color-bg); color:var(--color-text); height:24px;">${[["default","Order added"],["since-asc","Since watchlisted ↑"],["since-desc","Since watchlisted ↓"],["pe-asc","P/E low→high"],["eps-desc","EPS CAGR high→low"],["roe-desc","ROE high→low"],["stale","Stalest first"]].map(([v,l])=>`<option value="${v}"${window.uiState.watchlistSort===v?" selected":""}>${l}</option>`).join("")}</select>`;
+          driveLine.innerHTML = `<i>Drive connected · last pushed just now</i><select id="watchlist-sort" style="font-size:11px; padding:2px 6px; border:0.5px solid var(--color-border); border-radius:6px; background:var(--color-bg); color:var(--color-text); height:24px;"><option value="default">Order added</option><option value="since-asc">Since watchlisted ↑</option><option value="since-desc">Since watchlisted ↓</option><option value="pe-asc">P/E low→high</option><option value="eps-desc">EPS CAGR high→low</option><option value="roe-desc">ROE high→low</option><option value="stale">Stalest first</option></select>`;
           wireSortDropdown();
           progressEl.textContent = "✓ Saved to Drive";
           setTimeout(() => { progressEl.textContent = ""; }, 3000);
@@ -272,14 +272,14 @@ const watchlistScreen = {
         drivePushBtn.disabled = false;
       });
     } else {
-      driveLine.innerHTML = `<i>Working from local data only · <a href="#settings">Connect Drive</a></i><select id="watchlist-sort" style="font-size:11px; padding:2px 6px; border:0.5px solid var(--color-border); border-radius:6px; background:var(--color-bg); color:var(--color-text); height:24px;">${[["default","Order added"],["since-asc","Since watchlisted ↑"],["since-desc","Since watchlisted ↓"],["pe-asc","P/E low→high"],["eps-desc","EPS CAGR high→low"],["roe-desc","ROE high→low"],["stale","Stalest first"]].map(([v,l])=>`<option value="${v}"${window.uiState.watchlistSort===v?" selected":""}>${l}</option>`).join("")}</select>`;
+      driveLine.innerHTML = `<i>Working from local data only · <a href="#settings">Connect Drive</a></i><select id="watchlist-sort" style="font-size:11px; padding:2px 6px; border:0.5px solid var(--color-border); border-radius:6px; background:var(--color-bg); color:var(--color-text); height:24px;"><option value="default">Order added</option><option value="since-asc">Since watchlisted ↑</option><option value="since-desc">Since watchlisted ↓</option><option value="pe-asc">P/E low→high</option><option value="eps-desc">EPS CAGR high→low</option><option value="roe-desc">ROE high→low</option><option value="stale">Stalest first</option></select>`;
       wireSortDropdown();
     }
 
     const listEl = document.getElementById("watchlist-list");
 
-    // ── Multi-select filter chips — state persists via window.uiState ──
-    const activeFilters = window.uiState.watchlistFilters;
+    // ── Multi-select filter chips ─────────────────────────────────────
+    const activeFilters = new Set(["mainboard","sme","reit"]);
     document.querySelectorAll(".wl-chip").forEach(chip => {
       chip.addEventListener("click", () => {
         const f = chip.dataset.filter;
@@ -412,7 +412,7 @@ const watchlistScreen = {
     }
 
     // Initial list render (sort dropdown already wired by wireSortDropdown above)
-    renderList(window.uiState.watchlistSort);
+    renderList((document.getElementById("watchlist-sort") || {value:"default"}).value);
 
     document.getElementById("add-stock-btn").addEventListener("click", () => {
       window.location.hash = "#addStock";
@@ -445,8 +445,9 @@ const watchlistScreen = {
             fresh.priceContext = fresh.priceContext || {};
             fresh.priceContext.source = result.quoteInfo.source;
             fresh.priceContext.lastUpdated = today;
-            if (result.quoteInfo.week52High) fresh.priceContext.week52High = result.quoteInfo.week52High;
-            if (result.quoteInfo.week52Low)  fresh.priceContext.week52Low  = result.quoteInfo.week52Low;
+            // REIT/InvIT: Yahoo returns wrong 52w data — keep indianapi values
+            if (fresh.board !== "reit" && result.quoteInfo.week52High) fresh.priceContext.week52High = result.quoteInfo.week52High;
+            if (fresh.board !== "reit" && result.quoteInfo.week52Low)  fresh.priceContext.week52Low  = result.quoteInfo.week52Low;
             if (result.quoteInfo.todayLow)   fresh.priceContext.todayLow   = result.quoteInfo.todayLow;
             if (result.quoteInfo.todayHigh)  fresh.priceContext.todayHigh  = result.quoteInfo.todayHigh;
             if (result.quoteInfo.previousClose) fresh.priceContext.previousClose = result.quoteInfo.previousClose;
@@ -488,7 +489,7 @@ const watchlistScreen = {
       // Update the stocks array in-place so renderList uses fresh data
       stocks.length = 0;
       freshStocks.forEach(s => stocks.push(s));
-      renderList(window.uiState.watchlistSort);
+      renderList((document.getElementById("watchlist-sort") || {value:"default"}).value);
       // Refresh alert banner with new prices
       const freshAlerts = stocks.filter(s => s.alertPrice && s.fundamentals?.currentPrice && s.fundamentals.currentPrice < s.alertPrice);
       showAlertBanner(freshAlerts);
