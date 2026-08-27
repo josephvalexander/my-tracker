@@ -126,6 +126,9 @@ body {
 .chip-neutral { color: var(--color-text); }
 
 .since-added-row { display: flex; align-items: center; gap: 6px; padding-top: 6px; margin-top: 6px; border-top: 0.5px solid var(--color-border); font-size: 11px; }
+.fav-btn { background: none; border: none; cursor: pointer; font-size: 14px; color: var(--color-text-tertiary); padding: 0; margin: 0; line-height: 1; flex-shrink: 0; transition: color 0.15s; }
+.fav-btn:hover { color: var(--color-yellow); }
+.fav-btn.fav-btn-active { color: var(--color-yellow); }
 .wl-chip { padding: 3px 10px; border-radius: 12px; font-size: 11px; border: 0.5px solid var(--color-border); background: var(--color-bg); color: var(--color-text-secondary); cursor: pointer; }
 .wl-chip.wl-chip-active { background: var(--color-text); color: var(--color-surface); border-color: var(--color-text); }
 .h-chip, .af-chip { padding: 3px 10px; border-radius: 12px; font-size: 11px; border: 0.5px solid var(--color-border); background: var(--color-bg); color: var(--color-text-secondary); cursor: pointer; }
