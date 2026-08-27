@@ -15,59 +15,6 @@
  * "light" or "dark" sets the attribute to override the media query.
  * Exposed globally so settings.js can call it on toggle.
  */
-/**
- * Persistent UI state — survives screen navigation within a session.
- * Screens read/write here instead of local variables so filter selections
- * are remembered when navigating into detail views and back, or switching tabs.
- * Defaults match each screen's original behaviour.
- */
-// ── UI state persistence ────────────────────────────────────────────────────
-// Saved to localStorage as a plain JSON object; Sets are serialised as arrays.
-// uiStateSave() is called by every screen that mutates uiState.
-const UI_STATE_KEY = "buffett_compos_ui_state";
-
-function uiStateLoad() {
-  try {
-    const raw = localStorage.getItem(UI_STATE_KEY);
-    if (!raw) return null;
-    const saved = JSON.parse(raw);
-    return {
-      watchlistFilters:  new Set(saved.watchlistFilters  ?? ["mainboard", "sme", "reit"]),
-      watchlistSort:     saved.watchlistSort     ?? "default",
-      holdingsFilters:   new Set(saved.holdingsFilters   ?? ["mainboard"]),
-      holdingsXirr:      saved.holdingsXirr      ?? false,
-      analyticsFilters:  new Set(saved.analyticsFilters  ?? ["mainboard"]),
-      analyticsPeriod:   saved.analyticsPeriod   ?? null,
-      analyticsBenchmark: saved.analyticsBenchmark ?? "none",
-    };
-  } catch { return null; }
-}
-
-function uiStateSave() {
-  try {
-    const s = window.uiState;
-    localStorage.setItem(UI_STATE_KEY, JSON.stringify({
-      watchlistFilters:  [...s.watchlistFilters],
-      watchlistSort:     s.watchlistSort,
-      holdingsFilters:   [...s.holdingsFilters],
-      holdingsXirr:      s.holdingsXirr,
-      analyticsFilters:  [...s.analyticsFilters],
-      analyticsPeriod:   s.analyticsPeriod,
-      analyticsBenchmark: s.analyticsBenchmark,
-    }));
-  } catch { /* storage full or private mode — silently ignore */ }
-}
-
-window.uiState = uiStateLoad() || {
-  watchlistFilters:  new Set(["mainboard", "sme", "reit"]),
-  watchlistSort:     "default",
-  holdingsFilters:   new Set(["mainboard"]),
-  holdingsXirr:      false,
-  analyticsFilters:  new Set(["mainboard"]),
-  analyticsPeriod:   null,
-  analyticsBenchmark: "none",
-};
-
 function applyTheme(theme) {
   if (theme === "light") {
     document.documentElement.setAttribute("data-theme", "light");
@@ -96,21 +43,52 @@ async function seedDefaultsIfNeeded() {
 }
 
 async function registerServiceWorker() {
-  if ("serviceWorker" in navigator) {
-    try {
-      await navigator.serviceWorker.register("./service-worker.js");
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    // updateViaCache: "none" tells the browser to ALWAYS fetch service-worker.js
+    // from the network (bypassing the HTTP cache) when checking for updates.
+    // Without this, Chrome on Android can serve the old SW from disk cache for
+    // up to 24 hours, so users never see new deploys without reinstalling.
+    const registration = await navigator.serviceWorker.register(
+      "./service-worker.js",
+      { updateViaCache: "none" }
+    );
 
-      // Listen for the SW_UPDATED message sent by the new service worker
-      // when it activates. Reload immediately so the user gets the new
-      // files without needing to manually refresh or reinstall the PWA.
-      navigator.serviceWorker.addEventListener("message", (event) => {
-        if (event.data?.type === "SW_UPDATED") {
-          window.location.reload();
+    // Immediately check for an update so installs don't have to wait for
+    // the browser's default polling interval (up to 24 h in practice).
+    registration.update().catch(() => {});
+
+    // SW_UPDATED is posted by the new SW after it activates and claims all
+    // clients. Hard-reload (location.reload()) so the new cached files are
+    // actually executed, not just fetched — the page's already-parsed JS
+    // won't update otherwise.
+    navigator.serviceWorker.addEventListener("message", (event) => {
+      if (event.data?.type === "SW_UPDATED") {
+        // Small delay lets clients.claim() fully settle on Android before
+        // the reload fires, avoiding a race where the page reloads under
+        // the old SW.
+        setTimeout(() => window.location.reload(), 150);
+      }
+    });
+
+    // Fallback: if a waiting SW exists when the page loads (e.g. the user
+    // had the app open in the background during deployment), tell it to
+    // activate immediately rather than waiting for the tab to close.
+    if (registration.waiting) {
+      registration.waiting.postMessage({ type: "SKIP_WAITING" });
+    }
+    registration.addEventListener("updatefound", () => {
+      const newWorker = registration.installing;
+      if (!newWorker) return;
+      newWorker.addEventListener("statechange", () => {
+        if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+          newWorker.postMessage({ type: "SKIP_WAITING" });
         }
       });
-    } catch (err) {
-      console.warn("Service worker registration failed:", err);
-    }
+    });
+
+  } catch (err) {
+    console.warn("Service worker registration failed:", err);
   }
 }
 
