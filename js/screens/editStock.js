@@ -121,7 +121,8 @@ const editStockScreen = {
       current.qualitative.moatTags = [...document.querySelectorAll(".moat-tag-checkbox:checked")].map((cb) => cb.value);
       current.qualitative.marketPosition = document.getElementById("position-textarea").value.trim();
       await StockStore.set(ticker, current);
-      window.location.hash = `#stock/${ticker}`;
+
+      autoPush().catch(()=>{});      window.location.hash = `#stock/${ticker}`;
     });
   },
 };

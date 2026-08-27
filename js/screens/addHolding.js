@@ -103,9 +103,11 @@ const addHoldingScreen = {
         ];
         existing.lots.push(newLot);
         await HoldingStore.set(ticker, existing);
-      } else {
+
+        autoPush().catch(()=>{});      } else {
         await HoldingStore.set(ticker, { ticker, lots: [newLot] });
-      }
+
+        autoPush().catch(()=>{});      }
       window.location.hash = "#holdings";
     });
   },

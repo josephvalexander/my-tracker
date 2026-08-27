@@ -135,7 +135,8 @@ const stockNotesScreen = {
       });
       await StockStore.set(ticker, stock);
       navigate(`#stockNotes/${ticker}`);
-    });
+
+      autoPush().catch(()=>{});    });
 
     // Delete note
     document.querySelectorAll(".delete-note-btn").forEach(btn => {
@@ -149,7 +150,8 @@ const stockNotesScreen = {
         stock.notes = stock.notes.filter(n => n !== noteToDelete);
         await StockStore.set(ticker, stock);
         navigate(`#stockNotes/${ticker}`);
-      });
+
+        autoPush().catch(()=>{});      });
     });
   },
 };

@@ -151,7 +151,8 @@ async function applyIndianApiResult(ticker, parsed) {
   };
 
   await StockStore.set(ticker, stock);
-  return stock;
+
+  autoPush().catch(()=>{});  return stock;
 }
 
 // ── Screener upload fallback ──────────────────────────────────────────
@@ -293,7 +294,8 @@ const addStockScreen = {
         }
         // Stale archived record — delete it so we can re-add cleanly
         await deleteStockPermanently(ticker);
-      }
+
+        autoPush().catch(()=>{});      }
 
       const settings = await MetaStore.getSettings();
       const apiKey = settings?.indianApiKey;
@@ -315,6 +317,8 @@ const addStockScreen = {
       };
       await StockStore.set(ticker, stock);
 
+      autoPush().catch(()=>{});
+  autoPush().catch(()=>{});
       document.getElementById("create-stock-btn").disabled = true;
       document.getElementById("post-add-section").style.display = "block";
 
@@ -334,7 +338,8 @@ const addStockScreen = {
         if (parsed.stockFundamentals.currentPrice && !updatedStock.watchlistPrice) {
           updatedStock.watchlistPrice = parsed.stockFundamentals.currentPrice;
           await StockStore.set(ticker, updatedStock);
-        }
+
+        autoPush().catch(()=>{});        }
 
         const roe = roe5yAvg(updatedStock);
         const de = debtToEquity(updatedStock);
@@ -391,7 +396,8 @@ const addStockScreen = {
             stockNow.qualitative.moatDescription = result.moat;
             stockNow.qualitative.marketPosition = result.marketPosition;
             await StockStore.set(ticker, stockNow);
-            aiStatus.textContent = "✓ All three drafted — review on the stock page.";
+            
+autoPush().catch(()=>{});            aiStatus.textContent = "✓ All three drafted — review on the stock page.";
           } catch (err) {
             aiStatus.textContent = `Draft failed: ${err.message}`;
           }
@@ -415,7 +421,8 @@ const addStockScreen = {
           currentStock.fundamentals = stockFundamentals;
           if (companyName && (!currentStock.name || currentStock.name === ticker)) currentStock.name = companyName;
           await StockStore.set(ticker, currentStock);
-          document.getElementById("screener-dropzone-status").innerHTML = `<div class="dropzone-success-text">✓ Parsed ${stockFundamentals.annual.years?.length ?? 0} years from ${file.name}</div>`;
+
+        autoPush().catch(()=>{});          document.getElementById("screener-dropzone-status").innerHTML = `<div class="dropzone-success-text">✓ Parsed ${stockFundamentals.annual.years?.length ?? 0} years from ${file.name}</div>`;
         } catch (err) {
           document.getElementById("screener-dropzone-status").innerHTML = `<div class="dropzone-error-text">⚠ Parse failed: ${err.message}</div>`;
         }

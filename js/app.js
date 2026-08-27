@@ -219,6 +219,34 @@ async function migrateWatchlistPrice() {
   }
 }
 
+
+/**
+ * Silently pushes local data to Drive after a user-initiated write.
+ * Called after every watchlist/holdings mutation so Drive stays in sync
+ * without manual intervention.
+ *
+ * Uses silentOnly — never triggers a consent popup mid-flow. If the token
+ * has expired the push is skipped silently; the auth gate on next launch
+ * will re-authenticate and pull the latest data.
+ *
+ * Exposed as window.autoPush so screen scripts can call it without import.
+ */
+async function autoPush() {
+  try {
+    const settings = await MetaStore.getSettings();
+    if (!settings?.driveConnected) return;
+    const token = await getAccessToken({ silentOnly: true });
+    if (!token) return; // token expired — skip silently, auth gate handles it on relaunch
+    const localData = await exportAll();
+    await pushToDrive(token, localData);
+    settings.lastSyncPush = new Date().toISOString();
+    await MetaStore.setSettings(settings);
+  } catch (err) {
+    console.warn("Auto-push to Drive failed:", err.message);
+  }
+}
+window.autoPush = autoPush;
+
 async function init() {
   await seedDefaultsIfNeeded();
   const settings = await MetaStore.getSettings();
