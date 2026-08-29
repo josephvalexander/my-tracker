@@ -221,36 +221,27 @@ const stockChartsScreen = {
 
       if (shHistory.length > 0) {
         const latest = shHistory[shHistory.length - 1];
-        const shCategories = [
-          { label: "Promoter", value: latest.promoter, color: C.promoter },
-          { label: "FII",      value: latest.fii,      color: C.fii },
-          { label: "DII/MF",  value: latest.dii,      color: C.dii },
-          { label: "Public",  value: latest.public,   color: C.public },
-        ];
 
+        // Single summary row: colour dot + label + bold value — no separate legend needed
         if (shSummary) {
-          // Summary + HTML legend — rendered above the canvas so it's always visible
-          // and never clipped by the card height. Chart.js legend is disabled.
           shSummary.innerHTML = `
-            <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:6px;">
-              ${shCategories.filter(d => d.value != null).map(d => `
+            <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:8px;">
+              ${[
+                { label: "Promoter", value: latest.promoter, color: C.promoter },
+                { label: "FII",      value: latest.fii,      color: C.fii },
+                { label: "DII/MF",  value: latest.dii,      color: C.dii },
+                { label: "Public",  value: latest.public,   color: C.public },
+              ].filter(d => d.value != null).map(d => `
                 <div style="display:flex; align-items:center; gap:5px; font-size:12px;">
                   <span style="width:9px;height:9px;border-radius:50%;background:${d.color};flex-shrink:0;display:inline-block;"></span>
                   <span class="muted">${d.label}</span>
                   <strong>${d.value.toFixed(1)}%</strong>
                 </div>`).join("")}
               <span class="muted" style="font-size:10px; align-self:center;">as of ${latest.quarter}</span>
-            </div>
-            <div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:8px;">
-              ${shCategories.map(d => `
-                <div style="display:flex; align-items:center; gap:4px; font-size:11px; color:var(--color-text-secondary);">
-                  <span style="width:8px;height:8px;border-radius:50%;background:${d.color};flex-shrink:0;display:inline-block;"></span>
-                  ${d.label}
-                </div>`).join("")}
             </div>`;
         }
 
-        // Compute Y axis max dynamically so tall promoter bars never overflow
+        // Dynamic Y max: highest value + 15% headroom, rounded up to nearest 10
         const shAllValues = shHistory.flatMap(h => [h.promoter ?? 0, h.fii ?? 0, h.dii ?? 0, h.public ?? 0]);
         const shMax = Math.ceil((Math.max(...shAllValues, 10) * 1.15) / 10) * 10;
 
@@ -267,15 +258,16 @@ const stockChartsScreen = {
           },
           options: {
             responsive: true, maintainAspectRatio: false,
+            layout: { padding: { bottom: 8 } },
             plugins: {
-              legend: { display: false }, // legend rendered as HTML above — never clips
+              legend: { display: false },
               tooltip: {
                 ...tooltipDefaults,
                 callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(1)}%` },
               },
             },
             scales: {
-              x: { grid: { display: false }, ticks: { ...tickStyle, maxRotation: 45, minRotation: 45 } },
+              x: { grid: { display: false }, ticks: { ...tickStyle, maxRotation: 30, minRotation: 30 } },
               y: { grid: gridStyle, ticks: { ...tickStyle, callback: (v) => v + "%" }, min: 0, max: shMax },
             },
           },
