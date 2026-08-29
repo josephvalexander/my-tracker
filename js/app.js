@@ -43,21 +43,46 @@ async function seedDefaultsIfNeeded() {
 }
 
 async function registerServiceWorker() {
-  if ("serviceWorker" in navigator) {
-    try {
-      await navigator.serviceWorker.register("./service-worker.js");
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    // updateViaCache: "none" forces the browser to always fetch
+    // service-worker.js from the network, bypassing HTTP cache.
+    // Without this, Chrome on Android can serve the old SW from disk
+    // cache for up to 24 h — so users never see new deploys.
+    const registration = await navigator.serviceWorker.register(
+      "./service-worker.js",
+      { updateViaCache: "none" }
+    );
 
-      // Listen for the SW_UPDATED message sent by the new service worker
-      // when it activates. Reload immediately so the user gets the new
-      // files without needing to manually refresh or reinstall the PWA.
-      navigator.serviceWorker.addEventListener("message", (event) => {
-        if (event.data?.type === "SW_UPDATED") {
-          window.location.reload();
+    // Check for an update immediately on every app open instead of
+    // waiting for the browser's default polling interval.
+    registration.update().catch(() => {});
+
+    // SW_UPDATED is posted by the new SW after activate + clients.claim().
+    // Small delay lets claim() fully settle on Android before reload fires.
+    navigator.serviceWorker.addEventListener("message", (event) => {
+      if (event.data?.type === "SW_UPDATED") {
+        setTimeout(() => window.location.reload(), 150);
+      }
+    });
+
+    // If a waiting SW exists on load (app was in background during deploy),
+    // tell it to activate immediately rather than waiting for tab close.
+    if (registration.waiting) {
+      registration.waiting.postMessage({ type: "SKIP_WAITING" });
+    }
+    registration.addEventListener("updatefound", () => {
+      const newWorker = registration.installing;
+      if (!newWorker) return;
+      newWorker.addEventListener("statechange", () => {
+        if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+          newWorker.postMessage({ type: "SKIP_WAITING" });
         }
       });
-    } catch (err) {
-      console.warn("Service worker registration failed:", err);
-    }
+    });
+
+  } catch (err) {
+    console.warn("Service worker registration failed:", err);
   }
 }
 
