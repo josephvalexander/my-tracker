@@ -239,6 +239,10 @@ const stockChartsScreen = {
             </div>`;
         }
 
+        // Compute Y axis max dynamically so tall promoter bars never overflow
+        const shAllValues = shHistory.flatMap(h => [h.promoter ?? 0, h.fii ?? 0, h.dii ?? 0, h.public ?? 0]);
+        const shMax = Math.ceil((Math.max(...shAllValues, 10) * 1.15) / 10) * 10;
+
         charts.shareholding = new Chart(shCanvas, {
           type: "bar",
           data: {
@@ -261,7 +265,7 @@ const stockChartsScreen = {
             },
             scales: {
               x: { grid: { display: false }, ticks: { ...tickStyle, maxRotation: 45, minRotation: 45 } },
-              y: { grid: gridStyle, ticks: { ...tickStyle, callback: (v) => v + "%" }, suggestedMin: 0, suggestedMax: 80 },
+              y: { grid: gridStyle, ticks: { ...tickStyle, callback: (v) => v + "%" }, min: 0, max: shMax },
             },
           },
         });
