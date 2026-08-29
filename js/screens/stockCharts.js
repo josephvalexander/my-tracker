@@ -54,7 +54,7 @@ const stockChartsScreen = {
         </div>
 
         <div class="chart-section-label">Shareholding pattern <span class="muted">quarterly, grouped by category</span></div>
-        <div class="card chart-card">
+        <div class="card chart-card" style="height:320px;">
           <div id="sh-latest-summary"></div>
           <canvas id="chart-shareholding"></canvas>
         </div>
