@@ -54,7 +54,7 @@ const stockChartsScreen = {
         </div>
 
         <div class="chart-section-label">Shareholding pattern <span class="muted">quarterly, grouped by category</span></div>
-        <div class="card chart-card" style="height:320px;">
+        <div class="card chart-card">
           <div id="sh-latest-summary"></div>
           <canvas id="chart-shareholding"></canvas>
         </div>
@@ -221,21 +221,32 @@ const stockChartsScreen = {
 
       if (shHistory.length > 0) {
         const latest = shHistory[shHistory.length - 1];
+        const shCategories = [
+          { label: "Promoter", value: latest.promoter, color: C.promoter },
+          { label: "FII",      value: latest.fii,      color: C.fii },
+          { label: "DII/MF",  value: latest.dii,      color: C.dii },
+          { label: "Public",  value: latest.public,   color: C.public },
+        ];
+
         if (shSummary) {
+          // Summary + HTML legend — rendered above the canvas so it's always visible
+          // and never clipped by the card height. Chart.js legend is disabled.
           shSummary.innerHTML = `
-            <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
-              ${[
-                { label: "Promoter", value: latest.promoter, color: C.promoter },
-                { label: "FII",      value: latest.fii,      color: C.fii },
-                { label: "DII/MF",  value: latest.dii,      color: C.dii },
-                { label: "Public",  value: latest.public,   color: C.public },
-              ].filter(d => d.value != null).map(d => `
+            <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:6px;">
+              ${shCategories.filter(d => d.value != null).map(d => `
                 <div style="display:flex; align-items:center; gap:5px; font-size:12px;">
                   <span style="width:9px;height:9px;border-radius:50%;background:${d.color};flex-shrink:0;display:inline-block;"></span>
                   <span class="muted">${d.label}</span>
                   <strong>${d.value.toFixed(1)}%</strong>
                 </div>`).join("")}
               <span class="muted" style="font-size:10px; align-self:center;">as of ${latest.quarter}</span>
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:8px;">
+              ${shCategories.map(d => `
+                <div style="display:flex; align-items:center; gap:4px; font-size:11px; color:var(--color-text-secondary);">
+                  <span style="width:8px;height:8px;border-radius:50%;background:${d.color};flex-shrink:0;display:inline-block;"></span>
+                  ${d.label}
+                </div>`).join("")}
             </div>`;
         }
 
@@ -257,7 +268,7 @@ const stockChartsScreen = {
           options: {
             responsive: true, maintainAspectRatio: false,
             plugins: {
-              legend: { position: "bottom", labels: { font: baseFont, boxWidth: 10, boxHeight: 10, usePointStyle: true, pointStyle: "circle" } },
+              legend: { display: false }, // legend rendered as HTML above — never clips
               tooltip: {
                 ...tooltipDefaults,
                 callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(1)}%` },
