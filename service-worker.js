@@ -6,6 +6,7 @@
  * data, never served stale from cache.
  */
 
+// v2 — trash icon, chart alignment, ui-state, resilient install
 const CACHE_NAME = "portfolio-tracker-v1";
 const APP_SHELL = [
   "./",
