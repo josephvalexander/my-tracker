@@ -384,14 +384,9 @@ const watchlistScreen = {
         reitList  = reitList.filter(s => s.isFavorite);
       }
 
-      // Sort: favourites always bubble to top within their group, then apply sortMode
-      function sortWithFavFirst(arr) {
-        const sorted = sortStocks(arr, sortMode);
-        return [...sorted.filter(s => s.isFavorite), ...sorted.filter(s => !s.isFavorite)];
-      }
-      mainboard = sortWithFavFirst(mainboard);
-      satellite = sortWithFavFirst(satellite);
-      reitList  = sortWithFavFirst(reitList);
+      mainboard = sortStocks(mainboard, sortMode);
+      satellite = sortStocks(satellite, sortMode);
+      reitList  = sortStocks(reitList,  sortMode);
 
       let html = "";
       if (activeFilters.has("mainboard") && mainboard.length > 0) {
