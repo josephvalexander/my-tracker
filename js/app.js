@@ -58,30 +58,39 @@ async function seedDefaultsIfNeeded() {
 async function silentSWUpdate() {
   if (!("serviceWorker" in navigator)) return;
   try {
-    // Read the build-id baked into THIS page (served from SW cache)
-    const cachedBuildId = document.querySelector("meta[name='build-id']")?.content;
-    if (!cachedBuildId || cachedBuildId === "BUILD_ID_PLACEHOLDER") return; // dev/local
+    const buildId = document.querySelector("meta[name='build-id']")?.content;
+    if (!buildId || buildId === "BUILD_ID_PLACEHOLDER") return; // dev / not yet injected
 
-    // Fetch index.html fresh from network — bypass SW and HTTP cache
-    const res = await fetch("./index.html", { cache: "no-store", headers: { "pragma": "no-cache" } });
-    if (!res.ok) return;
-    const text = await res.text();
-    const match = text.match(/<meta name="build-id" content="([^"]+)"/);
-    if (!match) return;
-    const networkBuildId = match[1];
+    const reg = await navigator.serviceWorker.getRegistration("./");
+    if (!reg) return;
 
-    if (networkBuildId === cachedBuildId) return; // already current
+    // Force the browser to re-fetch service-worker.js from network right now.
+    // updateViaCache:"none" (set at register time) ensures no HTTP cache is used.
+    await reg.update();
 
-    // Stale SW detected — silently replace it
-    console.info(`[SW] Stale build detected (cached: ${cachedBuildId}, network: ${networkBuildId}). Updating silently…`);
-    const regs = await navigator.serviceWorker.getRegistrations();
-    await Promise.all(regs.map(r => r.unregister()));
-    const keys = await caches.keys();
-    await Promise.all(keys.map(k => caches.delete(k)));
+    // After update(), one of three states:
+    // 1. reg.installing  — new SW downloading/installing right now
+    // 2. reg.waiting     — new SW installed, waiting for old SW to release
+    // 3. neither         — SW was already current, nothing to do
+
+    const newWorker = reg.installing || reg.waiting;
+    if (!newWorker) return; // already up to date
+
+    console.info("[SW] New version detected — activating silently…");
+
+    // Tell the new SW to skip waiting immediately.
+    // Our new SW has the SKIP_WAITING message handler.
+    newWorker.postMessage({ type: "SKIP_WAITING" });
+
+    // Wait for it to become the active controller, then reload.
+    await new Promise((resolve) => {
+      navigator.serviceWorker.addEventListener("controllerchange", resolve, { once: true });
+      // Fallback: if controllerchange doesn't fire within 3s, reload anyway
+      setTimeout(resolve, 3000);
+    });
+
     window.location.reload();
-    // reload() is async on mobile — return a never-resolving promise
-    // so init() waits and doesn't start the router on the stale page.
-    await new Promise(() => {});
+    await new Promise(() => {}); // prevent initRouter running on stale page
   } catch (err) {
     console.warn("[SW] silentSWUpdate check failed:", err.message);
   }
