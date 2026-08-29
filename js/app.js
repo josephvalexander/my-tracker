@@ -42,6 +42,51 @@ async function seedDefaultsIfNeeded() {
   }
 }
 
+/**
+ * Silently detects and fixes a stale service worker.
+ *
+ * How it works: the deploy workflow stamps a SHORT_SHA into a
+ * <meta name="build-id"> in index.html AND into the CACHE_NAME in
+ * service-worker.js. On every app open we fetch index.html from the
+ * network (bypassing the SW cache) and read its build-id. If it
+ * differs from the build-id in the currently-loaded page, the SW is
+ * serving stale files — we unregister it, wipe all caches, and reload.
+ *
+ * This is self-healing: no user action needed. The reload re-registers
+ * the correct SW and serves fresh files from that point on.
+ */
+async function silentSWUpdate() {
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    // Read the build-id baked into THIS page (served from SW cache)
+    const cachedBuildId = document.querySelector("meta[name='build-id']")?.content;
+    if (!cachedBuildId || cachedBuildId === "BUILD_ID_PLACEHOLDER") return; // dev/local
+
+    // Fetch index.html fresh from network — bypass SW and HTTP cache
+    const res = await fetch("./index.html", { cache: "no-store", headers: { "pragma": "no-cache" } });
+    if (!res.ok) return;
+    const text = await res.text();
+    const match = text.match(/<meta name="build-id" content="([^"]+)"/);
+    if (!match) return;
+    const networkBuildId = match[1];
+
+    if (networkBuildId === cachedBuildId) return; // already current
+
+    // Stale SW detected — silently replace it
+    console.info(`[SW] Stale build detected (cached: ${cachedBuildId}, network: ${networkBuildId}). Updating silently…`);
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map(r => r.unregister()));
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => caches.delete(k)));
+    window.location.reload();
+    // reload() is async on mobile — return a never-resolving promise
+    // so init() waits and doesn't start the router on the stale page.
+    await new Promise(() => {});
+  } catch (err) {
+    console.warn("[SW] silentSWUpdate check failed:", err.message);
+  }
+}
+
 async function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
   try {
@@ -226,6 +271,7 @@ async function init() {
     if (settings.deRule.green  != null) DEFAULT_RULES.de.green  = settings.deRule.green;
     if (settings.deRule.yellow != null) DEFAULT_RULES.de.yellow = settings.deRule.yellow;
   }
+  await silentSWUpdate(); // unregisters stale SW and reloads if a new build is available
   await registerServiceWorker();
   await autoPullOnOpen();
   await migrateWatchlistPrice(); // must run AFTER pull so Drive doesn't overwrite it

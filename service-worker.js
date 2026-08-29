@@ -81,6 +81,13 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
+  // Always serve clear-cache.html from network — it must never be cached
+  // so it can be used to escape a broken cache state.
+  if (url.pathname.endsWith("clear-cache.html")) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   // Never cache the NSE proxy Worker or Google API calls — always go
   // to network, since this data must always be live, never stale.
   if (url.hostname.includes("workers.dev") || url.hostname.includes("googleapis.com") || url.hostname.includes("generativelanguage.googleapis.com") || url.hostname.includes("indianapi.in")) {
