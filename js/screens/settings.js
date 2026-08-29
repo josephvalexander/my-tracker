@@ -125,6 +125,10 @@ const settingsScreen = {
                 <span id="snapshot-count" class="muted" style="font-size:11px;"></span>
               </div>
               <div id="diag-status" class="muted" style="font-size:11px; margin-top:6px;"></div>
+              <div style="margin-top:12px; padding-top:10px; border-top:0.5px solid var(--color-border);">
+                <div class="muted" style="font-size:11px; margin-bottom:6px;">If the app is showing stale UI after an update, clear the service worker cache and reload fresh.</div>
+                <a href="./clear-cache.html" style="font-size:12px; color:var(--color-green); text-decoration:none; font-weight:500;">↺ Clear app cache &amp; update →</a>
+              </div>
             </div>
           </div>
         </div>

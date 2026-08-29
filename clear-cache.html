@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Buffett Compos — Clear Cache</title>
+<style>
+  body { font-family: -apple-system, sans-serif; display: flex; flex-direction: column;
+         align-items: center; justify-content: center; min-height: 100vh; margin: 0;
+         background: #f1efe8; color: #1a1a18; text-align: center; padding: 24px; }
+  h2  { font-size: 20px; margin-bottom: 8px; }
+  p   { font-size: 14px; color: #666; margin-bottom: 24px; line-height: 1.6; }
+  button { padding: 12px 28px; background: #1D9E75; color: #fff; border: none;
+           border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  #status { margin-top: 16px; font-size: 13px; color: #444; min-height: 20px; }
+</style>
+</head>
+<body>
+  <h2>📱 Update Buffett Compos</h2>
+  <p>Tap the button to clear the old app cache and load the latest version.<br>
+     Your portfolio data is stored separately and will not be affected.</p>
+  <button id="clear-btn">Clear cache &amp; update</button>
+  <div id="status"></div>
+
+<script>
+document.getElementById("clear-btn").addEventListener("click", async () => {
+  const statusEl = document.getElementById("status");
+  const btn = document.getElementById("clear-btn");
+  btn.disabled = true;
+  statusEl.textContent = "Unregistering service workers…";
+
+  try {
+    // 1. Unregister all service workers
+    if ("serviceWorker" in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+
+    // 2. Delete all caches
+    statusEl.textContent = "Clearing cached files…";
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => caches.delete(k)));
+
+    // 3. Redirect to app — fresh SW will install on next load
+    statusEl.textContent = "Done! Redirecting to app…";
+    setTimeout(() => { window.location.href = "./index.html"; }, 800);
+  } catch (err) {
+    statusEl.textContent = "Error: " + err.message;
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
