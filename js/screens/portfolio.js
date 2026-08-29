@@ -50,9 +50,9 @@ const portfolioScreen = {
           </div>
         </div>
         <div class="toggle-row" style="margin-bottom:12px;">
-          <button class="af-chip ${window.uiState.analyticsFilters.has('mainboard') ? 'af-chip-active' : ''}" data-filter="mainboard">Mainboard</button>
-          <button class="af-chip ${window.uiState.analyticsFilters.has('sme') ? 'af-chip-active' : ''}" data-filter="sme">SME</button>
-          <button class="af-chip ${window.uiState.analyticsFilters.has('reit') ? 'af-chip-active' : ''}" data-filter="reit">REIT / InvIT</button>
+          <button class="af-chip af-chip-active" data-filter="mainboard">Mainboard</button>
+          <button class="af-chip" data-filter="sme">SME</button>
+          <button class="af-chip" data-filter="reit">REIT / InvIT</button>
         </div>
         <div class="section-label">Buffett checklist — held stocks</div>
         <div id="portfolio-summary" class="metric-grid-3"></div>
@@ -112,7 +112,7 @@ const portfolioScreen = {
       })
       .filter(Boolean);
 
-    const activeFilters = window.uiState.analyticsFilters; // persisted across navigation
+    const activeFilters = new Set(["mainboard"]);
 
     function applyFilter(items) {
       return items.filter(h => {
@@ -130,7 +130,6 @@ const portfolioScreen = {
         if (activeFilters.has(f)) { if (activeFilters.size > 1) activeFilters.delete(f); }
         else activeFilters.add(f);
         chip.classList.toggle("af-chip-active", activeFilters.has(f));
-        uiStateSave();
         buildAnalytics();
       });
     });
@@ -173,8 +172,7 @@ const portfolioScreen = {
 
     // Load all snapshots for the current filter
     const snapKey = activeFilters.size === 1 && activeFilters.has("mainboard") ? "mainboard"
-      : activeFilters.size === 1 && activeFilters.has("sme")  ? "sme"
-      : activeFilters.size === 1 && activeFilters.has("reit") ? "reit"
+      : activeFilters.size === 1 && activeFilters.has("sme") ? "sme"
       : "all";
     const allSnapshots = (await MetaStore.getSnapshots()) || {};
     const allSnaps     = (allSnapshots[snapKey] || []).sort((a,b) => a.date.localeCompare(b.date));
@@ -361,22 +359,15 @@ const portfolioScreen = {
       ].filter(p => p.days===9999 || totalDays>=p.days*0.7);
       if (!PERIODS.length) PERIODS.push({key:"All",label:"All",days:9999});
 
-      // Restore saved period if it exists in the available PERIODS list, else auto-select
-      const savedPeriod = window.uiState.analyticsPeriod;
-      let activePeriod = (savedPeriod && PERIODS.find(p => p.key === savedPeriod))
-        ? savedPeriod
-        : (PERIODS.find(p => p.days <= 30) || PERIODS[0]).key;
-      let benchmark = window.uiState.analyticsBenchmark ?? "none"; // "none" | "sensex" | "nifty"
+      let activePeriod = (PERIODS.find(p=>p.days<=30)||PERIODS[0]).key;
+      let benchmark    = "none"; // "none" | "sensex" | "nifty"
 
       const toggleDiv = document.getElementById("snap-period-toggle");
       if (toggleDiv) {
         toggleDiv.innerHTML = PERIODS.map(p =>
           `<button class="snap-period-btn btn btn-small" data-period="${p.key}" style="font-size:10px;padding:1px 7px;${p.key===activePeriod?"background:var(--color-text);color:var(--color-surface);":" "}">${p.label}</button>`
         ).join("") +
-        `<span style="margin-left:8px;font-size:10px;color:var(--color-text-tertiary);">vs</span>
-         <button class="bm-btn btn btn-small" data-bm="none"   style="font-size:10px;padding:1px 7px;${benchmark==='none'   ?'background:var(--color-text);color:var(--color-surface);':''}" >None</button>
-         <button class="bm-btn btn btn-small" data-bm="sensex" style="font-size:10px;padding:1px 7px;${benchmark==='sensex'?'background:var(--color-text);color:var(--color-surface);':''}" >SENSEX</button>
-         <button class="bm-btn btn btn-small" data-bm="nifty"  style="font-size:10px;padding:1px 7px;${benchmark==='nifty'  ?'background:var(--color-text);color:var(--color-surface);':''}" >NIFTY</button>`;
+        ``;
       }
 
       const idxSnaps = (allSnapshots.index || []);
@@ -469,22 +460,13 @@ const portfolioScreen = {
       document.querySelectorAll(".snap-period-btn").forEach(btn => {
         btn.addEventListener("click", ()=>{
           activePeriod=btn.dataset.period;
-          window.uiState.analyticsPeriod = activePeriod; uiStateSave();
           document.querySelectorAll(".snap-period-btn").forEach(b=>{b.style.background="";b.style.color="";});
           btn.style.background="var(--color-text)"; btn.style.color="var(--color-surface)";
           chartInstances=chartInstances.filter(c=>c!==pvChart); drawChart(activePeriod);
         });
       });
 
-      document.querySelectorAll(".bm-btn").forEach(btn => {
-        btn.addEventListener("click", ()=>{
-          benchmark=btn.dataset.bm;
-          window.uiState.analyticsBenchmark = benchmark; uiStateSave();
-          document.querySelectorAll(".bm-btn").forEach(b=>{b.style.background="";b.style.color="";});
-          btn.style.background="var(--color-text)"; btn.style.color="var(--color-surface)";
-          chartInstances=chartInstances.filter(c=>c!==pvChart); drawChart(activePeriod);
-        });
-      });
+
     }
 
 
