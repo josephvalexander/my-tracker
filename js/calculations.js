@@ -520,8 +520,9 @@ function deriveVerdict(stock) {
     if (!pass) hardFlags.push("roeBelow15");
   }
   if (de !== null) {
-    const pass = de <= 0.2;
-    checks.push({ label: `D/E ${de.toFixed(2)} ${pass ? "≤" : ">"} 0.2`, pass });
+    const deHardThreshold = DEFAULT_RULES.de.green ?? 0.2;
+    const pass = de <= deHardThreshold;
+    checks.push({ label: `D/E ${de.toFixed(2)} ${pass ? "≤" : ">"} ${deHardThreshold}`, pass });
     if (!pass) hardFlags.push("deAbove02");
   }
   if (promoterHistory.length >= 2) {
