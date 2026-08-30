@@ -520,7 +520,9 @@ function deriveVerdict(stock) {
     if (!pass) hardFlags.push("roeBelow15");
   }
   if (de !== null) {
-    const deHardThreshold = DEFAULT_RULES.de.green ?? 0.2;
+    // Use user-configured yellow threshold — values above this are hard-flagged red.
+    // DEFAULT_RULES.de.yellow is updated from settings on every app boot (app.js).
+    const deHardThreshold = DEFAULT_RULES.de.yellow ?? 0.2;
     const pass = de <= deHardThreshold;
     checks.push({ label: `D/E ${de.toFixed(2)} ${pass ? "≤" : ">"} ${deHardThreshold}`, pass });
     if (!pass) hardFlags.push("deAbove02");
