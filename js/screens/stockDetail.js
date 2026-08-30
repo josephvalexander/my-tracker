@@ -251,7 +251,60 @@ const stockDetailScreen = {
           ${metricRow("Gearing (D/E)", pc.gearing, pc.gearing != null ? pc.gearing.toFixed(2)+"x" : "—", pc.gearing != null ? (pc.gearing <= 1.0 ? "green" : "red") : null)}
           ${metricRow("Interest coverage", pc.interestCoverage, pc.interestCoverage != null ? pc.interestCoverage.toFixed(2)+"x" : "—", pc.interestCoverage != null ? (pc.interestCoverage >= 1.5 ? "green" : "red") : null)}
           ${metricRow("Operating margin", pc.operatingMargin, pc.operatingMargin != null ? pc.operatingMargin.toFixed(1)+"%" : "—", null)}
-        </div>`;
+        </div>
+
+        ${(() => {
+          // Build LTM component breakdown from individual dividend records
+          const ltmDivs = (s.corporateActions?.dividends || []).filter(d => {
+            if (!d.recordDate || !d.components) return false;
+            const ago = (Date.now() - new Date(d.recordDate)) / 86400000;
+            return ago >= 0 && ago <= 366;
+          });
+          if (!ltmDivs.length) return "";
+
+          // Aggregate by canonical component type across all LTM quarters
+          const totals = {};
+          ltmDivs.forEach(d => {
+            d.components.forEach(c => {
+              if (!totals[c.canonical]) totals[c.canonical] = { taxable: c.taxable, amount: 0 };
+              totals[c.canonical].amount += c.amount;
+            });
+          });
+
+          const comps = Object.entries(totals).sort((a,b) => b[1].amount - a[1].amount);
+          if (!comps.length) return "";
+
+          const grandTotal = comps.reduce((s, [,c]) => s + c.amount, 0);
+          const taxableTotal   = comps.filter(([,c]) => c.taxable).reduce((s,[,c]) => s+c.amount, 0);
+          const taxFreeTotal   = comps.filter(([,c]) => !c.taxable).reduce((s,[,c]) => s+c.amount, 0);
+          const taxablePct     = grandTotal > 0 ? Math.round(taxableTotal / grandTotal * 100) : 0;
+          const taxFreePct     = 100 - taxablePct;
+
+          const rows = comps.map(([label, c]) => {
+            const pct = grandTotal > 0 ? (c.amount / grandTotal * 100).toFixed(0) : 0;
+            const badge = c.taxable
+              ? `<span style="font-size:10px;padding:1px 5px;border-radius:4px;background:var(--color-red-bg);color:var(--color-red);margin-left:6px;">Taxable</span>`
+              : `<span style="font-size:10px;padding:1px 5px;border-radius:4px;background:var(--color-green-bg);color:var(--color-green);margin-left:6px;">Tax-free</span>`;
+            return `
+              <div class="metric-row">
+                <div class="metric-row-label" style="display:flex;align-items:center;">
+                  ${label}${badge}
+                </div>
+                <div class="metric-row-value">₹${c.amount.toFixed(2)} <span class="muted" style="font-size:10px;">(${pct}%)</span></div>
+              </div>`;
+          }).join("");
+
+          return `
+            <div class="section-label">Distribution composition (LTM)</div>
+            <div class="card">
+              ${rows}
+              <div style="margin-top:8px;padding-top:8px;border-top:0.5px solid var(--color-border);display:flex;gap:12px;font-size:12px;flex-wrap:wrap;">
+                <span><span class="muted">Taxable:</span> <strong>₹${taxableTotal.toFixed(2)}</strong> <span class="muted">(${taxablePct}%)</span></span>
+                <span><span class="muted">Tax-free:</span> <strong>₹${taxFreeTotal.toFixed(2)}</strong> <span class="muted">(${taxFreePct}%)</span></span>
+                <span class="muted" style="font-size:10px;align-self:center;">per unit · last 12 months</span>
+              </div>
+            </div>`;
+        })()}`;
     }
 
     return `

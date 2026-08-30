@@ -434,19 +434,53 @@ function buildShareholdingHistory(rawShareholding) {
 }
 
 /**
+ * Maps raw `interimOrFinal` strings from the Indian API to canonical
+ * component categories and their taxability for REIT/InvIT distributions.
+ *
+ * Taxability under Indian tax law (as of FY2025-26):
+ *  - Interest income         → taxable at investor's slab rate
+ *  - Dividend (taxable)      → taxable at slab rate
+ *  - Dividend (exempt)       → tax-free (from SPV with pass-through status)
+ *  - Repayment of capital    → tax-free (reduces cost basis, taxed on sale)
+ *  - Treasury income         → taxable at slab rate
+ */
+const REIT_COMPONENT_MAP = {
+  "Interest":           { canonical: "Interest",            taxable: true  },
+  "Dividend - Taxable": { canonical: "Taxable Dividend",    taxable: true  },
+  "Dividend - Exempt":  { canonical: "Exempt Dividend",     taxable: false },
+  "RepOfCapSPVDebt":    { canonical: "Return of Capital",   taxable: false },
+  "ROC":                { canonical: "Return of Capital",   taxable: false },
+  "Treasury Income":    { canonical: "Treasury Income",     taxable: true  },
+  // Generic types used by some REITs — treated as taxable by default
+  "Final":              { canonical: "Distribution",        taxable: true  },
+  "Interim":            { canonical: "Distribution",        taxable: true  },
+  // Misc.Income appears as an alias for RepOfCapSPVDebt in some quarters
+  "Misc.Income":        { canonical: "Return of Capital",   taxable: false },
+};
+
+/**
  * Parse corporate actions into a clean structure.
+ * For REITs/InvITs each distribution quarter arrives as multiple rows
+ * (one per component type) with the same recordDate. We:
+ *  1. Deduplicate by (recordDate, canonicalType) — the API sometimes emits
+ *     the same component under two different `interimOrFinal` labels
+ *  2. Sum components into a total per date
+ *  3. Preserve the component breakdown so the UI can show taxable/tax-free split
  */
 function parseCorporateActions(raw) {
   if (!raw) return { dividends: [], splits: [], bonus: [] };
 
-  // REITs/InvITs split each distribution into sub-components (Interest, Taxable
-  // Dividend, Exempt Dividend, Repayment of Capital, Treasury Income) — each with
-  // the same recordDate but different `interimOrFinal` and `value`.
-  // Merge them by recordDate so downstream code sees one record per distribution date.
   const rawDivs = raw.dividend ?? [];
   const divByDate = {};
+
   rawDivs.forEach((d) => {
     const key = d.recordDate || d.dateOfAnnouncement || `no-date-${Math.random()}`;
+    const map = REIT_COMPONENT_MAP[d.interimOrFinal] || null;
+    const canonical = map ? map.canonical : (d.interimOrFinal || "Distribution");
+    const taxable   = map ? map.taxable   : true;
+    const val       = parseFloat(d.value) || 0;
+    if (val === 0) return; // skip zero-value rows
+
     if (!divByDate[key]) {
       divByDate[key] = {
         type: "Distribution",
@@ -455,16 +489,37 @@ function parseCorporateActions(raw) {
         recordDate: d.recordDate,
         xdDate: d.xdDate,
         announced: d.dateOfAnnouncement,
-        remarks: d.remarks,          // keep first record's full remarks (has the total)
+        remarks: d.remarks,
+        components: {}, // keyed by canonical type to deduplicate
       };
     }
-    divByDate[key].amount += parseFloat(d.value) || 0;
+
+    const entry = divByDate[key];
+    // Deduplicate: if same canonical type already seen for this date,
+    // keep whichever has the higher-specificity source type.
+    // Specific types (Interest, Dividend - Taxable) beat generic (Interim, Misc.Income).
+    const isGeneric = ["Interim", "Final", "Misc.Income"].includes(d.interimOrFinal);
+    if (!entry.components[canonical] || !isGeneric) {
+      entry.components[canonical] = { canonical, taxable, amount: val };
+    }
   });
-  // Round merged amounts to avoid floating-point noise (e.g. 2.9999 → 3.00)
-  const mergedDividends = Object.values(divByDate).map((d) => ({
-    ...d,
-    amount: parseFloat(d.amount.toFixed(4)),
-  }));
+
+  // Build final dividend array from deduplicated components
+  const mergedDividends = Object.values(divByDate).map((d) => {
+    const comps = Object.values(d.components);
+    const total = comps.reduce((s, c) => s + c.amount, 0);
+    return {
+      type:       d.type,
+      amount:     parseFloat(total.toFixed(4)),
+      percentage: d.percentage,
+      recordDate: d.recordDate,
+      xdDate:     d.xdDate,
+      announced:  d.announced,
+      remarks:    d.remarks,
+      // Component breakdown for REIT distribution composition display
+      components: comps.length > 1 ? comps : null, // only set for REIT multi-component distributions
+    };
+  });
 
   return {
     dividends: mergedDividends,
