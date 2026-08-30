@@ -367,7 +367,7 @@ function buildDivEntries(filteredHoldings, divMap) {
         return sum;
       }, 0);
       if (eligibleQty > 0)
-        entries.push({ ticker:h.ticker, divDate, divFY, amountPerShare:div.amount, qty:eligibleQty, total:eligibleQty*div.amount, components: div.components || null });
+        entries.push({ ticker:h.ticker, divDate, divFY, amountPerShare:div.amount, qty:eligibleQty, total:eligibleQty*div.amount });
     }
   }
   return entries;
@@ -401,28 +401,38 @@ function wireDividendModal(filteredHoldings, divMap) {
     const grand = filtered.reduce((s,e)=>s+e.total,0);
     document.getElementById("div-modal-total").textContent = `Total: ₹${Math.round(grand).toLocaleString("en-IN")}`;
     if (filtered.length===0) { document.getElementById("div-modal-table").innerHTML=`<div class="muted" style="font-size:13px;">No dividends for this period.</div>`; return; }
-    document.getElementById("div-modal-table").innerHTML = Object.entries(byTicker).sort((a,b)=>b[1].total-a[1].total).map(([ticker,data])=>`
+    document.getElementById("div-modal-table").innerHTML = Object.entries(byTicker).sort((a,b)=>b[1].total-a[1].total).map(([ticker,data])=>{
+      // Build taxable/tax-free summary from the stock's component data (all LTM dividends)
+      const stockDivs = divMap[ticker] || [];
+      const taxableTot = {}; // canonical → {taxable, amount}
+      stockDivs.forEach(d => {
+        if (!d.components) return;
+        d.components.forEach(c => {
+          if (!taxableTot[c.canonical]) taxableTot[c.canonical] = { taxable: c.taxable, amount: 0 };
+          taxableTot[c.canonical].amount += c.amount;
+        });
+      });
+      const compList = Object.values(taxableTot);
+      const taxableAmt  = compList.filter(c=>c.taxable).reduce((s,c)=>s+c.amount,0);
+      const taxFreeAmt  = compList.filter(c=>!c.taxable).reduce((s,c)=>s+c.amount,0);
+      const grandAmt    = taxableAmt + taxFreeAmt;
+      const taxSummary  = grandAmt > 0 ? `
+        <div style="font-size:11px;padding:4px 0;display:flex;gap:10px;flex-wrap:wrap;color:var(--color-text-secondary);">
+          <span>Per unit (LTM):</span>
+          <span><span style="padding:1px 5px;border-radius:3px;background:var(--color-red-bg);color:var(--color-red);font-size:10px;">Taxable</span> ₹${taxableAmt.toFixed(2)} (${Math.round(taxableAmt/grandAmt*100)}%)</span>
+          <span><span style="padding:1px 5px;border-radius:3px;background:var(--color-green-bg);color:var(--color-green);font-size:10px;">Tax-free</span> ₹${taxFreeAmt.toFixed(2)} (${Math.round(taxFreeAmt/grandAmt*100)}%)</span>
+        </div>` : "";
+      return `
       <div style="margin-bottom:12px;">
         <div style="font-size:13px;font-weight:600;padding:4px 0;border-bottom:0.5px solid var(--color-border);">${ticker} — ₹${Math.round(data.total).toLocaleString("en-IN")} total</div>
-        ${data.entries.map(e=>{
-          const mainRow = `<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:${e.components?"none":"0.5px solid var(--color-border)"};gap:8px;flex-wrap:wrap;">
-            <span class="muted">${e.divDate} (${e.divFY})</span>
-            <span>${e.qty.toLocaleString()} × ₹${e.amountPerShare}</span>
-            <span style="font-weight:500;">₹${Math.round(e.total).toLocaleString("en-IN")}</span>
-          </div>`;
-          if (!e.components || !e.components.length) return mainRow;
-          const compRows = e.components.sort((a,b)=>b.amount-a.amount).map(c=>{
-            const badge = c.taxable
-              ? `<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:var(--color-red-bg);color:var(--color-red);">Taxable</span>`
-              : `<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:var(--color-green-bg);color:var(--color-green);">Tax-free</span>`;
-            return `<div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0 2px 12px;color:var(--color-text-secondary);gap:6px;flex-wrap:wrap;">
-              <span style="display:flex;align-items:center;gap:4px;">${c.canonical} ${badge}</span>
-              <span>₹${c.amount.toFixed(2)}/unit · ₹${Math.round(c.amount * e.qty).toLocaleString("en-IN")} total</span>
-            </div>`;
-          }).join("");
-          return mainRow + `<div style="border-bottom:0.5px solid var(--color-border);padding-bottom:4px;margin-bottom:2px;">${compRows}</div>`;
-        }).join("")}
-      </div>`).join("");
+        ${taxSummary}
+        ${data.entries.map(e=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:0.5px solid var(--color-border);gap:8px;flex-wrap:wrap;">
+          <span class="muted">${e.divDate} (${e.divFY})</span>
+          <span>${e.qty.toLocaleString()} × ₹${e.amountPerShare}</span>
+          <span style="font-weight:500;">₹${Math.round(e.total).toLocaleString("en-IN")}</span>
+        </div>`).join("")}
+      </div>`;
+    }).join("");
   }
   document.getElementById("div-summary-card").addEventListener("click", () => { renderDivTable("all"); document.getElementById("div-modal-overlay").style.display="block"; });
   document.getElementById("div-modal-close").addEventListener("click", () => { document.getElementById("div-modal-overlay").style.display="none"; });

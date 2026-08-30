@@ -251,9 +251,7 @@ const stockDetailScreen = {
           ${metricRow("Gearing (D/E)", pc.gearing, pc.gearing != null ? pc.gearing.toFixed(2)+"x" : "—", pc.gearing != null ? (pc.gearing <= 1.0 ? "green" : "red") : null)}
           ${metricRow("Interest coverage", pc.interestCoverage, pc.interestCoverage != null ? pc.interestCoverage.toFixed(2)+"x" : "—", pc.interestCoverage != null ? (pc.interestCoverage >= 1.5 ? "green" : "red") : null)}
           ${metricRow("Operating margin", pc.operatingMargin, pc.operatingMargin != null ? pc.operatingMargin.toFixed(1)+"%" : "—", null)}
-        </div>
-
-        })()}`;
+        </div>`;
     }
 
     return `
