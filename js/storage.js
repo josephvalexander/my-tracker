@@ -180,7 +180,7 @@ async function importAll(data) {
   if (data.snapshots) {
     const localSnaps = (await MetaStore.getSnapshots()) || {};
     const merged = {};
-    for (const filter of ["all","mainboard","sme","index"]) {
+    for (const filter of ["all","mainboard","sme","reit","index"]) {
       const local  = (localSnaps[filter] || []);
       const remote = (data.snapshots[filter] || []);
       const byDate = {};
