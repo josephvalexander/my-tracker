@@ -544,8 +544,9 @@ const stockDetailScreen = {
             ...stock.priceContext,
             source: result.quoteInfo.source === "bse" ? "bse_live" : "yahoo_finance",
             lastUpdated: today,
-            ...(result.quoteInfo.week52High && { week52High: result.quoteInfo.week52High }),
-            ...(result.quoteInfo.week52Low  && { week52Low:  result.quoteInfo.week52Low  }),
+            // REIT/InvIT: Yahoo 52w data is unreliable — keep indianapi values
+            ...(stock.board !== "reit" && result.quoteInfo.week52High && { week52High: result.quoteInfo.week52High }),
+            ...(stock.board !== "reit" && result.quoteInfo.week52Low  && { week52Low:  result.quoteInfo.week52Low  }),
             ...(result.quoteInfo.todayLow   && { todayLow:   result.quoteInfo.todayLow   }),
             ...(result.quoteInfo.todayHigh  && { todayHigh:  result.quoteInfo.todayHigh  }),
             ...(result.quoteInfo.previousClose && { previousClose: result.quoteInfo.previousClose }),

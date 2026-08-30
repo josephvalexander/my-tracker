@@ -402,9 +402,13 @@ function wireDividendModal(filteredHoldings, divMap) {
     document.getElementById("div-modal-total").textContent = `Total: ₹${Math.round(grand).toLocaleString("en-IN")}`;
     if (filtered.length===0) { document.getElementById("div-modal-table").innerHTML=`<div class="muted" style="font-size:13px;">No dividends for this period.</div>`; return; }
     document.getElementById("div-modal-table").innerHTML = Object.entries(byTicker).sort((a,b)=>b[1].total-a[1].total).map(([ticker,data])=>{
-      // Build taxable/tax-free summary from the stock's component data (all LTM dividends)
-      const stockDivs = divMap[ticker] || [];
-      const taxableTot = {}; // canonical → {taxable, amount}
+      // Build taxable/tax-free summary from filtered entries for this ticker
+      // Uses component ratios from stored dividend data, applied to actual received amounts
+      // so it respects the FY filter and shows total ₹ received, not per-unit.
+      const tickerTotal = data.total; // already FY-filtered
+      const stockDivs   = divMap[ticker] || [];
+      // Compute per-unit taxable/tax-free ratio from LTM component data
+      const taxableTot = {};
       stockDivs.forEach(d => {
         if (!d.components) return;
         d.components.forEach(c => {
@@ -412,15 +416,17 @@ function wireDividendModal(filteredHoldings, divMap) {
           taxableTot[c.canonical].amount += c.amount;
         });
       });
-      const compList = Object.values(taxableTot);
-      const taxableAmt  = compList.filter(c=>c.taxable).reduce((s,c)=>s+c.amount,0);
-      const taxFreeAmt  = compList.filter(c=>!c.taxable).reduce((s,c)=>s+c.amount,0);
-      const grandAmt    = taxableAmt + taxFreeAmt;
-      const taxSummary  = grandAmt > 0 ? `
+      const compList   = Object.values(taxableTot);
+      const taxableUnit = compList.filter(c=>c.taxable).reduce((s,c)=>s+c.amount,0);
+      const taxFreeUnit = compList.filter(c=>!c.taxable).reduce((s,c)=>s+c.amount,0);
+      const grandUnit   = taxableUnit + taxFreeUnit;
+      // Apply ratio to actual filtered total ₹
+      const taxableTotal_ = grandUnit > 0 ? tickerTotal * taxableUnit / grandUnit : 0;
+      const taxFreeTotal_ = grandUnit > 0 ? tickerTotal * taxFreeUnit  / grandUnit : 0;
+      const taxSummary  = grandUnit > 0 ? `
         <div style="font-size:11px;padding:4px 0;display:flex;gap:10px;flex-wrap:wrap;color:var(--color-text-secondary);">
-          <span>Per unit (LTM):</span>
-          <span><span style="padding:1px 5px;border-radius:3px;background:var(--color-red-bg);color:var(--color-red);font-size:10px;">Taxable</span> ₹${taxableAmt.toFixed(2)} (${Math.round(taxableAmt/grandAmt*100)}%)</span>
-          <span><span style="padding:1px 5px;border-radius:3px;background:var(--color-green-bg);color:var(--color-green);font-size:10px;">Tax-free</span> ₹${taxFreeAmt.toFixed(2)} (${Math.round(taxFreeAmt/grandAmt*100)}%)</span>
+          <span><span style="padding:1px 5px;border-radius:3px;background:var(--color-red-bg);color:var(--color-red);font-size:10px;">Taxable</span> ₹${Math.round(taxableTotal_).toLocaleString("en-IN")} (${Math.round(taxableUnit/grandUnit*100)}%)</span>
+          <span><span style="padding:1px 5px;border-radius:3px;background:var(--color-green-bg);color:var(--color-green);font-size:10px;">Tax-free</span> ₹${Math.round(taxFreeTotal_).toLocaleString("en-IN")} (${Math.round(taxFreeUnit/grandUnit*100)}%)</span>
         </div>` : "";
       return `
       <div style="margin-bottom:12px;">
