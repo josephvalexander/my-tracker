@@ -318,7 +318,6 @@ const addStockScreen = {
       await StockStore.set(ticker, stock);
 
       autoPush().catch(()=>{});
-  autoPush().catch(()=>{});
       document.getElementById("create-stock-btn").disabled = true;
       document.getElementById("post-add-section").style.display = "block";
 
@@ -397,7 +396,8 @@ const addStockScreen = {
             stockNow.qualitative.marketPosition = result.marketPosition;
             await StockStore.set(ticker, stockNow);
             
-autoPush().catch(()=>{});            aiStatus.textContent = "✓ All three drafted — review on the stock page.";
+autoPush().catch(()=>{});
+            aiStatus.textContent = "✓ All three drafted — review on the stock page.";
           } catch (err) {
             aiStatus.textContent = `Draft failed: ${err.message}`;
           }
