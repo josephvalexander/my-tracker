@@ -130,8 +130,8 @@ function renderSummaryCard(summary) {
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
         <span class="metric-card-label">Overall</span>
         ${xirrText ? `<div style="display:flex;border:0.5px solid var(--color-border);border-radius:4px;overflow:hidden;">
-          <button id="toggle-abs"  style="padding:1px 5px;background:var(--color-text);color:var(--color-surface);border:none;cursor:pointer;font-size:9px;">Abs</button>
-          <button id="toggle-xirr" style="padding:1px 5px;background:none;color:var(--color-text-secondary);border:none;cursor:pointer;font-size:9px;">XIRR</button>
+          <button id="toggle-abs"  style="padding:1px 5px;background:${window.uiState.holdingsXirr?'none':'var(--color-text)'};color:${window.uiState.holdingsXirr?'var(--color-text-secondary)':'var(--color-surface)'};border:none;cursor:pointer;font-size:9px;">Abs</button>
+          <button id="toggle-xirr" style="padding:1px 5px;background:${window.uiState.holdingsXirr?'var(--color-text)':'none'};color:${window.uiState.holdingsXirr?'var(--color-surface)':'var(--color-text-secondary)'};border:none;cursor:pointer;font-size:9px;">XIRR</button>
         </div>` : ""}
       </div>
       <div class="metric-card-value ${absCls}" id="overall-value">${absText}</div>
@@ -158,8 +158,9 @@ function renderSummaryCard(summary) {
         tA.style.background = "none"; tA.style.color = "var(--color-text-secondary)";
       }
     }
-    tA.addEventListener("click", e => { e.stopPropagation(); setMode("abs"); });
-    tX.addEventListener("click", e => { e.stopPropagation(); setMode("xirr"); });
+    tA.addEventListener("click", e => { e.stopPropagation(); window.uiState.holdingsXirr = false; uiStateSave(); setMode("abs"); });
+    tX.addEventListener("click", e => { e.stopPropagation(); window.uiState.holdingsXirr = true; uiStateSave(); setMode("xirr"); });
+    setMode(window.uiState.holdingsXirr ? "xirr" : "abs");
   }
 }
 
@@ -431,9 +432,9 @@ const holdingsScreen = {
           <button id="add-holding-btn" class="btn btn-small">+ Add position</button>
         </div>
         <div class="toggle-row" style="margin-bottom:8px;">
-          <button class="h-chip h-chip-active" data-filter="mainboard">Mainboard</button>
-          <button class="h-chip" data-filter="sme">SME</button>
-          <button class="h-chip" data-filter="reit">REIT / InvIT</button>
+          <button class="h-chip ${window.uiState.holdingsFilters.has('mainboard') ? 'h-chip-active' : ''}" data-filter="mainboard">Mainboard</button>
+          <button class="h-chip ${window.uiState.holdingsFilters.has('sme') ? 'h-chip-active' : ''}" data-filter="sme">SME</button>
+          <button class="h-chip ${window.uiState.holdingsFilters.has('reit') ? 'h-chip-active' : ''}" data-filter="reit">REIT / InvIT</button>
         </div>
         <div id="holdings-summary" class="metric-grid-4"></div>
         <div id="holdings-list" class="stock-list"></div>
@@ -453,7 +454,7 @@ const holdingsScreen = {
       `· ${holdings.length} position${holdings.length===1?"":"s"}`;
     document.getElementById("add-holding-btn").addEventListener("click", () => { window.location.hash="#addHolding"; });
 
-    let activeFilters = new Set(["mainboard"]);
+    const activeFilters = window.uiState.holdingsFilters;
 
     function filterHoldings() {
       return holdings.filter(h => {
@@ -486,6 +487,7 @@ const holdingsScreen = {
         if (activeFilters.has(f)) { if (activeFilters.size > 1) activeFilters.delete(f); }
         else activeFilters.add(f);
         chip.classList.toggle("h-chip-active", activeFilters.has(f));
+        uiStateSave();
         applyFilter();
       });
     });
