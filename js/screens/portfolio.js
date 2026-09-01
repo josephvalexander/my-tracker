@@ -173,7 +173,8 @@ const portfolioScreen = {
 
     // Load all snapshots for the current filter
     const snapKey = activeFilters.size === 1 && activeFilters.has("mainboard") ? "mainboard"
-      : activeFilters.size === 1 && activeFilters.has("sme") ? "sme"
+      : activeFilters.size === 1 && activeFilters.has("sme")  ? "sme"
+      : activeFilters.size === 1 && activeFilters.has("reit") ? "reit"
       : "all";
     const allSnapshots = (await MetaStore.getSnapshots()) || {};
     const allSnaps     = (allSnapshots[snapKey] || []).sort((a,b) => a.date.localeCompare(b.date));
@@ -223,7 +224,7 @@ const portfolioScreen = {
           <div id="snap-period-toggle" style="display:flex; gap:4px;"></div>
         </div>
         <div style="position:relative; height:110px;"><canvas id="portfolio-value-chart"></canvas></div>`
-        : `<div class="muted" style="font-size:11px; padding-top:8px; border-top:0.5px solid var(--color-border);">Portfolio value chart will appear after a few days of price refreshes. Tap ↻ Prices daily to build history.</div>`
+                : `<div class="muted" style="font-size:11px; padding-top:8px; border-top:0.5px solid var(--color-border);">${snapKey === "reit" ? "REIT/InvIT chart builds day by day — select only the REIT/InvIT chip and open the app daily." : "Portfolio value chart will appear after a few days of price refreshes."}</div>`
       }`;
 
     // Wire tooltips each time growth section re-renders

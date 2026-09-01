@@ -228,12 +228,13 @@ const addStockScreen = {
 
         <div class="form-group">
           <label>Board</label>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:4px; max-width:280px;">
-            <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;"><input type="radio" name="board" value="mainboard" checked style="flex-shrink:0;width:16px;height:16px;accent-color:var(--color-green);" /> Mainboard</label>
-            <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;"><input type="radio" name="board" value="sme" style="flex-shrink:0;width:16px;height:16px;accent-color:var(--color-green);" /> SME</label>
-            <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;"><input type="radio" name="board" value="microcap" style="flex-shrink:0;width:16px;height:16px;accent-color:var(--color-green);" /> Microcap</label>
-            <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;"><input type="radio" name="board" value="reit" style="flex-shrink:0;width:16px;height:16px;accent-color:var(--color-green);" /> REIT / InvIT</label>
+          <div id="board-chip-row" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:4px;">
+            <button type="button" class="board-chip board-chip-active" data-board="mainboard">Mainboard</button>
+            <button type="button" class="board-chip" data-board="sme">SME</button>
+            <button type="button" class="board-chip" data-board="microcap">Microcap</button>
+            <button type="button" class="board-chip" data-board="reit">REIT / InvIT</button>
           </div>
+          <input type="hidden" name="board" id="board-hidden-input" value="mainboard" />
           <div id="add-reit-subtype-row" style="display:none; gap:20px; margin-top:10px;">
             <label style="font-size:12px; color:var(--color-text-secondary);">Sub-type:</label>
             <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="radio" name="add-reit-type" value="REIT" checked /> REIT</label>
@@ -264,10 +265,13 @@ const addStockScreen = {
   },
 
   async afterRender() {
-    // Show/hide REIT sub-fields when board changes
-    document.querySelectorAll('input[name="board"]').forEach(radio => {
-      radio.addEventListener("change", () => {
-        const isReit = document.querySelector('input[name="board"]:checked')?.value === "reit";
+    // Board chip selection — updates hidden input, toggles REIT sub-fields
+    document.querySelectorAll(".board-chip").forEach(chip => {
+      chip.addEventListener("click", () => {
+        document.querySelectorAll(".board-chip").forEach(c => c.classList.remove("board-chip-active"));
+        chip.classList.add("board-chip-active");
+        document.getElementById("board-hidden-input").value = chip.dataset.board;
+        const isReit = chip.dataset.board === "reit";
         document.getElementById("add-reit-subtype-row").style.display = isReit ? "flex" : "none";
         document.getElementById("add-reit-asset-row").style.display   = isReit ? "flex" : "none";
       });
@@ -276,7 +280,7 @@ const addStockScreen = {
       const ticker    = document.getElementById("ticker-input").value.trim().toUpperCase();
       const nameInput = document.getElementById("name-input").value.trim();
       const searchName = ticker;
-      const board     = document.querySelector('input[name="board"]:checked')?.value || "mainboard";
+      const board     = document.getElementById("board-hidden-input")?.value || "mainboard";
       const reitType  = board === "reit" ? (document.querySelector('input[name="add-reit-type"]:checked')?.value || "REIT") : undefined;
       const reitAssetClass = board === "reit" ? (document.getElementById("add-reit-asset-class")?.value || "Office") : undefined;
       const statusEl = document.getElementById("fetch-status");
@@ -345,7 +349,7 @@ const addStockScreen = {
         const cagr = epsCagr(updatedStock);
         const years = parsed.stockFundamentals.annual.years?.length ?? 0;
         const latestShareholding = parsed.shareholding.history?.slice(-1)?.[0];
-        const isReitAdd = (document.querySelector('input[name="board"]:checked')?.value) === "reit";
+        const isReitAdd = document.getElementById("board-hidden-input")?.value === "reit";
         const pc = parsed.priceContext;
 
         const equityRows = `
