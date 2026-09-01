@@ -228,11 +228,11 @@ const addStockScreen = {
 
         <div class="form-group">
           <label>Board</label>
-          <div style="display:flex; flex-wrap:wrap; gap:10px 20px; margin-top:4px;">
-            <label style="display:flex; align-items:center; gap:6px; font-size:13px; white-space:nowrap;"><input type="radio" name="board" value="mainboard" checked /> Mainboard</label>
-            <label style="display:flex; align-items:center; gap:6px; font-size:13px; white-space:nowrap;"><input type="radio" name="board" value="sme" /> SME</label>
-            <label style="display:flex; align-items:center; gap:6px; font-size:13px; white-space:nowrap;"><input type="radio" name="board" value="microcap" /> Microcap</label>
-            <label style="display:flex; align-items:center; gap:6px; font-size:13px; white-space:nowrap;"><input type="radio" name="board" value="reit" /> REIT / InvIT</label>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:4px; max-width:280px;">
+            <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;"><input type="radio" name="board" value="mainboard" checked style="flex-shrink:0;width:16px;height:16px;accent-color:var(--color-green);" /> Mainboard</label>
+            <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;"><input type="radio" name="board" value="sme" style="flex-shrink:0;width:16px;height:16px;accent-color:var(--color-green);" /> SME</label>
+            <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;"><input type="radio" name="board" value="microcap" style="flex-shrink:0;width:16px;height:16px;accent-color:var(--color-green);" /> Microcap</label>
+            <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;"><input type="radio" name="board" value="reit" style="flex-shrink:0;width:16px;height:16px;accent-color:var(--color-green);" /> REIT / InvIT</label>
           </div>
           <div id="add-reit-subtype-row" style="display:none; gap:20px; margin-top:10px;">
             <label style="font-size:12px; color:var(--color-text-secondary);">Sub-type:</label>

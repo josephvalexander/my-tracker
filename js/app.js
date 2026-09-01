@@ -309,9 +309,12 @@ async function clearCorruptedReitSnapshots() {
     const allByDate = {};
     (snaps.all || []).forEach(s => { allByDate[s.date] = s.value; });
     const reitSnaps = snaps.reit || [];
-    const corruptCount = reitSnaps.filter(s => allByDate[s.date] === s.value).length;
-    // If more than half of reit snapshots match the "all" value, they're corrupted
-    if (corruptCount > reitSnaps.length / 2) {
+    // Corrupted if reit value is within 2% of the "all" value (reit should be a subset)
+    const corruptCount = reitSnaps.filter(s => {
+      const a = allByDate[s.date];
+      return a && s.value > 0 && Math.abs(s.value - a) / a < 0.02;
+    }).length;
+    if (corruptCount > 0) { // any match is suspicious — reit should differ from all
       console.info("[Migration] Clearing corrupted reit snapshots — will rebuild from today.");
       snaps.reit = [];
       await MetaStore.setSnapshots(snaps);
