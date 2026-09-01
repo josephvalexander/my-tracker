@@ -294,6 +294,33 @@ async function autoPush() {
 }
 window.autoPush = autoPush;
 
+
+/**
+ * One-time migration: clear corrupted reit portfolio snapshots.
+ * Before the reit filter was added to savePortfolioSnapshot, snapshots were
+ * stored under the "reit" key but contained the "all" (full portfolio) value.
+ * Detect this by comparing reit vs all values — if they match on multiple
+ * dates, the reit bucket is corrupted and should be reset.
+ */
+async function clearCorruptedReitSnapshots() {
+  try {
+    const snaps = await MetaStore.getSnapshots();
+    if (!snaps?.reit?.length || !snaps?.all?.length) return;
+    const allByDate = {};
+    (snaps.all || []).forEach(s => { allByDate[s.date] = s.value; });
+    const reitSnaps = snaps.reit || [];
+    const corruptCount = reitSnaps.filter(s => allByDate[s.date] === s.value).length;
+    // If more than half of reit snapshots match the "all" value, they're corrupted
+    if (corruptCount > reitSnaps.length / 2) {
+      console.info("[Migration] Clearing corrupted reit snapshots — will rebuild from today.");
+      snaps.reit = [];
+      await MetaStore.setSnapshots(snaps);
+    }
+  } catch (err) {
+    console.warn("clearCorruptedReitSnapshots failed:", err);
+  }
+}
+
 async function init() {
   await seedDefaultsIfNeeded();
   const settings = await MetaStore.getSettings();
@@ -308,6 +335,7 @@ async function init() {
   await registerServiceWorker();
   await autoPullOnOpen();
   await migrateWatchlistPrice(); // must run AFTER pull so Drive doesn't overwrite it
+  await clearCorruptedReitSnapshots(); // one-time fix for corrupted reit snapshots
   savePortfolioSnapshot().catch(() => {}); // capture today's value on each open
   initRouter();
 }

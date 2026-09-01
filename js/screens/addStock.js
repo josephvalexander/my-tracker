@@ -228,7 +228,7 @@ const addStockScreen = {
 
         <div class="form-group">
           <label>Board</label>
-          <div style="display:grid; grid-template-columns:repeat(4,auto); gap:12px 16px; margin-top:4px; width:fit-content;">
+          <div style="display:flex; flex-wrap:wrap; gap:10px 20px; margin-top:4px;">
             <label style="display:flex; align-items:center; gap:6px; font-size:13px; white-space:nowrap;"><input type="radio" name="board" value="mainboard" checked /> Mainboard</label>
             <label style="display:flex; align-items:center; gap:6px; font-size:13px; white-space:nowrap;"><input type="radio" name="board" value="sme" /> SME</label>
             <label style="display:flex; align-items:center; gap:6px; font-size:13px; white-space:nowrap;"><input type="radio" name="board" value="microcap" /> Microcap</label>
