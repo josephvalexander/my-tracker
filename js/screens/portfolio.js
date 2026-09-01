@@ -172,12 +172,39 @@ const portfolioScreen = {
     const yoy  = revenueCount > 0 && totalRevYoY  > 0 ? ((totalRevQ - totalRevYoY)  / totalRevYoY  * 100) : null;
 
     // Load all snapshots for the current filter
+    const allSnapshots = (await MetaStore.getSnapshots()) || {};
+
+    // Determine which snapshot buckets to combine based on active chip selection.
+    // Each board filter has its own snapshot bucket. When multiple chips are selected
+    // we sum the per-date values from each bucket rather than using the "all" bucket
+    // (which always includes every board regardless of filter selection).
     const snapKey = activeFilters.size === 1 && activeFilters.has("mainboard") ? "mainboard"
       : activeFilters.size === 1 && activeFilters.has("sme")  ? "sme"
       : activeFilters.size === 1 && activeFilters.has("reit") ? "reit"
-      : "all";
-    const allSnapshots = (await MetaStore.getSnapshots()) || {};
-    const allSnaps     = (allSnapshots[snapKey] || []).sort((a,b) => a.date.localeCompare(b.date));
+      : "combined"; // multi-chip: sum individual buckets
+
+    let allSnaps;
+    if (snapKey !== "combined") {
+      allSnaps = (allSnapshots[snapKey] || []).sort((a,b) => a.date.localeCompare(b.date));
+    } else {
+      // Sum values from each selected bucket by date
+      const buckets = [];
+      if (activeFilters.has("mainboard")) buckets.push(allSnapshots.mainboard || []);
+      if (activeFilters.has("sme"))       buckets.push(allSnapshots.sme       || []);
+      if (activeFilters.has("reit"))      buckets.push(allSnapshots.reit      || []);
+      // Only use "all" if no individual buckets match (legacy / fallback)
+      if (!buckets.length) buckets.push(allSnapshots.all || []);
+
+      const byDate = {};
+      buckets.forEach(bucket => {
+        bucket.forEach(s => {
+          byDate[s.date] = (byDate[s.date] || 0) + s.value;
+        });
+      });
+      allSnaps = Object.entries(byDate)
+        .map(([date, value]) => ({ date, value }))
+        .sort((a,b) => a.date.localeCompare(b.date));
+    }
 
     growthEl.innerHTML = `
       <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:${allSnaps.length > 1 ? "14px" : "0"};">
