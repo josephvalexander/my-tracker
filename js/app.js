@@ -55,85 +55,51 @@ async function seedDefaultsIfNeeded() {
  * This is self-healing: no user action needed. The reload re-registers
  * the correct SW and serves fresh files from that point on.
  */
-async function silentSWUpdate() {
-  if (!("serviceWorker" in navigator)) return;
-  try {
-    const buildId = document.querySelector("meta[name='build-id']")?.content;
-    if (!buildId || buildId === "BUILD_ID_PLACEHOLDER") return; // dev / not yet injected
-
-    const reg = await navigator.serviceWorker.getRegistration("./");
-    if (!reg) return;
-
-    // Force the browser to re-fetch service-worker.js from network right now.
-    // updateViaCache:"none" (set at register time) ensures no HTTP cache is used.
-    await reg.update();
-
-    // After update(), one of three states:
-    // 1. reg.installing  — new SW downloading/installing right now
-    // 2. reg.waiting     — new SW installed, waiting for old SW to release
-    // 3. neither         — SW was already current, nothing to do
-
-    const newWorker = reg.installing || reg.waiting;
-    if (!newWorker) return; // already up to date
-
-    console.info("[SW] New version detected — activating silently…");
-
-    // Tell the new SW to skip waiting immediately.
-    // Our new SW has the SKIP_WAITING message handler.
-    newWorker.postMessage({ type: "SKIP_WAITING" });
-
-    // Wait for it to become the active controller, then reload.
-    await new Promise((resolve) => {
-      navigator.serviceWorker.addEventListener("controllerchange", resolve, { once: true });
-      // Fallback: if controllerchange doesn't fire within 3s, reload anyway
-      setTimeout(resolve, 3000);
-    });
-
-    window.location.reload();
-    await new Promise(() => {}); // prevent initRouter running on stale page
-  } catch (err) {
-    console.warn("[SW] silentSWUpdate check failed:", err.message);
-  }
-}
 
 async function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
   try {
-    // updateViaCache: "none" forces the browser to always fetch
-    // service-worker.js from the network, bypassing HTTP cache.
-    // Without this, Chrome on Android can serve the old SW from disk
-    // cache for up to 24 h — so users never see new deploys.
+    // updateViaCache:"none" — browser always fetches service-worker.js from
+    // network, bypassing HTTP cache. Critical for Android where Chrome can
+    // serve the old SW from disk cache for up to 24 h otherwise.
     const registration = await navigator.serviceWorker.register(
       "./service-worker.js",
       { updateViaCache: "none" }
     );
 
-    // Check for an update immediately on every app open instead of
-    // waiting for the browser's default polling interval.
-    registration.update().catch(() => {});
-
-    // SW_UPDATED is posted by the new SW after activate + clients.claim().
-    // Small delay lets claim() fully settle on Android before reload fires.
+    // SW_UPDATED posted by new SW after activate+claim. Reload to pick up
+    // new cached files. Delay 200ms to let claim() settle on Android.
     navigator.serviceWorker.addEventListener("message", (event) => {
       if (event.data?.type === "SW_UPDATED") {
-        setTimeout(() => window.location.reload(), 150);
+        setTimeout(() => window.location.reload(), 200);
       }
     });
 
-    // If a waiting SW exists on load (app was in background during deploy),
-    // tell it to activate immediately rather than waiting for tab close.
-    if (registration.waiting) {
-      registration.waiting.postMessage({ type: "SKIP_WAITING" });
-    }
-    registration.addEventListener("updatefound", () => {
-      const newWorker = registration.installing;
-      if (!newWorker) return;
-      newWorker.addEventListener("statechange", () => {
-        if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-          newWorker.postMessage({ type: "SKIP_WAITING" });
+    // Wire the updatefound listener BEFORE calling registration.update()
+    // so we never miss the event if the network responds immediately.
+    function wireNewWorker(worker) {
+      worker.addEventListener("statechange", () => {
+        if (worker.state === "installed" && navigator.serviceWorker.controller) {
+          console.info("[SW] New version installed — activating…");
+          worker.postMessage({ type: "SKIP_WAITING" });
         }
       });
+    }
+
+    registration.addEventListener("updatefound", () => {
+      if (registration.installing) wireNewWorker(registration.installing);
     });
+
+    // Handle SW that was already waiting when the page loaded
+    // (app was in background during a deploy).
+    if (registration.waiting) {
+      console.info("[SW] Waiting SW found on load — activating…");
+      registration.waiting.postMessage({ type: "SKIP_WAITING" });
+    }
+
+    // Trigger a network check for a new SW on every app open.
+    // This fires updatefound if service-worker.js changed.
+    registration.update().catch(() => {});
 
   } catch (err) {
     console.warn("Service worker registration failed:", err);
@@ -334,7 +300,6 @@ async function init() {
     if (settings.deRule.green  != null) DEFAULT_RULES.de.green  = settings.deRule.green;
     if (settings.deRule.yellow != null) DEFAULT_RULES.de.yellow = settings.deRule.yellow;
   }
-  await silentSWUpdate(); // unregisters stale SW and reloads if a new build is available
   await registerServiceWorker();
   await autoPullOnOpen();
   await migrateWatchlistPrice(); // must run AFTER pull so Drive doesn't overwrite it
