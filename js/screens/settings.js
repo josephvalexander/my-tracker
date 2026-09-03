@@ -19,49 +19,24 @@ const settingsScreen = {
       <div class="screen-padding">
         <div class="screen-title">Settings</div>
 
+        <!-- ① Google Drive — always visible -->
         <div class="section-label">Google Drive</div>
         <div class="card" id="drive-status-card">Loading...</div>
 
-        <div class="section-label" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" id="board-class-header">
-          Stock board classification
-          <span id="board-class-chevron" style="font-size:11px; color:var(--color-text-tertiary);">▶ expand</span>
-        </div>
-        <div id="board-class-panel" style="display:none;">
-          <div class="card">
-            <div class="muted" style="font-size:11px; margin-bottom:8px;">Set each stock's board — Mainboard, SME, or Microcap. Affects watchlist grouping and analytics.</div>
-            <div id="board-classification-list"></div>
-            <button id="save-board-classification-btn" class="btn btn-small" style="margin-top:10px;">Save classifications</button>
-            <div id="board-save-status" class="muted" style="font-size:11px; margin-top:4px;"></div>
-          </div>
-        </div>
-
-        <div class="section-label">Export data</div>
+        <!-- ② Appearance — always visible -->
+        <div class="section-label">Appearance</div>
         <div class="card">
-          <div class="muted" style="font-size:11px; margin-bottom:10px;">Download your holdings and watchlist as CSV.</div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
-            <button id="export-holdings-csv" class="btn btn-small">↓ Holdings CSV</button>
-            <button id="export-watchlist-csv" class="btn btn-small">↓ Watchlist CSV</button>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:13px;">Theme</span>
+            <div class="theme-toggle-group" id="theme-toggle-group">
+              <button class="theme-btn" data-theme="auto">Auto</button>
+              <button class="theme-btn" data-theme="light">Light</button>
+              <button class="theme-btn" data-theme="dark">Dark</button>
+            </div>
           </div>
-          <div class="muted" style="font-size:11px; margin-bottom:6px;">Tax summary (realised gains only):</div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-            <select id="tax-fy-select" style="font-size:12px; padding:4px 8px; border:0.5px solid var(--color-border); border-radius:6px; background:var(--color-bg); color:var(--color-text);">
-              <option value="all">All years</option>
-            </select>
-            <button id="export-tax-csv" class="btn btn-small">↓ Tax summary CSV</button>
-          </div>
-          <div id="export-status" class="muted" style="font-size:11px; margin-top:6px;"></div>
         </div>
 
-        <div class="section-label">Import watchlist</div>
-        <div class="card">
-          <div class="muted" style="font-size:11px; margin-bottom:8px;">Import a watchlist CSV exported from another device. Merges with existing stocks — does not overwrite fundamentals already fetched.</div>
-          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-            <input type="file" id="import-watchlist-file" accept=".csv" style="font-size:12px;" />
-            <button id="import-watchlist-btn" class="btn btn-small">↑ Import</button>
-          </div>
-          <div id="import-status" class="muted" style="font-size:11px; margin-top:6px;"></div>
-        </div>
-
+        <!-- ③ Buffett rule thresholds — always visible -->
         <div class="section-label">Buffett rule thresholds</div>
         <div class="card">
           <div class="metric-row">
@@ -75,48 +50,102 @@ const settingsScreen = {
           <button id="save-thresholds-btn" class="btn btn-small">Save</button>
         </div>
 
-        <div class="section-label">Appearance</div>
-        <div class="card">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-size:13px;">Theme</span>
-            <div class="theme-toggle-group" id="theme-toggle-group">
-              <button class="theme-btn" data-theme="auto">Auto</button>
-              <button class="theme-btn" data-theme="light">Light</button>
-              <button class="theme-btn" data-theme="dark">Dark</button>
+        <!-- ④ Export data — collapsed -->
+        <div class="section-label" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" id="export-header">
+          Export data <span id="export-chevron" style="font-size:11px; color:var(--color-text-tertiary);">▶ expand</span>
+        </div>
+        <div id="export-panel" style="display:none;">
+          <div class="card">
+            <div class="muted" style="font-size:11px; margin-bottom:10px;">Download your holdings and watchlist as CSV.</div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+              <button id="export-holdings-csv" class="btn btn-small">↓ Holdings CSV</button>
+              <button id="export-watchlist-csv" class="btn btn-small">↓ Watchlist CSV</button>
+            </div>
+            <div class="muted" style="font-size:11px; margin-bottom:6px;">Tax summary (realised gains only):</div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+              <select id="tax-fy-select" style="font-size:16px; padding:4px 8px; border:0.5px solid var(--color-border); border-radius:6px; background:var(--color-bg); color:var(--color-text);">
+                <option value="all">All years</option>
+              </select>
+              <button id="export-tax-csv" class="btn btn-small">↓ Tax summary CSV</button>
+            </div>
+            <div id="export-status" class="muted" style="font-size:11px; margin-top:6px;"></div>
+          </div>
+        </div>
+
+        <!-- ⑤ Import watchlist — collapsed -->
+        <div class="section-label" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" id="import-header">
+          Import watchlist <span id="import-chevron" style="font-size:11px; color:var(--color-text-tertiary);">▶ expand</span>
+        </div>
+        <div id="import-panel" style="display:none;">
+          <div class="card">
+            <div class="muted" style="font-size:11px; margin-bottom:8px;">Import a watchlist CSV exported from another device. Merges with existing stocks — does not overwrite fundamentals already fetched.</div>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <input type="file" id="import-watchlist-file" accept=".csv" style="font-size:16px;" />
+              <button id="import-watchlist-btn" class="btn btn-small">↑ Import</button>
+            </div>
+            <div id="import-status" class="muted" style="font-size:11px; margin-top:6px;"></div>
+          </div>
+        </div>
+
+        <!-- ⑥ Data APIs — collapsed -->
+        <div class="section-label" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" id="apis-header">
+          Data APIs <span id="apis-chevron" style="font-size:11px; color:var(--color-text-tertiary);">▶ expand</span>
+        </div>
+        <div id="apis-panel" style="display:none;">
+          <div class="card">
+            <div class="muted" style="margin-bottom:8px; font-size:11px;"><strong>indianapi.in</strong> — provides fundamentals, shareholding, corporate actions, and live price for Indian stocks. Free tier: 500 requests/month. Sign up at <a href="https://indianapi.in" target="_blank">indianapi.in</a>, subscribe to the free/hobby plan, copy the API key from your dashboard.</div>
+            <input type="password" id="indian-api-key-input" placeholder="Paste your indianapi.in API key" />
+            <button id="save-indian-api-key-btn" class="btn btn-small" style="margin-top:8px;">Save key</button>
+          </div>
+        </div>
+
+        <!-- ⑦ AI draft assist — collapsed -->
+        <div class="section-label" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" id="ai-header">
+          AI draft assist <span id="ai-chevron" style="font-size:11px; color:var(--color-text-tertiary);">▶ expand</span>
+        </div>
+        <div id="ai-panel" style="display:none;">
+          <div class="card">
+            <div class="muted" style="margin-bottom:8px; font-size:11px;">Used by "Draft with AI" buttons on each stock's edit screen, for the business/moat/market-position fields. Get a free key from <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a>. Stored only on this device — never committed to your repo, never sent anywhere except Google's API.</div>
+            <input type="password" id="gemini-key-input" placeholder="Paste your Gemini API key" />
+            <button id="save-gemini-key-btn" class="btn btn-small" style="margin-top:8px;">Save key</button>
+          </div>
+        </div>
+
+        <!-- ⑧ Stock board classification — collapsed -->
+        <div class="section-label" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" id="board-class-header">
+          Stock board classification
+          <span id="board-class-chevron" style="font-size:11px; color:var(--color-text-tertiary);">▶ expand</span>
+        </div>
+        <div id="board-class-panel" style="display:none;">
+          <div class="card">
+            <div class="muted" style="font-size:11px; margin-bottom:8px;">Set each stock's board — Mainboard, SME, or Microcap. Affects watchlist grouping and analytics.</div>
+            <div id="board-classification-list"></div>
+            <button id="save-board-classification-btn" class="btn btn-small" style="margin-top:10px;">Save classifications</button>
+            <div id="board-save-status" class="muted" style="font-size:11px; margin-top:4px;"></div>
+          </div>
+        </div>
+
+        <!-- ⑨ Data backup — collapsed -->
+        <div class="section-label" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" id="data-header">
+          Data backup <span id="data-chevron" style="font-size:11px; color:var(--color-text-tertiary);">▶ expand</span>
+        </div>
+        <div id="data-panel" style="display:none;">
+          <div class="card">
+            <button id="export-backup-btn" class="btn btn-small">Export backup (.json)</button>
+            <div style="margin-top:10px; padding-top:10px; border-top:0.5px solid var(--color-border);">
+              <div class="muted" style="font-size:11px; margin-bottom:8px;">For the NSE scraper (GitHub Actions): export your current ticker list, then replace <code>data/tickers.json</code> in your repo with it.</div>
+              <button id="export-tickers-btn" class="btn btn-small">Export ticker list for scraper</button>
             </div>
           </div>
         </div>
 
-        <div class="section-label">Data APIs</div>
-        <div class="card">
-          <div class="muted" style="margin-bottom:8px; font-size:11px;"><strong>indianapi.in</strong> — provides fundamentals, shareholding, corporate actions, and live price for Indian stocks. Free tier: 500 requests/month. Sign up at <a href="https://indianapi.in" target="_blank">indianapi.in</a>, subscribe to the free/hobby plan, copy the API key from your dashboard.</div>
-          <input type="password" id="indian-api-key-input" placeholder="Paste your indianapi.in API key" />
-          <button id="save-indian-api-key-btn" class="btn btn-small" style="margin-top:8px;">Save key</button>
-        </div>
-
-        <div class="section-label">AI draft assist</div>
-        <div class="card">
-          <div class="muted" style="margin-bottom:8px; font-size:11px;">Used by "Draft with AI" buttons on each stock's edit screen, for the business/moat/market-position fields. Get a free key from <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a>. Stored only on this device — never committed to your repo, never sent anywhere except Google's API.</div>
-          <input type="password" id="gemini-key-input" placeholder="Paste your Gemini API key" />
-          <button id="save-gemini-key-btn" class="btn btn-small" style="margin-top:8px;">Save key</button>
-        </div>
-
-        <div class="section-label">Data</div>
-        <div class="card">
-          <button id="export-backup-btn" class="btn btn-small">Export backup (.json)</button>
-          <div style="margin-top:10px; padding-top:10px; border-top:0.5px solid var(--color-border);">
-            <div class="muted" style="font-size:11px; margin-bottom:8px;">For the NSE scraper (GitHub Actions): export your current ticker list, then replace <code>data/tickers.json</code> in your repo with it.</div>
-            <button id="export-tickers-btn" class="btn btn-small">Export ticker list for scraper</button>
-          </div>
-        </div>
-
+        <!-- ⑩ Diagnostics — collapsed -->
         <div class="section-label collapsible-header" id="diag-header" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center;">
           Diagnostics <span class="muted" style="font-size:11px;" id="diag-chevron">▶ expand</span>
         </div>
         <div id="diag-panel" style="display:none;">
           <div class="card">
             <div class="muted" style="font-size:11px; margin-bottom:12px;">Use these tools to fix data issues on mobile without needing browser DevTools.</div>
-
             <div style="margin-bottom:12px;">
               <div style="font-size:13px; font-weight:500; margin-bottom:4px;">Portfolio snapshots</div>
               <div class="muted" style="font-size:11px; margin-bottom:8px;">Clears all stored portfolio value history (used for the Analytics growth chart). After clearing, tap ↻ Prices on the watchlist to start recording fresh snapshots. The next Drive push will save the cleared state.</div>
@@ -127,7 +156,7 @@ const settingsScreen = {
               <div id="diag-status" class="muted" style="font-size:11px; margin-top:6px;"></div>
               <div style="margin-top:12px; padding-top:10px; border-top:0.5px solid var(--color-border);">
                 <div class="muted" style="font-size:11px; margin-bottom:6px;">If the app is showing stale UI after an update, clear the service worker cache and reload fresh.</div>
-                <a href="./clear-cache.html" style="font-size:12px; color:var(--color-green); text-decoration:none; font-weight:500;">↺ Clear app cache &amp; update →</a>
+                <a href="./clear-cache.html" style="font-size:12px; color:var(--color-green); text-decoration:none; font-weight:500;">&#8635; Clear app cache &amp; update &#8594;</a>
               </div>
             </div>
           </div>
@@ -556,6 +585,30 @@ const settingsScreen = {
       a.download = "tickers.json";
       a.click();
       URL.revokeObjectURL(url);
+    });
+
+    // ── New collapsible sections ──────────────────────────────────────
+    [
+      ["export-header",     "export-chevron",     "export-panel"],
+      ["import-header",     "import-chevron",     "import-panel"],
+      ["apis-header",       "apis-chevron",       "apis-panel"],
+      ["ai-header",         "ai-chevron",         "ai-panel"],
+      ["board-class-header","board-class-chevron","board-class-panel"],
+      ["data-header",       "data-chevron",       "data-panel"],
+    ].forEach(([headerId, chevId, panelId]) => {
+      const header = document.getElementById(headerId);
+      const chev   = document.getElementById(chevId);
+      const panel  = document.getElementById(panelId);
+      if (!header || !panel) return;
+      header.addEventListener("click", () => {
+        const open = panel.style.display !== "none";
+        panel.style.display = open ? "none" : "block";
+        if (chev) chev.textContent = open ? "▶ expand" : "▼ collapse";
+        // Load board classification list lazily on first expand
+        if (panelId === "board-class-panel" && !open) {
+          loadBoardClassification();
+        }
+      });
     });
 
     // ── Diagnostics — expand/collapse + snapshot clear ────────────────
