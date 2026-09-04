@@ -106,7 +106,20 @@ async function getAccessToken(options = {}) {
       cachedTokenExpiry = Date.now() + (response.expires_in - 60) * 1000;
       resolve(cachedAccessToken);
     };
-    tokenClient.requestAccessToken();
+    // On mobile PWA, requestAccessToken opens a Chrome Custom Tab.
+    // If GIS fails silently (script error, network issue, popup blocked
+    // in webview), the promise hangs forever — reject after 25s.
+    const hangTimeout = setTimeout(() => {
+      reject(new Error("timeout: Google sign-in did not respond. Tap the button again."));
+    }, 25000);
+
+    const origCallback = tokenClient.callback;
+    tokenClient.callback = (response) => {
+      clearTimeout(hangTimeout);
+      origCallback(response);
+    };
+
+    tokenClient.requestAccessToken({ prompt: "" });
   });
 }
 

@@ -166,13 +166,27 @@ function showAuthGate() {
 
     function dismiss() { overlay.remove(); resolve(); }
 
+    let authAttemptInProgress = false;
+
     signinBtn.addEventListener("click", async () => {
+      if (authAttemptInProgress) return; // prevent double-tap
+      authAttemptInProgress = true;
       signinBtn.disabled = true;
       signinBtn.style.opacity = "0.6";
-      statusEl.textContent = "Connecting to Google…";
+      statusEl.style.color = "var(--color-text-secondary)";
+      statusEl.textContent = "Opening Google sign-in…";
+
+      // Timeout: if getAccessToken doesn't resolve in 20s the popup
+      // was likely blocked or the GIS script failed to load on mobile.
+      let timeoutId;
+      const timeoutPromise = new Promise((_, reject) =>
+        timeoutId = setTimeout(() => reject(new Error("timeout")), 20000)
+      );
+
       try {
-        const token = await getAccessToken();
-        statusEl.textContent = "Pulling latest data…";
+        const token = await Promise.race([getAccessToken(), timeoutPromise]);
+        clearTimeout(timeoutId);
+        statusEl.textContent = "Signed in — pulling latest data…";
         const remoteData = await pullFromDrive(token);
         if (remoteData) {
           await importAll(remoteData);
@@ -182,11 +196,22 @@ function showAuthGate() {
         }
         dismiss();
       } catch (err) {
-        console.warn("Auth gate sign-in failed:", err.message);
-        statusEl.style.color = "var(--color-red)";
-        statusEl.textContent = "Sign-in failed — try again or continue offline.";
+        clearTimeout(timeoutId);
+        authAttemptInProgress = false;
         signinBtn.disabled = false;
         signinBtn.style.opacity = "1";
+        console.warn("Auth gate sign-in failed:", err.message);
+
+        if (err.message === "timeout") {
+          statusEl.style.color = "var(--color-red)";
+          statusEl.textContent = "Sign-in timed out. If the Google window didn't open, tap the button again.";
+        } else if (err.message?.includes("popup")) {
+          statusEl.style.color = "var(--color-red)";
+          statusEl.textContent = "Popup blocked. Open the app in Chrome (not a webview) and try again.";
+        } else {
+          statusEl.style.color = "var(--color-red)";
+          statusEl.textContent = "Sign-in failed — tap to try again.";
+        }
       }
     });
 
