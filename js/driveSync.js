@@ -75,6 +75,27 @@ function loadGisScript() {
  * person needs to interact (tap Sync) to get a fresh token. This is a
  * real platform constraint, not an implementation gap to "fix" later.
  */
+/**
+ * Pre-initialise the GIS token client as soon as the GIS script is ready.
+ * Called once on app boot. Safe to call if GIS isn't loaded yet — it waits.
+ * This ensures tokenClient exists before any user gesture so requestAccessToken
+ * can be called synchronously in the tap handler (iOS Safari PWA requirement).
+ */
+async function preInitTokenClient() {
+  try {
+    await loadGisScript();
+    if (!tokenClient && window.google?.accounts?.oauth2) {
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: DRIVE_CLIENT_ID,
+        scope: DRIVE_SCOPE,
+        callback: () => {},
+      });
+    }
+  } catch (e) {
+    console.warn("[Drive] preInitTokenClient failed:", e.message);
+  }
+}
+
 async function getAccessToken(options = {}) {
   const { silentOnly = false } = options;
 
@@ -86,39 +107,39 @@ async function getAccessToken(options = {}) {
     return null;
   }
 
+  // Ensure GIS is loaded and tokenClient exists.
+  // On the auth gate tap this should already be done (preInitTokenClient
+  // ran at boot), so this is just a safety net.
   await loadGisScript();
+  if (!tokenClient) {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: DRIVE_CLIENT_ID,
+      scope: DRIVE_SCOPE,
+      callback: () => {},
+    });
+  }
 
+  // requestAccessToken must be called as close to the user gesture as
+  // possible — iOS Safari cancels it if too many microtasks have run.
+  // We set up the promise and call it in the same synchronous block.
   return new Promise((resolve, reject) => {
-    if (!tokenClient) {
-      tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: DRIVE_CLIENT_ID,
-        scope: DRIVE_SCOPE,
-        callback: () => {}, // overwritten per-call below
-      });
-    }
+    const hangTimeout = setTimeout(() => {
+      reject(new Error("timeout"));
+    }, 25000);
+
     tokenClient.callback = (response) => {
+      clearTimeout(hangTimeout);
       if (response.error) {
         reject(new Error(`Drive sign-in failed: ${response.error}`));
         return;
       }
       cachedAccessToken = response.access_token;
-      // expires_in is in seconds; back off by 60s as a safety margin.
       cachedTokenExpiry = Date.now() + (response.expires_in - 60) * 1000;
       resolve(cachedAccessToken);
     };
-    // On mobile PWA, requestAccessToken opens a Chrome Custom Tab.
-    // If GIS fails silently (script error, network issue, popup blocked
-    // in webview), the promise hangs forever — reject after 25s.
-    const hangTimeout = setTimeout(() => {
-      reject(new Error("timeout: Google sign-in did not respond. Tap the button again."));
-    }, 25000);
 
-    const origCallback = tokenClient.callback;
-    tokenClient.callback = (response) => {
-      clearTimeout(hangTimeout);
-      origCallback(response);
-    };
-
+    // prompt:"" reuses an existing Google session without re-prompting,
+    // falling back to account picker only if no session exists.
     tokenClient.requestAccessToken({ prompt: "" });
   });
 }
@@ -215,7 +236,7 @@ function summarizeDiff(local, remote) {
   return { onlyInRemote, onlyInLocal, remoteExportedAt };
 }
 
-const driveSyncExports = { pushToDrive, pullFromDrive, summarizeDiff, findBackupFileId, getAccessToken, disconnectDrive };
+const driveSyncExports = { pushToDrive, pullFromDrive, summarizeDiff, findBackupFileId, getAccessToken, disconnectDrive, preInitTokenClient };
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports = driveSyncExports;

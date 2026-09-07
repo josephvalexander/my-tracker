@@ -176,16 +176,8 @@ function showAuthGate() {
       statusEl.style.color = "var(--color-text-secondary)";
       statusEl.textContent = "Opening Google sign-in…";
 
-      // Timeout: if getAccessToken doesn't resolve in 20s the popup
-      // was likely blocked or the GIS script failed to load on mobile.
-      let timeoutId;
-      const timeoutPromise = new Promise((_, reject) =>
-        timeoutId = setTimeout(() => reject(new Error("timeout")), 20000)
-      );
-
       try {
-        const token = await Promise.race([getAccessToken(), timeoutPromise]);
-        clearTimeout(timeoutId);
+        const token = await getAccessToken();
         statusEl.textContent = "Signed in — pulling latest data…";
         const remoteData = await pullFromDrive(token);
         if (remoteData) {
@@ -196,7 +188,6 @@ function showAuthGate() {
         }
         dismiss();
       } catch (err) {
-        clearTimeout(timeoutId);
         authAttemptInProgress = false;
         signinBtn.disabled = false;
         signinBtn.style.opacity = "1";
@@ -326,6 +317,9 @@ async function init() {
     if (settings.deRule.yellow != null) DEFAULT_RULES.de.yellow = settings.deRule.yellow;
   }
   await registerServiceWorker();
+  // Pre-init GIS token client while network is available so it's ready
+  // before the user taps "Sign in" — prevents iOS Safari gesture-chain timeout.
+  if (settings?.driveConnected) preInitTokenClient().catch(() => {});
   await autoPullOnOpen();
   await migrateWatchlistPrice(); // must run AFTER pull so Drive doesn't overwrite it
   await clearCorruptedReitSnapshots(); // one-time fix for corrupted reit snapshots
