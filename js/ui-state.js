@@ -56,3 +56,7 @@ function uiStateSave() {
 
   window.uiState = { ...DEFAULTS };
 })();
+
+// Scroll positions are session-only (not persisted to localStorage).
+// Populated by router.js when navigating away from scrollable screens.
+window.uiState.scrollPositions = {};

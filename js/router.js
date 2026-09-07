@@ -17,9 +17,20 @@ function registerScreen(name, module) {
   screens[name] = module;
 }
 
+// Screens whose scroll position should be saved and restored.
+// Add more screen names here if needed in future.
+const SCROLL_SAVE_SCREENS = new Set(["watchlist", "holdings", "portfolio"]);
+
 async function navigate(hash) {
   const clean = (hash || "#watchlist").replace(/^#/, "");
   const [screenName, ...rawParams] = clean.split("/");
+
+  // Save current scroll position for the screen we're leaving
+  const prevScreen = window._currentScreen;
+  if (prevScreen && SCROLL_SAVE_SCREENS.has(prevScreen)) {
+    window.uiState.scrollPositions[prevScreen] = window.scrollY;
+  }
+  window._currentScreen = screenName;
   // Decode each param segment so URL-encoded tickers (e.g. CLEAN%20SCIENCE)
   // resolve to the actual stored key (CLEAN SCIENCE)
   const params = rawParams.map((p) => { try { return decodeURIComponent(p); } catch { return p; } });
@@ -54,7 +65,14 @@ async function navigate(hash) {
     btn.classList.toggle("active", btn.dataset.screen === screenName);
   });
 
-  window.scrollTo(0, 0);
+  // Restore saved scroll position when returning to a scrollable screen,
+  // otherwise reset to top. Use requestAnimationFrame to let the DOM
+  // fully paint before scrolling — without this the scroll fires before
+  // the content height is known and lands at 0 anyway.
+  const savedY = SCROLL_SAVE_SCREENS.has(screenName)
+    ? (window.uiState.scrollPositions[screenName] ?? 0)
+    : 0;
+  requestAnimationFrame(() => window.scrollTo({ top: savedY, behavior: "instant" }));
 }
 
 function initRouter() {
