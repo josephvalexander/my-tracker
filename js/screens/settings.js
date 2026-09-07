@@ -97,6 +97,17 @@ const settingsScreen = {
             <input type="password" id="indian-api-key-input" placeholder="Paste your indianapi.in API key" />
             <button id="save-indian-api-key-btn" class="btn btn-small" style="margin-top:8px;">Save key</button>
           </div>
+
+          <div class="card" style="margin-top:10px;">
+            <div style="font-size:13px; font-weight:600; margin-bottom:4px;">Bulk fundamentals refresh</div>
+            <div class="muted" style="font-size:11px; margin-bottom:10px;">Fetches latest fundamentals from indianapi.in for all watchlist stocks. Each stock uses 1 request. Recommended once a month on the free tier (500 req/month).</div>
+            <div id="bulk-refresh-last" class="muted" style="font-size:11px; margin-bottom:8px;"></div>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <button id="bulk-refresh-btn" class="btn btn-small">↻ Refresh all fundamentals</button>
+              <span id="bulk-refresh-count" class="muted" style="font-size:11px;"></span>
+            </div>
+            <div id="bulk-refresh-progress" style="margin-top:8px;"></div>
+          </div>
         </div>
 
         <!-- ⑦ AI draft assist — collapsed -->
@@ -541,6 +552,80 @@ const settingsScreen = {
         document.querySelectorAll(".theme-btn").forEach((b) => b.classList.remove("theme-btn-active"));
         btn.classList.add("theme-btn-active");
       });
+    });
+
+
+    // ── Bulk fundamentals refresh ────────────────────────────────────
+    const bulkRefreshBtn  = document.getElementById("bulk-refresh-btn");
+    const bulkProgress    = document.getElementById("bulk-refresh-progress");
+    const bulkCount       = document.getElementById("bulk-refresh-count");
+    const bulkLastEl      = document.getElementById("bulk-refresh-last");
+
+    // Show last refresh date
+    if (settings.lastBulkFundamentalsRefresh) {
+      const d = new Date(settings.lastBulkFundamentalsRefresh);
+      bulkLastEl.textContent = `Last refreshed: ${d.toLocaleDateString("en-IN", { day:"numeric", month:"short", year:"numeric" })}`;
+    }
+
+    // Show stock count
+    const allStocks = await StockStore.getActive();
+    bulkCount.textContent = `${allStocks.length} stocks in watchlist`;
+
+    bulkRefreshBtn.addEventListener("click", async () => {
+      const apiKey = settings.indianApiKey;
+      if (!apiKey) {
+        bulkProgress.innerHTML = `<span style="color:var(--color-red);font-size:12px;">No indianapi.in key set — add it above first.</span>`;
+        return;
+      }
+
+      if (!confirm(`This will fetch fundamentals for all ${allStocks.length} stocks using ${allStocks.length} indianapi.in requests. Continue?`)) return;
+
+      bulkRefreshBtn.disabled = true;
+      let done = 0, succeeded = 0, failed = 0;
+      const total = allStocks.length;
+      const BATCH = 3; // small batches to stay within free tier rate limits
+
+      function setProgress(msg, color) {
+        bulkProgress.innerHTML = `<span style="font-size:12px;color:${color || "var(--color-text-secondary)"};">${msg}</span>`;
+      }
+
+      for (let i = 0; i < total; i += BATCH) {
+        const batch = allStocks.slice(i, i + BATCH);
+        setProgress(`Fetching ${done + 1}–${Math.min(done + BATCH, total)} of ${total}…`);
+
+        await Promise.allSettled(batch.map(async (stock) => {
+          try {
+            const parsed = await fetchIndianApiData(stock.name || stock.ticker, apiKey);
+            await applyIndianApiResult(stock.ticker, parsed);
+            succeeded++;
+          } catch (err) {
+            console.warn(`Bulk refresh failed for ${stock.ticker}:`, err.message);
+            failed++;
+          }
+          done++;
+          setProgress(`Fetching… ${done}/${total} done`);
+        }));
+
+        // Small pause between batches to be kind to the API rate limiter
+        if (i + BATCH < total) await new Promise(r => setTimeout(r, 800));
+      }
+
+      // Save last refresh timestamp
+      settings.lastBulkFundamentalsRefresh = new Date().toISOString();
+      await MetaStore.setSettings(settings);
+      bulkLastEl.textContent = `Last refreshed: ${new Date().toLocaleDateString("en-IN", { day:"numeric", month:"short", year:"numeric" })}`;
+
+      const color = failed === 0 ? "var(--color-green)" : "var(--color-text-secondary)";
+      setProgress(
+        failed === 0
+          ? `✓ All ${succeeded} stocks refreshed successfully`
+          : `✓ ${succeeded} refreshed · ${failed} failed — check API key or stock names`,
+        color
+      );
+
+      // Push updated data to Drive
+      autoPush().catch(() => {});
+      bulkRefreshBtn.disabled = false;
     });
 
     document.getElementById("save-indian-api-key-btn").addEventListener("click", async () => {

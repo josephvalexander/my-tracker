@@ -361,7 +361,12 @@ const watchlistScreen = {
           const db = b.fundamentals?.lastUpdated ?? "0";
           return da.localeCompare(db);
         });
-        default: return sorted; // "default" = add order unchanged
+        default: return sorted.sort((a,b) => {
+          // Sort by addedDate ascending — oldest watchlisted first
+          const da = a.addedDate ?? "0000-00-00";
+          const db = b.addedDate ?? "0000-00-00";
+          return da.localeCompare(db);
+        });
       }
     }
 

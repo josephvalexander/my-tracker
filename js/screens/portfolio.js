@@ -254,12 +254,30 @@ const portfolioScreen = {
                 : `<div class="muted" style="font-size:11px; padding-top:8px; border-top:0.5px solid var(--color-border);">${snapKey === "reit" ? "REIT/InvIT chart builds day by day — select only the REIT/InvIT chip and open the app daily." : "Portfolio value chart will appear after a few days of price refreshes."}</div>`
       }`;
 
-    // Wire tooltips each time growth section re-renders
+    // Wire tooltips — touch-safe: tap to toggle, tap elsewhere to dismiss
+    // Uses bubbling (not capture) for dismiss so stopPropagation works correctly.
     document.querySelectorAll(".tooltip-wrap").forEach(wrap => {
       const box = wrap.querySelector(".tooltip-box");
-      wrap.addEventListener("mouseenter", () => { box.style.display = "block"; });
-      wrap.addEventListener("mouseleave", () => { box.style.display = "none"; });
-      wrap.addEventListener("click", (e) => { e.stopPropagation(); box.style.display = box.style.display === "none" ? "block" : "none"; });
+      if (!box) return;
+      // Reposition tooltip to stay on screen
+      function showTooltip() {
+        box.style.display = "block";
+        const rect = box.getBoundingClientRect();
+        const vw = window.innerWidth;
+        if (rect.left < 8) box.style.left = "0"; // too far left
+        if (rect.right > vw - 8) { // too far right
+          const overflow = rect.right - (vw - 8);
+          box.style.left = `calc(50% - ${overflow}px)`;
+        }
+      }
+      wrap.addEventListener("mouseenter", showTooltip);
+      wrap.addEventListener("mouseleave", () => { box.style.display = "none"; box.style.left = ""; });
+      wrap.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const isVisible = box.style.display === "block";
+        document.querySelectorAll(".tooltip-box").forEach(b => { b.style.display = "none"; b.style.left = ""; });
+        if (!isVisible) showTooltip();
+      });
     });
 
     // ── Position sizing ───────────────────────────────────────────────
@@ -361,13 +379,7 @@ const portfolioScreen = {
         </div>`).join("");
     }
 
-    // Wire tooltips after growth section renders
-    document.querySelectorAll(".tooltip-wrap").forEach(wrap => {
-      const box = wrap.querySelector(".tooltip-box");
-      wrap.addEventListener("mouseenter", () => { box.style.display = "block"; });
-      wrap.addEventListener("mouseleave", () => { box.style.display = "none"; });
-      wrap.addEventListener("click", (e) => { e.stopPropagation(); box.style.display = box.style.display === "none" ? "block" : "none"; });
-    });
+    // Tooltips already wired above — no re-wiring needed here
 
     // Portfolio value chart with dynamic period toggle + benchmark
     if (allSnaps.length > 1) {
@@ -739,10 +751,14 @@ const portfolioScreen = {
 
     } // end buildAnalytics
 
-    // Tooltip dismiss — registered once outside buildAnalytics
-    document.addEventListener("click", () => {
-      document.querySelectorAll(".tooltip-box").forEach(b => { b.style.display = "none"; });
-    }, { capture: true });
+    // Tooltip dismiss — bubbling phase so stopPropagation from tooltip-wrap click works.
+    // Guard against duplicate registration across re-renders.
+    if (!window._portfolioTooltipDismissRegistered) {
+      window._portfolioTooltipDismissRegistered = true;
+      document.addEventListener("click", () => {
+        document.querySelectorAll(".tooltip-box").forEach(b => { b.style.display = "none"; b.style.left = ""; });
+      });
+    }
 
     buildAnalytics();
   },

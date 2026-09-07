@@ -32,6 +32,7 @@ async function seedDefaultsIfNeeded() {
       driveConnected: false,
       lastSyncPush: null,
       lastSyncPull: null,
+      lastBulkFundamentalsRefresh: null,
       theme: "auto",
       deRule: { green: 0.1, yellow: 0.2 },
       verdictRules: {
