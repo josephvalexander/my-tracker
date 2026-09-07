@@ -362,10 +362,10 @@ const watchlistScreen = {
           return da.localeCompare(db);
         });
         default: return sorted.sort((a,b) => {
-          // Sort by addedDate ascending — oldest watchlisted first
+          // Sort by addedDate descending — latest added first
           const da = a.addedDate ?? "0000-00-00";
           const db = b.addedDate ?? "0000-00-00";
-          return da.localeCompare(db);
+          return db.localeCompare(da);
         });
       }
     }
