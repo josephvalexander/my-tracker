@@ -54,11 +54,9 @@ const stockChartsScreen = {
         </div>
 
         <div class="chart-section-label">Shareholding pattern <span class="muted">quarterly, grouped by category</span></div>
-        <div class="card chart-card" style="height:auto; min-height:0;">
+        <div class="card chart-card">
           <div id="sh-latest-summary"></div>
-          <div style="position:relative; height:220px;">
-            <canvas id="chart-shareholding"></canvas>
-          </div>
+          <canvas id="chart-shareholding"></canvas>
         </div>
         `}
       </div>`;
@@ -177,7 +175,14 @@ const stockChartsScreen = {
         // ROE vs D/E
         const roe    = roeHistory(annual);
         const equity = equityHistory(annual);
-        const de     = (annual.borrowings || []).map((b, i) => equity[i] ? b / equity[i] : null);
+        // Round D/E to 2 decimal places — prevents floating-point micro-values
+        // (e.g. 5e-6) that cause Chart.js to auto-scale to scientific notation.
+        const de     = (annual.borrowings || []).map((b, i) =>
+          equity[i] ? Math.round(b / equity[i] * 100) / 100 : null
+        );
+        // Ensure right axis has a sensible range even for debt-free companies
+        const deMax  = Math.max(...de.filter(v => v !== null), 0);
+        const y1Max  = Math.max(Math.ceil(deMax * 1.2 * 10) / 10, 0.5);
 
         charts.roeDe = new Chart(document.getElementById("chart-roe-de"), {
           type: "line",
@@ -207,7 +212,7 @@ const stockChartsScreen = {
             scales: {
               x: { grid: { display: false }, ticks: tickStyle },
               y:  { type: "linear", position: "left",  grid: gridStyle, ticks: { ...tickStyle, callback: (v) => v + "%" } },
-              y1: { type: "linear", position: "right", grid: { drawOnChartArea: false }, ticks: tickStyle },
+              y1: { type: "linear", position: "right", grid: { drawOnChartArea: false }, min: 0, suggestedMax: y1Max, ticks: { ...tickStyle, callback: (v) => v.toFixed(2) } },
             },
           },
         });
@@ -223,11 +228,9 @@ const stockChartsScreen = {
 
       if (shHistory.length > 0) {
         const latest = shHistory[shHistory.length - 1];
-
-        // Single summary row: colour dot + label + bold value — no separate legend needed
         if (shSummary) {
           shSummary.innerHTML = `
-            <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:8px;">
+            <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
               ${[
                 { label: "Promoter", value: latest.promoter, color: C.promoter },
                 { label: "FII",      value: latest.fii,      color: C.fii },
@@ -243,34 +246,29 @@ const stockChartsScreen = {
             </div>`;
         }
 
-        // Dynamic Y max: highest value + 15% headroom, rounded up to nearest 10
-        const shAllValues = shHistory.flatMap(h => [h.promoter ?? 0, h.fii ?? 0, h.dii ?? 0, h.public ?? 0]);
-        const shMax = Math.ceil((Math.max(...shAllValues, 10) * 1.15) / 10) * 10;
-
         charts.shareholding = new Chart(shCanvas, {
           type: "bar",
           data: {
             labels: shHistory.map((h) => h.quarter),
             datasets: [
-              { label: "Promoter", data: shHistory.map((h) => h.promoter ?? 0), backgroundColor: C.promoter + "CC", borderColor: C.promoter, borderWidth: 1, borderRadius: 2 },
-              { label: "FII",      data: shHistory.map((h) => h.fii      ?? 0), backgroundColor: C.fii      + "CC", borderColor: C.fii,      borderWidth: 1, borderRadius: 2 },
-              { label: "DII/MF",  data: shHistory.map((h) => h.dii      ?? 0), backgroundColor: C.dii      + "CC", borderColor: C.dii,      borderWidth: 1, borderRadius: 2 },
-              { label: "Public",  data: shHistory.map((h) => h.public   ?? 0), backgroundColor: C.public   + "CC", borderColor: C.public,   borderWidth: 1, borderRadius: 2 },
+              { label: "Promoter", data: shHistory.map((h) => h.promoter), backgroundColor: C.promoter + "CC", borderColor: C.promoter, borderWidth: 1, borderRadius: 2 },
+              { label: "FII",      data: shHistory.map((h) => h.fii),      backgroundColor: C.fii      + "CC", borderColor: C.fii,      borderWidth: 1, borderRadius: 2 },
+              { label: "DII/MF",  data: shHistory.map((h) => h.dii),      backgroundColor: C.dii      + "CC", borderColor: C.dii,      borderWidth: 1, borderRadius: 2 },
+              { label: "Public",  data: shHistory.map((h) => h.public),   backgroundColor: C.public   + "CC", borderColor: C.public,   borderWidth: 1, borderRadius: 2 },
             ],
           },
           options: {
             responsive: true, maintainAspectRatio: false,
-            layout: { padding: { bottom: 8 } },
             plugins: {
-              legend: { display: false },
+              legend: { position: "bottom", labels: { font: baseFont, boxWidth: 10, boxHeight: 10, usePointStyle: true, pointStyle: "circle" } },
               tooltip: {
                 ...tooltipDefaults,
                 callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(1)}%` },
               },
             },
             scales: {
-              x: { grid: { display: false }, ticks: { ...tickStyle, maxRotation: 30, minRotation: 30 } },
-              y: { grid: gridStyle, ticks: { ...tickStyle, callback: (v) => v + "%" }, min: 0, max: shMax },
+              x: { grid: { display: false }, ticks: { ...tickStyle, maxRotation: 45, minRotation: 45 } },
+              y: { grid: gridStyle, ticks: { ...tickStyle, callback: (v) => v + "%" }, suggestedMin: 0, suggestedMax: 80 },
             },
           },
         });
