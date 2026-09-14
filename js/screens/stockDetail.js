@@ -266,8 +266,9 @@ const stockDetailScreen = {
         </div>
 
         ${(() => {
-          const vol   = pc.avgVolume3M;
-          const float = pc.floatShares;
+          const _pc   = stock.priceContext || {};
+          const vol   = _pc.avgVolume3M;
+          const float = _pc.floatShares;
           if (!vol && !float) return "";
           const fmtVol = v => v >= 1e7 ? (v/1e7).toFixed(2)+" Cr" : v >= 1e5 ? (v/1e5).toFixed(1)+" L" : v.toLocaleString("en-IN");
           const fmtFloat = f => f >= 1e7 ? (f/1e7).toFixed(2)+" Cr shares" : (f/1e5).toFixed(1)+" L shares";
