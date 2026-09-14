@@ -451,9 +451,6 @@ const watchlistScreen = {
             if (result.quoteInfo.todayHigh)  fresh.priceContext.todayHigh  = result.quoteInfo.todayHigh;
             if (result.quoteInfo.previousClose) fresh.priceContext.previousClose = result.quoteInfo.previousClose;
             if (result.quoteInfo.dayChangePct != null) fresh.priceContext.dayChangePct = result.quoteInfo.dayChangePct;
-            if (result.quoteInfo.trailingPE != null)   fresh.priceContext.peTTM = result.quoteInfo.trailingPE;
-            if (result.quoteInfo.avgVolume3M  != null) fresh.priceContext.avgVolume3M = result.quoteInfo.avgVolume3M;
-            if (result.quoteInfo.floatShares  != null) fresh.priceContext.floatShares = result.quoteInfo.floatShares;
 
             // Set watchlistPrice on first fetch if not already stored
             if (!fresh.watchlistPrice && result.quoteInfo.currentPrice) {

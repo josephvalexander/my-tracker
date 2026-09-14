@@ -265,21 +265,6 @@ const stockDetailScreen = {
           ) : ""}
         </div>
 
-        ${(() => {
-          const _pc   = stock.priceContext || {};
-          const vol   = _pc.avgVolume3M;
-          const float = _pc.floatShares;
-          if (!vol && !float) return "";
-          const fmtVol = v => v >= 1e7 ? (v/1e7).toFixed(2)+" Cr" : v >= 1e5 ? (v/1e5).toFixed(1)+" L" : v.toLocaleString("en-IN");
-          const fmtFloat = f => f >= 1e7 ? (f/1e7).toFixed(2)+" Cr shares" : (f/1e5).toFixed(1)+" L shares";
-          return `
-            <div class="section-label">Market data</div>
-            <div class="card metric-card">
-              ${vol   ? metricRow("Avg volume (3M)", vol,   fmtVol(vol),     null) : ""}
-              ${float ? metricRow("Float shares",    float, fmtFloat(float), null) : ""}
-            </div>`;
-        })()}
-
         <div class="section-label">Quarterly results <span class="muted" style="font-size:10px;">last 4 quarters</span></div>
         <div class="card" style="padding:0; overflow-x:auto;">
           ${(() => {
@@ -519,10 +504,6 @@ const stockDetailScreen = {
             ...(result.quoteInfo.todayHigh  && { todayHigh:  result.quoteInfo.todayHigh  }),
             ...(result.quoteInfo.previousClose && { previousClose: result.quoteInfo.previousClose }),
             ...(result.quoteInfo.dayChangePct != null && { dayChangePct: result.quoteInfo.dayChangePct }),
-            // Yahoo trailingPE overwrites indianapi peTTM — more current (recalculated with each price move)
-            ...(result.quoteInfo.trailingPE != null && { peTTM: result.quoteInfo.trailingPE }),
-            ...(result.quoteInfo.avgVolume3M != null && { avgVolume3M: result.quoteInfo.avgVolume3M }),
-            ...(result.quoteInfo.floatShares != null && { floatShares: result.quoteInfo.floatShares }),
           };
           // Set watchlistPrice on first ever fetch if not already stored
           if (!stock.watchlistPrice && result.quoteInfo.currentPrice) {
