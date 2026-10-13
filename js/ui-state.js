@@ -17,6 +17,7 @@ function uiStateSave() {
     localStorage.setItem(_UI_STATE_KEY, JSON.stringify({
       watchlistFilters:   [...s.watchlistFilters],
       watchlistSort:      s.watchlistSort,
+      watchlistFavOnly:   s.watchlistFavOnly ?? false,
       holdingsFilters:    [...s.holdingsFilters],
       holdingsXirr:       s.holdingsXirr,
       analyticsFilters:   [...s.analyticsFilters],
@@ -44,6 +45,7 @@ function uiStateSave() {
       window.uiState = {
         watchlistFilters:   new Set(saved.watchlistFilters   ?? [...DEFAULTS.watchlistFilters]),
         watchlistSort:      saved.watchlistSort      ?? DEFAULTS.watchlistSort,
+        watchlistFavOnly:   saved.watchlistFavOnly   ?? false,
         holdingsFilters:    new Set(saved.holdingsFilters    ?? [...DEFAULTS.holdingsFilters]),
         holdingsXirr:       saved.holdingsXirr       ?? DEFAULTS.holdingsXirr,
         analyticsFilters:   new Set(saved.analyticsFilters   ?? [...DEFAULTS.analyticsFilters]),

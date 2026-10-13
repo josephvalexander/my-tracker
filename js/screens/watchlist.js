@@ -11,8 +11,11 @@ const TRASH_ICON = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" 
   <path d="M1.75 3.5h10.5M5.25 3.5V2.333a.583.583 0 0 1 .583-.583h2.334a.583.583 0 0 1 .583.583V3.5M11.083 3.5l-.583 7.583a.583.583 0 0 1-.583.584H4.083a.583.583 0 0 1-.583-.584L2.917 3.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>`;
 
-const FAV_STAR = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+const FAV_STAR_OUTLINE = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <path d="M7 1.167l1.575 3.191 3.508.511-2.541 2.476.6 3.492L7 9.116l-3.142 1.721.6-3.492L1.917 4.869l3.508-.511L7 1.167z" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
+const FAV_STAR_SOLID = `<svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M7 1.167l1.575 3.191 3.508.511-2.541 2.476.6 3.492L7 9.116l-3.142 1.721.6-3.492L1.917 4.869l3.508-.511L7 1.167z"/>
 </svg>`;
 
 function metricChip(label, value, formatted, colorClass) {
@@ -56,7 +59,8 @@ function reitRow(stock) {
   }
 
   return `
-    <div class="stock-row${isFav ? " stock-row-fav" : ""}" data-ticker="${stock.ticker}">
+    <div class="stock-row${isFav ? " stock-row-fav" : ""}" data-ticker="${stock.ticker}" style="position:relative;">
+      <button class="fav-btn${isFav ? " fav-btn-active" : ""}" data-fav-ticker="${stock.ticker}" aria-label="${isFav ? "Unfavourite" : "Favourite"}" title="${isFav ? "Unfavourite" : "Favourite"}" style="position:absolute;top:8px;right:8px;z-index:1;">${isFav ? FAV_STAR_SOLID : FAV_STAR_OUTLINE}</button>
       <div class="stock-row-grid">
         <div class="stock-identity">
           <div class="stock-name">${stock.name || stock.ticker}</div>
@@ -69,7 +73,6 @@ function reitRow(stock) {
           <div class="price-main">${formatCurrency(cmp)}</div>
         </div>
         <div class="row-actions">
-          <button class="fav-btn${isFav ? " fav-btn-active" : ""}" data-fav-ticker="${stock.ticker}" aria-label="${isFav ? "Unfavourite" : "Favourite"}" title="${isFav ? "Unfavourite" : "Favourite"}">${FAV_STAR}</button>
           <button class="row-menu-btn" data-menu-ticker="${stock.ticker}" aria-label="Delete">${TRASH_ICON}</button>
         </div>
       </div>
@@ -118,7 +121,8 @@ function stockRow(stock) {
     : null;
 
   return `
-    <div class="stock-row${isFav ? " stock-row-fav" : ""}" data-ticker="${stock.ticker}">
+    <div class="stock-row${isFav ? " stock-row-fav" : ""}" data-ticker="${stock.ticker}" style="position:relative;">
+      <button class="fav-btn${isFav ? " fav-btn-active" : ""}" data-fav-ticker="${stock.ticker}" aria-label="${isFav ? "Unfavourite" : "Favourite"}" title="${isFav ? "Unfavourite" : "Favourite"}" style="position:absolute;top:8px;right:8px;z-index:1;">${isFav ? FAV_STAR_SOLID : FAV_STAR_OUTLINE}</button>
       <div class="stock-row-grid">
         <div class="stock-identity">
           <div class="stock-name">${stock.name || stock.ticker}</div>
@@ -131,7 +135,6 @@ function stockRow(stock) {
           <div class="price-main">${formatCurrency(cmp)}</div>
         </div>
         <div class="row-actions">
-          <button class="fav-btn${isFav ? " fav-btn-active" : ""}" data-fav-ticker="${stock.ticker}" aria-label="${isFav ? "Unfavourite" : "Favourite"}" title="${isFav ? "Unfavourite" : "Favourite"}">${FAV_STAR}</button>
           <button class="row-menu-btn" data-menu-ticker="${stock.ticker}" aria-label="Delete">${TRASH_ICON}</button>
         </div>
       </div>
@@ -155,13 +158,12 @@ const SORT_SELECT_HTML = `<select id="watchlist-sort" style="font-size:11px; pad
 
 const watchlistScreen = {
   async render() {
-    // Restore persisted filter/sort/fav state — coerce to array defensively
-    const rawFilters = window.uiState?.watchlistFilters;
-    const savedFilters = Array.isArray(rawFilters) ? rawFilters : ["mainboard","sme","reit"];
+    // Restore persisted filter/sort/fav state from uiState Set (always a Set — see ui-state.js)
+    const savedFilters = window.uiState.watchlistFilters; // Set
     const savedFavOnly = window.uiState?.watchlistFavOnly || false;
 
     const filterChips = ["mainboard","sme","reit"].map(f =>
-      `<button class="wl-chip${savedFilters.includes(f) ? " wl-chip-active" : ""}" data-filter="${f}">${
+      `<button class="wl-chip${savedFilters.has(f) ? " wl-chip-active" : ""}" data-filter="${f}">${
         f === "mainboard" ? "Mainboard" : f === "sme" ? "SME" : "REIT / InvIT"
       }</button>`
     ).join("");
@@ -188,7 +190,7 @@ const watchlistScreen = {
         <div id="drive-status-line" class="drive-status-line" style="display:flex; align-items:center; justify-content:space-between;"></div>
         <div style="display:flex; gap:6px; margin:8px 0 4px; flex-wrap:wrap; align-items:center;" id="wl-filter-chips">
           ${filterChips}
-          <button class="wl-chip${savedFavOnly ? " wl-chip-active" : ""}" id="fav-filter-btn" data-filter="favOnly" title="Show favourites only">★</button>
+          <button class="wl-chip${savedFavOnly ? " wl-chip-active" : ""}" id="fav-filter-btn" data-filter="favOnly" title="Show favourites only" style="font-size:13px;">${savedFavOnly ? "★" : "☆"}</button>
         </div>
         <div id="watchlist-list" class="stock-list">
           <div class="loading">Loading...</div>
@@ -334,9 +336,8 @@ const watchlistScreen = {
 
     const listEl = document.getElementById("watchlist-list");
 
-    // ── Filter state (restored from uiState) ──────────────────────────
-    const _storedFilters = window.uiState?.watchlistFilters;
-    const activeFilters = new Set(Array.isArray(_storedFilters) ? _storedFilters : ["mainboard","sme","reit"]);
+    // ── Filter state — use uiState.watchlistFilters Set directly (same pattern as holdings/analytics) ──
+    const activeFilters = window.uiState.watchlistFilters; // always a Set, maintained by ui-state.js
     let favOnly = window.uiState?.watchlistFavOnly || false;
 
     document.querySelectorAll(".wl-chip[data-filter]").forEach(chip => {
@@ -346,7 +347,7 @@ const watchlistScreen = {
         if (activeFilters.has(f)) activeFilters.delete(f);
         else activeFilters.add(f);
         chip.classList.toggle("wl-chip-active", activeFilters.has(f));
-        if (window.uiState) { window.uiState.watchlistFilters = [...activeFilters]; uiStateSave(); }
+        uiStateSave();
         renderList();
       });
     });
@@ -356,7 +357,9 @@ const watchlistScreen = {
       favFilterBtn.addEventListener("click", () => {
         favOnly = !favOnly;
         favFilterBtn.classList.toggle("wl-chip-active", favOnly);
-        if (window.uiState) { window.uiState.watchlistFavOnly = favOnly; uiStateSave(); }
+        favFilterBtn.textContent = favOnly ? "★" : "☆";
+        window.uiState.watchlistFavOnly = favOnly;
+        uiStateSave();
         renderList();
       });
     }
@@ -478,7 +481,14 @@ const watchlistScreen = {
           s.isFavorite = !s.isFavorite;
           await StockStore.set(ticker, s);
           autoPush().catch(() => {});
-          renderList();
+          // Update icon and class immediately without full re-render
+          btn.innerHTML = s.isFavorite ? FAV_STAR_SOLID : FAV_STAR_OUTLINE;
+          btn.classList.toggle("fav-btn-active", s.isFavorite);
+          btn.closest(".stock-row")?.classList.toggle("stock-row-fav", s.isFavorite);
+          btn.setAttribute("aria-label", s.isFavorite ? "Unfavourite" : "Favourite");
+          btn.setAttribute("title", s.isFavorite ? "Unfavourite" : "Favourite");
+          // If favOnly filter is on, re-render to remove/add the row
+          if (favOnly) renderList();
         });
       });
 
