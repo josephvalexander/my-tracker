@@ -217,8 +217,17 @@ const addStockScreen = {
         </div>
 
         <div class="form-group">
-          <label>Ticker (NSE symbol)</label>
+          <label>Ticker</label>
           <input type="text" id="ticker-input" placeholder="e.g. CAPLIPOINT" />
+        </div>
+        <div class="form-group">
+          <label>Exchange</label>
+          <div id="exchange-chip-row" style="display:flex; gap:8px; margin-top:4px;">
+            <button type="button" class="board-chip board-chip-active" data-exchange="NSE">NSE</button>
+            <button type="button" class="board-chip" data-exchange="BSE">BSE</button>
+          </div>
+          <input type="hidden" id="exchange-hidden-input" value="NSE" />
+          <div class="field-hint" style="margin-top:4px;">Most stocks are on NSE. Use BSE only for stocks not listed on NSE.</div>
         </div>
         <div class="form-group">
           <label>Company name <span class="muted">(optional — for display only)</span></label>
@@ -265,10 +274,19 @@ const addStockScreen = {
   },
 
   async afterRender() {
-    // Board chip selection — updates hidden input, toggles REIT sub-fields
-    document.querySelectorAll(".board-chip").forEach(chip => {
+    // Exchange chip selection (NSE / BSE)
+    document.querySelectorAll("#exchange-chip-row .board-chip").forEach(chip => {
       chip.addEventListener("click", () => {
-        document.querySelectorAll(".board-chip").forEach(c => c.classList.remove("board-chip-active"));
+        document.querySelectorAll("#exchange-chip-row .board-chip").forEach(c => c.classList.remove("board-chip-active"));
+        chip.classList.add("board-chip-active");
+        document.getElementById("exchange-hidden-input").value = chip.dataset.exchange;
+      });
+    });
+
+    // Board chip selection — updates hidden input, toggles REIT sub-fields
+    document.querySelectorAll("#board-chip-row .board-chip").forEach(chip => {
+      chip.addEventListener("click", () => {
+        document.querySelectorAll("#board-chip-row .board-chip").forEach(c => c.classList.remove("board-chip-active"));
         chip.classList.add("board-chip-active");
         document.getElementById("board-hidden-input").value = chip.dataset.board;
         const isReit = chip.dataset.board === "reit";
@@ -280,6 +298,7 @@ const addStockScreen = {
       const ticker    = document.getElementById("ticker-input").value.trim().toUpperCase();
       const nameInput = document.getElementById("name-input").value.trim();
       const searchName = ticker;
+      const exchange  = document.getElementById("exchange-hidden-input")?.value || "NSE";
       const board     = document.getElementById("board-hidden-input")?.value || "mainboard";
       const reitType  = board === "reit" ? (document.querySelector('input[name="add-reit-type"]:checked')?.value || "REIT") : undefined;
       const reitAssetClass = board === "reit" ? (document.getElementById("add-reit-asset-class")?.value || "Office") : undefined;
@@ -307,6 +326,7 @@ const addStockScreen = {
       // Create the stock record immediately
       const stock = {
         ticker, name: nameInput || ticker, sector: null, board,
+        exchange,
         ...(reitType ? { reitType, reitAssetClass } : {}),
         status: "active",
         addedDate: new Date().toISOString().slice(0, 10),

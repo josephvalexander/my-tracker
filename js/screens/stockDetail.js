@@ -472,8 +472,8 @@ const stockDetailScreen = {
         const yahooInput = document.getElementById("yahoo-symbol-input");
         const yahooSymbolValue = yahooInput?.value?.trim().toUpperCase() || null;
 
-        const result = await refreshStockFromNse(ticker, yahooSymbolValue);
         const stock = await StockStore.get(ticker);
+        const result = await refreshStockFromNse(ticker, yahooSymbolValue, stock?.exchange || null);
         const today = new Date().toISOString().slice(0, 10);
 
         // Save yahooSymbol if it differs from the default

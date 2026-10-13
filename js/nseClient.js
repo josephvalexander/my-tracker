@@ -7,7 +7,8 @@
  *
  * Source priority:
  *   1. Yahoo Finance (/yf-quote) — gives live price, 52-week range,
- *      market cap. Uses NSE suffix (CAPLIPOINT.NS). Free, no key needed.
+ *      market cap. Uses NSE suffix (CAPLIPOINT.NS) or BSE suffix (CAPLIPOINT.BO)
+ *      depending on stock.exchange ("NSE" default, "BSE" for BSE-only stocks).
  *   2. BSE (/bse-quote) — fallback. Gives live price + today's range.
  *      52-week range attempt may still fail (Angular page issue).
  *
@@ -56,7 +57,7 @@ const DEFAULT_YAHOO_OVERRIDES = {
   "VINATI":        "VINATIORGA", // if stock was added with ticker VINATI, fix it
 };
 
-async function fetchYfQuoteInfo(symbol, yahooSymbol) {
+async function fetchYfQuoteInfo(symbol, yahooSymbol, exchange) {
   // DEFAULT_YAHOO_OVERRIDES takes priority over any stored yahooSymbol —
   // this ensures known corrections (VINATIORGA, CLEAN) are always used
   // even if the user previously set a wrong manual override.
@@ -64,7 +65,9 @@ async function fetchYfQuoteInfo(symbol, yahooSymbol) {
     || DEFAULT_YAHOO_OVERRIDES[symbol.replace(/\s+/g, "")];
   const resolved = mapOverride || yahooSymbol || symbol;
   const cleanSymbol = resolved.replace(/\s+/g, "");
-  const yfSymbol = cleanSymbol.includes(".") ? cleanSymbol : `${cleanSymbol}.NS`;
+  // Use .BO for BSE-only stocks, .NS for everything else
+  const suffix = exchange === "BSE" ? ".BO" : ".NS";
+  const yfSymbol = cleanSymbol.includes(".") ? cleanSymbol : `${cleanSymbol}${suffix}`;
   const data = await callWorker("/yf-quote", yfSymbol);
   return {
     name: data.companyName ?? null,
@@ -101,9 +104,9 @@ async function fetchBseQuoteInfo(symbol) {
 }
 
 /** Try Yahoo Finance first (with optional symbol override), fall back to BSE. */
-async function fetchQuoteInfo(symbol, yahooSymbol) {
+async function fetchQuoteInfo(symbol, yahooSymbol, exchange) {
   try {
-    return await fetchYfQuoteInfo(symbol, yahooSymbol);
+    return await fetchYfQuoteInfo(symbol, yahooSymbol, exchange);
   } catch (yfErr) {
     try {
       return await fetchBseQuoteInfo(symbol);
@@ -126,12 +129,13 @@ async function fetchShareholding(symbol) {
  * yahooSymbol overrides the default NSE-ticker-based Yahoo symbol
  * for stocks where NSE and Yahoo use different tickers
  * (e.g. NSE: CLEANSCIENCE → Yahoo: CLEAN.NS).
+ * exchange: "NSE" (default) or "BSE" — controls Yahoo suffix (.NS vs .BO).
  */
-async function refreshStockFromNse(symbol, yahooSymbol) {
+async function refreshStockFromNse(symbol, yahooSymbol, exchange) {
   const result = { symbol, quoteInfo: null, shareholding: null, errors: {} };
 
   try {
-    result.quoteInfo = await fetchQuoteInfo(symbol, yahooSymbol);
+    result.quoteInfo = await fetchQuoteInfo(symbol, yahooSymbol, exchange);
   } catch (err) {
     result.errors.quoteInfo = err.message;
   }
@@ -142,10 +146,13 @@ async function refreshStockFromNse(symbol, yahooSymbol) {
   return result;
 }
 
-async function batchRefresh(symbols, onProgress) {
+// stockMeta: optional map of { [ticker]: { yahooSymbol, exchange } } to pass
+// per-stock overrides into refreshStockFromNse.
+async function batchRefresh(symbols, onProgress, stockMeta) {
   const results = [];
   for (const symbol of symbols) {
-    const result = await refreshStockFromNse(symbol);
+    const meta = stockMeta?.[symbol] || {};
+    const result = await refreshStockFromNse(symbol, meta.yahooSymbol || null, meta.exchange || null);
     results.push(result);
     if (onProgress) onProgress(symbol, result);
   }

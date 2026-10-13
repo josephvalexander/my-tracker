@@ -71,6 +71,13 @@ const batchRefreshScreen = {
 
       const today = new Date().toISOString().slice(0, 10);
 
+      // Build per-stock meta (yahooSymbol, exchange) for correct Yahoo suffix
+      const allStockData = await StockStore.getActive();
+      const stockMeta = Object.fromEntries(
+        allStockData.filter(s => tickers.includes(s.ticker))
+          .map(s => [s.ticker, { yahooSymbol: s.yahooSymbol || null, exchange: s.exchange || null }])
+      );
+
       await batchRefresh(tickers, async (ticker, result) => {
         const stock = await StockStore.get(ticker);
         if (!stock) return;
@@ -101,7 +108,7 @@ const batchRefreshScreen = {
         } else {
           rowEl.innerHTML = `<span class="stock-name">${ticker}</span> <span class="nse-fetch-error">⚠ blocked by NSE's site policy — use manual entry on the stock's own page</span>`;
         }
-      });
+      }, stockMeta);
     });
   },
 };
