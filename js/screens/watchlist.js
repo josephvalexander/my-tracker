@@ -7,6 +7,14 @@
  * here is hardcoded sample data.
  */
 
+const TRASH_ICON = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M1.75 3.5h10.5M5.25 3.5V2.333a.583.583 0 0 1 .583-.583h2.334a.583.583 0 0 1 .583.583V3.5M11.083 3.5l-.583 7.583a.583.583 0 0 1-.583.584H4.083a.583.583 0 0 1-.583-.584L2.917 3.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
+
+const FAV_STAR = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M7 1.167l1.575 3.191 3.508.511-2.541 2.476.6 3.492L7 9.116l-3.142 1.721.6-3.492L1.917 4.869l3.508-.511L7 1.167z" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
+
 function metricChip(label, value, formatted, colorClass) {
   const cls = colorClass ? `chip chip-${colorClass}` : "chip chip-neutral";
   return `
@@ -19,6 +27,7 @@ function metricChip(label, value, formatted, colorClass) {
 function reitRow(stock) {
   const cmp = stock.fundamentals?.currentPrice ?? null;
   const pc  = stock.priceContext || {};
+  const isFav = !!stock.isFavorite;
 
   let watchlistPrice = stock.watchlistPrice ?? null;
   if (!watchlistPrice && cmp) {
@@ -47,7 +56,7 @@ function reitRow(stock) {
   }
 
   return `
-    <div class="stock-row" data-ticker="${stock.ticker}">
+    <div class="stock-row${isFav ? " stock-row-fav" : ""}" data-ticker="${stock.ticker}">
       <div class="stock-row-grid">
         <div class="stock-identity">
           <div class="stock-name">${stock.name || stock.ticker}</div>
@@ -59,7 +68,10 @@ function reitRow(stock) {
         <div class="stock-price">
           <div class="price-main">${formatCurrency(cmp)}</div>
         </div>
-        <button class="row-menu-btn" data-menu-ticker="${stock.ticker}" aria-label="Row options">&#8942;</button>
+        <div class="row-actions">
+          <button class="fav-btn${isFav ? " fav-btn-active" : ""}" data-fav-ticker="${stock.ticker}" aria-label="${isFav ? "Unfavourite" : "Favourite"}" title="${isFav ? "Unfavourite" : "Favourite"}">${FAV_STAR}</button>
+          <button class="row-menu-btn" data-menu-ticker="${stock.ticker}" aria-label="Delete">${TRASH_ICON}</button>
+        </div>
       </div>
       <div class="since-added-row">
         <span class="muted">Since watchlisted</span>
@@ -74,6 +86,7 @@ function stockRow(stock) {
   const de = debtToEquity(stock);
   const cagr = epsCagr(stock);
   const cmp = stock.fundamentals?.currentPrice ?? null;
+  const isFav = !!stock.isFavorite;
 
   // Self-heal: if watchlistPrice missing but currentPrice exists, set it in background
   let watchlistPrice = stock.watchlistPrice ?? null;
@@ -105,7 +118,7 @@ function stockRow(stock) {
     : null;
 
   return `
-    <div class="stock-row" data-ticker="${stock.ticker}">
+    <div class="stock-row${isFav ? " stock-row-fav" : ""}" data-ticker="${stock.ticker}">
       <div class="stock-row-grid">
         <div class="stock-identity">
           <div class="stock-name">${stock.name || stock.ticker}</div>
@@ -117,7 +130,10 @@ function stockRow(stock) {
         <div class="stock-price">
           <div class="price-main">${formatCurrency(cmp)}</div>
         </div>
-        <button class="row-menu-btn" data-menu-ticker="${stock.ticker}" aria-label="Row options">&#8942;</button>
+        <div class="row-actions">
+          <button class="fav-btn${isFav ? " fav-btn-active" : ""}" data-fav-ticker="${stock.ticker}" aria-label="${isFav ? "Unfavourite" : "Favourite"}" title="${isFav ? "Unfavourite" : "Favourite"}">${FAV_STAR}</button>
+          <button class="row-menu-btn" data-menu-ticker="${stock.ticker}" aria-label="Delete">${TRASH_ICON}</button>
+        </div>
       </div>
       <div class="since-added-row">
         <span class="muted">Since watchlisted</span>
@@ -127,8 +143,28 @@ function stockRow(stock) {
     </div>`;
 }
 
+const SORT_SELECT_HTML = `<select id="watchlist-sort" style="font-size:11px; padding:2px 6px; border:0.5px solid var(--color-border); border-radius:6px; background:var(--color-bg); color:var(--color-text); height:24px;">
+  <option value="default">Order added</option>
+  <option value="since-asc">Since watchlisted ↑</option>
+  <option value="since-desc">Since watchlisted ↓</option>
+  <option value="pe-asc">P/E low→high</option>
+  <option value="eps-desc">EPS CAGR high→low</option>
+  <option value="roe-desc">ROE high→low</option>
+  <option value="stale">Stalest first</option>
+</select>`;
+
 const watchlistScreen = {
   async render() {
+    // Restore persisted filter/sort/fav state
+    const savedFilters = window.uiState?.watchlistFilters || ["mainboard","sme","reit"];
+    const savedFavOnly = window.uiState?.watchlistFavOnly || false;
+
+    const filterChips = ["mainboard","sme","reit"].map(f =>
+      `<button class="wl-chip${savedFilters.includes(f) ? " wl-chip-active" : ""}" data-filter="${f}">${
+        f === "mainboard" ? "Mainboard" : f === "sme" ? "SME" : "REIT / InvIT"
+      }</button>`
+    ).join("");
+
     return `
       <div class="screen-padding">
         <div id="index-bar" class="index-bar">
@@ -149,10 +185,9 @@ const watchlistScreen = {
         <div id="alert-banner" style="display:none; margin-bottom:8px; padding:8px 12px; background:var(--color-red-bg); border:0.5px solid var(--color-red); border-radius:var(--radius-md); font-size:12px; color:var(--color-red);"></div>
         <div id="refresh-progress" class="muted" style="font-size:11px; min-height:16px; margin-bottom:4px;"></div>
         <div id="drive-status-line" class="drive-status-line" style="display:flex; align-items:center; justify-content:space-between;"></div>
-        <div style="display:flex; gap:6px; margin:8px 0 4px; flex-wrap:wrap;" id="wl-filter-chips">
-          <button class="wl-chip wl-chip-active" data-filter="mainboard">Mainboard</button>
-          <button class="wl-chip wl-chip-active" data-filter="sme">SME</button>
-          <button class="wl-chip wl-chip-active" data-filter="reit">REIT / InvIT</button>
+        <div style="display:flex; gap:6px; margin:8px 0 4px; flex-wrap:wrap; align-items:center;" id="wl-filter-chips">
+          ${filterChips}
+          <button class="wl-chip${savedFavOnly ? " wl-chip-active" : ""}" id="fav-filter-btn" data-filter="favOnly" title="Show favourites only">★</button>
         </div>
         <div id="watchlist-list" class="stock-list">
           <div class="loading">Loading...</div>
@@ -232,18 +267,38 @@ const watchlistScreen = {
 
     const countEl = document.getElementById("watchlist-count");
     countEl.textContent = `· ${stocks.length} stock${stocks.length === 1 ? "" : "s"}`;
-    // Sort dropdown is rendered inside drive-status-line — re-wire after each update
+
+    // ── autoPush helper ───────────────────────────────────────────────
+    async function autoPush() {
+      if (!settings?.driveConnected) return;
+      try {
+        const token = await getAccessToken({ silentOnly: true });
+        if (!token) return;
+        const localData = await exportAll();
+        await pushToDrive(token, localData);
+        settings.lastSyncPush = new Date().toISOString();
+        await MetaStore.setSettings(settings);
+      } catch { /* non-critical */ }
+    }
+
+    // ── Sort dropdown wiring ──────────────────────────────────────────
     function wireSortDropdown() {
       const sel = document.getElementById("watchlist-sort");
       if (!sel) return;
-      sel.addEventListener("change", () => renderList(sel.value));
+      // Restore saved sort
+      const saved = window.uiState?.watchlistSort || "default";
+      if (sel.value !== saved) sel.value = saved;
+      sel.addEventListener("change", () => {
+        if (window.uiState) { window.uiState.watchlistSort = sel.value; uiStateSave(); }
+        renderList();
+      });
     }
 
     const driveLine = document.getElementById("drive-status-line");
     const drivePushBtn = document.getElementById("drive-push-btn");
 
     if (settings?.driveConnected) {
-      driveLine.innerHTML = `<i>Drive connected · last pushed ${settings.lastSyncPush ? new Date(settings.lastSyncPush).toLocaleDateString("en-IN") : "never"}</i><select id="watchlist-sort" style="font-size:11px; padding:2px 6px; border:0.5px solid var(--color-border); border-radius:6px; background:var(--color-bg); color:var(--color-text); height:24px;"><option value="default">Order added</option><option value="since-asc">Since watchlisted ↑</option><option value="since-desc">Since watchlisted ↓</option><option value="pe-asc">P/E low→high</option><option value="eps-desc">EPS CAGR high→low</option><option value="roe-desc">ROE high→low</option><option value="stale">Stalest first</option></select>`;
+      driveLine.innerHTML = `<i>Drive connected · last pushed ${settings.lastSyncPush ? new Date(settings.lastSyncPush).toLocaleDateString("en-IN") : "never"}</i>${SORT_SELECT_HTML}`;
       wireSortDropdown();
       drivePushBtn.style.display = "";
 
@@ -262,7 +317,7 @@ const watchlistScreen = {
           await pushToDrive(token, localData);
           settings.lastSyncPush = new Date().toISOString();
           await MetaStore.setSettings(settings);
-          driveLine.innerHTML = `<i>Drive connected · last pushed just now</i><select id="watchlist-sort" style="font-size:11px; padding:2px 6px; border:0.5px solid var(--color-border); border-radius:6px; background:var(--color-bg); color:var(--color-text); height:24px;"><option value="default">Order added</option><option value="since-asc">Since watchlisted ↑</option><option value="since-desc">Since watchlisted ↓</option><option value="pe-asc">P/E low→high</option><option value="eps-desc">EPS CAGR high→low</option><option value="roe-desc">ROE high→low</option><option value="stale">Stalest first</option></select>`;
+          driveLine.innerHTML = `<i>Drive connected · last pushed just now</i>${SORT_SELECT_HTML}`;
           wireSortDropdown();
           progressEl.textContent = "✓ Saved to Drive";
           setTimeout(() => { progressEl.textContent = ""; }, 3000);
@@ -272,23 +327,37 @@ const watchlistScreen = {
         drivePushBtn.disabled = false;
       });
     } else {
-      driveLine.innerHTML = `<i>Working from local data only · <a href="#settings">Connect Drive</a></i><select id="watchlist-sort" style="font-size:11px; padding:2px 6px; border:0.5px solid var(--color-border); border-radius:6px; background:var(--color-bg); color:var(--color-text); height:24px;"><option value="default">Order added</option><option value="since-asc">Since watchlisted ↑</option><option value="since-desc">Since watchlisted ↓</option><option value="pe-asc">P/E low→high</option><option value="eps-desc">EPS CAGR high→low</option><option value="roe-desc">ROE high→low</option><option value="stale">Stalest first</option></select>`;
+      driveLine.innerHTML = `<i>Working from local data only · <a href="#settings">Connect Drive</a></i>${SORT_SELECT_HTML}`;
       wireSortDropdown();
     }
 
     const listEl = document.getElementById("watchlist-list");
 
-    // ── Multi-select filter chips ─────────────────────────────────────
-    const activeFilters = new Set(["mainboard","sme","reit"]);
-    document.querySelectorAll(".wl-chip").forEach(chip => {
+    // ── Filter state (restored from uiState) ──────────────────────────
+    const activeFilters = new Set(window.uiState?.watchlistFilters || ["mainboard","sme","reit"]);
+    let favOnly = window.uiState?.watchlistFavOnly || false;
+
+    document.querySelectorAll(".wl-chip[data-filter]").forEach(chip => {
+      if (chip.id === "fav-filter-btn") return; // handled separately below
       chip.addEventListener("click", () => {
         const f = chip.dataset.filter;
         if (activeFilters.has(f)) activeFilters.delete(f);
         else activeFilters.add(f);
         chip.classList.toggle("wl-chip-active", activeFilters.has(f));
-        renderList(document.getElementById("watchlist-sort")?.value || "default");
+        if (window.uiState) { window.uiState.watchlistFilters = [...activeFilters]; uiStateSave(); }
+        renderList();
       });
     });
+
+    const favFilterBtn = document.getElementById("fav-filter-btn");
+    if (favFilterBtn) {
+      favFilterBtn.addEventListener("click", () => {
+        favOnly = !favOnly;
+        favFilterBtn.classList.toggle("wl-chip-active", favOnly);
+        if (window.uiState) { window.uiState.watchlistFavOnly = favOnly; uiStateSave(); }
+        renderList();
+      });
+    }
 
     // ── Alert banner — stocks below alert price ───────────────────────
     function showAlertBanner(alertStocks) {
@@ -317,64 +386,55 @@ const watchlistScreen = {
       const sorted = [...arr];
       switch (mode) {
         case "since-desc": return sorted.sort((a,b) => {
-          const pa = a.watchlistPrice, pb = b.watchlistPrice;
-          const ca = a.fundamentals?.currentPrice, cb = b.fundamentals?.currentPrice;
-          const ra = (ca&&pa) ? (ca-pa)/pa : null;
-          const rb = (cb&&pb) ? (cb-pb)/pb : null;
-          if (ra===null&&rb===null) return 0;
-          if (ra===null) return 1; if (rb===null) return -1;
-          return rb - ra;
+          const ra = (a.fundamentals?.currentPrice&&a.watchlistPrice) ? (a.fundamentals.currentPrice-a.watchlistPrice)/a.watchlistPrice : null;
+          const rb = (b.fundamentals?.currentPrice&&b.watchlistPrice) ? (b.fundamentals.currentPrice-b.watchlistPrice)/b.watchlistPrice : null;
+          if (ra===null&&rb===null) return 0; if (ra===null) return 1; if (rb===null) return -1; return rb-ra;
         });
         case "since-asc": return sorted.sort((a,b) => {
-          const pa = a.watchlistPrice, pb = b.watchlistPrice;
-          const ca = a.fundamentals?.currentPrice, cb = b.fundamentals?.currentPrice;
-          const ra = (ca&&pa) ? (ca-pa)/pa : null;
-          const rb = (cb&&pb) ? (cb-pb)/pb : null;
-          if (ra===null&&rb===null) return 0;
-          if (ra===null) return 1; if (rb===null) return -1;
-          return ra - rb;
+          const ra = (a.fundamentals?.currentPrice&&a.watchlistPrice) ? (a.fundamentals.currentPrice-a.watchlistPrice)/a.watchlistPrice : null;
+          const rb = (b.fundamentals?.currentPrice&&b.watchlistPrice) ? (b.fundamentals.currentPrice-b.watchlistPrice)/b.watchlistPrice : null;
+          if (ra===null&&rb===null) return 0; if (ra===null) return 1; if (rb===null) return -1; return ra-rb;
         });
         case "pe-asc": return sorted.sort((a,b) => {
-          const pa = a.priceContext?.peTTM ?? null, pb = b.priceContext?.peTTM ?? null;
-          if (pa===null&&pb===null) return 0;
-          if (pa===null) return 1; if (pb===null) return -1;
-          return pa - pb;
+          const pa = a.priceContext?.peTTM??null, pb = b.priceContext?.peTTM??null;
+          if (pa===null&&pb===null) return 0; if (pa===null) return 1; if (pb===null) return -1; return pa-pb;
         });
         case "eps-desc": return sorted.sort((a,b) => {
-          const ea = epsCagr(a) ?? null, eb = epsCagr(b) ?? null;
-          if (ea===null&&eb===null) return 0;
-          if (ea===null) return 1; if (eb===null) return -1;
-          return eb - ea;
+          const ea = epsCagr(a)??null, eb = epsCagr(b)??null;
+          if (ea===null&&eb===null) return 0; if (ea===null) return 1; if (eb===null) return -1; return eb-ea;
         });
         case "roe-desc": return sorted.sort((a,b) => {
-          const ra = roe5yAvg(a) ?? null, rb = roe5yAvg(b) ?? null;
-          if (ra===null&&rb===null) return 0;
-          if (ra===null) return 1; if (rb===null) return -1;
-          return rb - ra;
+          const ra = roe5yAvg(a)??null, rb = roe5yAvg(b)??null;
+          if (ra===null&&rb===null) return 0; if (ra===null) return 1; if (rb===null) return -1; return rb-ra;
         });
         case "stale": return sorted.sort((a,b) => {
-          const da = a.fundamentals?.lastUpdated ?? "0";
-          const db = b.fundamentals?.lastUpdated ?? "0";
+          const da = a.fundamentals?.lastUpdated??"0", db = b.fundamentals?.lastUpdated??"0";
           return da.localeCompare(db);
         });
         default: return sorted.sort((a,b) => {
           // Latest added first
-          const da = a.addedDate ?? "0000-00-00";
-          const db = b.addedDate ?? "0000-00-00";
+          const da = a.addedDate??"0000-00-00", db = b.addedDate??"0000-00-00";
           return db.localeCompare(da);
         });
       }
     }
 
-    // ── Render list (called on load and on sort change) ───────────────
-    function renderList(sortMode) {
+    // ── Render list (called on load, filter/sort/fav changes) ─────────
+    function renderList() {
+      const sortMode = document.getElementById("watchlist-sort")?.value || window.uiState?.watchlistSort || "default";
+
       if (stocks.length === 0) {
         listEl.innerHTML = `<div class="empty-state">No stocks yet. Tap "+ Add" to start tracking one.</div>`;
         return;
       }
-      let mainboard = stocks.filter(s => !s.board || s.board === "mainboard");
-      let satellite = stocks.filter(s => s.board === "sme" || s.board === "microcap");
-      let reitList  = stocks.filter(s => s.board === "reit");
+
+      // Apply favOnly filter first
+      let visible = favOnly ? stocks.filter(s => s.isFavorite) : stocks;
+
+      let mainboard = visible.filter(s => !s.board || s.board === "mainboard");
+      let satellite = visible.filter(s => s.board === "sme" || s.board === "microcap");
+      let reitList  = visible.filter(s => s.board === "reit");
+
       mainboard = sortStocks(mainboard, sortMode);
       satellite = sortStocks(satellite, sortMode);
       reitList  = sortStocks(reitList,  sortMode);
@@ -400,81 +460,119 @@ const watchlistScreen = {
     function wireRowEvents() {
       listEl.querySelectorAll(".stock-row").forEach(row => {
         row.addEventListener("click", (e) => {
-          if (e.target.closest(".row-menu-btn")) return;
+          // Skip nav if clicking fav-btn or trash btn
+          if (e.target.closest(".row-menu-btn") || e.target.closest(".fav-btn")) return;
           window.location.hash = `#stock/${encodeURIComponent(row.dataset.ticker)}`;
         });
       });
+
+      // Favourite toggle
+      listEl.querySelectorAll(".fav-btn").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const ticker = btn.dataset.favTicker;
+          const s = stocks.find(x => x.ticker === ticker);
+          if (!s) return;
+          s.isFavorite = !s.isFavorite;
+          await StockStore.set(ticker, s);
+          autoPush().catch(() => {});
+          renderList();
+        });
+      });
+
+      // Trash / delete
       listEl.querySelectorAll(".row-menu-btn").forEach(btn => {
         btn.addEventListener("click", async (e) => {
           e.stopPropagation();
           const ticker = btn.dataset.menuTicker;
-          if (confirm(`Delete ${ticker}? This permanently removes all data for this stock.`)) {
+          const s = stocks.find(x => x.ticker === ticker);
+          const label = s?.name || ticker;
+          if (confirm(`Delete ${label}? This permanently removes all data for this stock.`)) {
             await deleteStockPermanently(ticker);
-            navigate("#watchlist");
+            autoPush().catch(() => {});
+            // Remove from local array and re-render without full navigation
+            const idx = stocks.findIndex(x => x.ticker === ticker);
+            if (idx !== -1) stocks.splice(idx, 1);
+            countEl.textContent = `· ${stocks.length} stock${stocks.length === 1 ? "" : "s"}`;
+            renderList();
           }
         });
       });
     }
 
-    // Initial list render (sort dropdown already wired by wireSortDropdown above)
-    renderList((document.getElementById("watchlist-sort") || {value:"default"}).value);
+    // Initial list render
+    renderList();
 
     document.getElementById("add-stock-btn").addEventListener("click", () => {
       window.location.hash = "#addStock";
     });
 
-    // ── Batch price refresh ──────────────────────────────────────────
+    // ── Parallel batch price refresh ──────────────────────────────────
+    const BATCH_SIZE = 5;
+
+    async function refreshOne(stock) {
+      try {
+        const result = await refreshStockFromNse(stock.ticker, stock.yahooSymbol || null, stock.exchange || null);
+        if (!result.quoteInfo) return false;
+
+        const fresh = await StockStore.get(stock.ticker);
+        if (!fresh) return false;
+        const today = new Date().toISOString().slice(0, 10);
+
+        fresh.fundamentals = fresh.fundamentals || {};
+        if (result.quoteInfo.currentPrice)  fresh.fundamentals.currentPrice  = result.quoteInfo.currentPrice;
+        if (result.quoteInfo.marketCap)     fresh.fundamentals.marketCap     = result.quoteInfo.marketCap;
+        if (result.quoteInfo.sector && !fresh.sector) fresh.sector = result.quoteInfo.sector;
+
+        fresh.priceContext = fresh.priceContext || {};
+        fresh.priceContext.source      = result.quoteInfo.source;
+        fresh.priceContext.lastUpdated = today;
+        // REIT/InvIT: Yahoo 52w data is unreliable — keep indianapi values
+        if (fresh.board !== "reit") {
+          if (result.quoteInfo.week52High) fresh.priceContext.week52High = result.quoteInfo.week52High;
+          if (result.quoteInfo.week52Low)  fresh.priceContext.week52Low  = result.quoteInfo.week52Low;
+        }
+        if (result.quoteInfo.todayLow)      fresh.priceContext.todayLow      = result.quoteInfo.todayLow;
+        if (result.quoteInfo.todayHigh)     fresh.priceContext.todayHigh     = result.quoteInfo.todayHigh;
+        if (result.quoteInfo.previousClose) fresh.priceContext.previousClose = result.quoteInfo.previousClose;
+        if (result.quoteInfo.dayChangePct != null) fresh.priceContext.dayChangePct = result.quoteInfo.dayChangePct;
+
+        if (!fresh.watchlistPrice && result.quoteInfo.currentPrice) {
+          fresh.watchlistPrice = result.quoteInfo.currentPrice;
+        }
+
+        if (!result.quoteInfo.marketCap && !fresh.fundamentals.marketCap) {
+          const derived = calculateMarketCap(fresh);
+          if (derived) fresh.fundamentals.marketCap = derived;
+        }
+
+        await StockStore.set(stock.ticker, fresh);
+        // Update local in-memory stocks array so re-render reflects new price
+        const idx = stocks.findIndex(x => x.ticker === stock.ticker);
+        if (idx !== -1) stocks[idx] = fresh;
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
     document.getElementById("refresh-prices-btn").addEventListener("click", async () => {
       if (stocks.length === 0) return;
       const btn = document.getElementById("refresh-prices-btn");
       const progressEl = document.getElementById("refresh-progress");
       btn.disabled = true;
 
-      let updated = 0;
-      let failed = 0;
+      let updated = 0, failed = 0;
+      const total = stocks.length;
 
-      for (const stock of stocks) {
-        progressEl.textContent = `Fetching ${stock.ticker}… (${updated + failed + 1}/${stocks.length})`;
+      for (let i = 0; i < total; i += BATCH_SIZE) {
+        const batch = stocks.slice(i, i + BATCH_SIZE);
+        progressEl.textContent = `Fetching ${i + 1}–${Math.min(i + BATCH_SIZE, total)} of ${total}…`;
 
-        try {
-          const result = await refreshStockFromNse(stock.ticker, stock.yahooSymbol || null, stock.exchange || null);
-          if (result.quoteInfo) {
-            const fresh = await StockStore.get(stock.ticker);
-            const today = new Date().toISOString().slice(0, 10);
-
-            fresh.fundamentals = fresh.fundamentals || {};
-            if (result.quoteInfo.currentPrice) fresh.fundamentals.currentPrice = result.quoteInfo.currentPrice;
-            if (result.quoteInfo.marketCap) fresh.fundamentals.marketCap = result.quoteInfo.marketCap;
-            if (result.quoteInfo.sector && !fresh.sector) fresh.sector = result.quoteInfo.sector;
-
-            fresh.priceContext = fresh.priceContext || {};
-            fresh.priceContext.source = result.quoteInfo.source;
-            fresh.priceContext.lastUpdated = today;
-            if (result.quoteInfo.week52High) fresh.priceContext.week52High = result.quoteInfo.week52High;
-            if (result.quoteInfo.week52Low)  fresh.priceContext.week52Low  = result.quoteInfo.week52Low;
-            if (result.quoteInfo.todayLow)   fresh.priceContext.todayLow   = result.quoteInfo.todayLow;
-            if (result.quoteInfo.todayHigh)  fresh.priceContext.todayHigh  = result.quoteInfo.todayHigh;
-            if (result.quoteInfo.previousClose) fresh.priceContext.previousClose = result.quoteInfo.previousClose;
-            if (result.quoteInfo.dayChangePct != null) fresh.priceContext.dayChangePct = result.quoteInfo.dayChangePct;
-
-            // Set watchlistPrice on first fetch if not already stored
-            if (!fresh.watchlistPrice && result.quoteInfo.currentPrice) {
-              fresh.watchlistPrice = result.quoteInfo.currentPrice;
-            }
-
-            // Only derive market cap if neither YF nor indianapi has set one
-            if (!result.quoteInfo.marketCap && !fresh.fundamentals.marketCap) {
-              const derived = calculateMarketCap(fresh);
-              if (derived) fresh.fundamentals.marketCap = derived;
-            }
-
-            await StockStore.set(stock.ticker, fresh);
-            updated++;
-          } else {
-            failed++;
-          }
-        } catch {
-          failed++;
+        const results = await Promise.allSettled(batch.map(refreshOne));
+        for (const r of results) {
+          if (r.status === "fulfilled" && r.value) updated++;
+          else failed++;
         }
       }
 
@@ -485,16 +583,13 @@ const watchlistScreen = {
       btn.disabled = false;
       setTimeout(() => { progressEl.textContent = ""; }, 5000);
 
+      // Push to Drive after batch refresh
+      autoPush().catch(() => {});
+
       // Save portfolio snapshot now that prices are fresh
       savePortfolioSnapshot().catch(() => {});
 
-      // Full re-render respecting current sort and board grouping
-      const freshStocks = await StockStore.getActive();
-      // Update the stocks array in-place so renderList uses fresh data
-      stocks.length = 0;
-      freshStocks.forEach(s => stocks.push(s));
-      renderList((document.getElementById("watchlist-sort") || {value:"default"}).value);
-      // Refresh alert banner with new prices
+      renderList();
       const freshAlerts = stocks.filter(s => s.alertPrice && s.fundamentals?.currentPrice && s.fundamentals.currentPrice < s.alertPrice);
       showAlertBanner(freshAlerts);
     });
