@@ -245,10 +245,14 @@ const watchlistScreen = {
     const stocks = await StockStore.getActive();
     const settings = await MetaStore.getSettings();
 
-    // Safety net: set watchlistPrice for any stock still missing it.
+    // Safety net: set watchlistPrice only for stocks added TODAY that are still missing it
+    // (i.e. genuinely new additions where addStock.js didn't set it yet).
+    // Do NOT stamp existing stocks — their watchlistPrice may have gone missing due to a Drive
+    // sync from an older backup, and setting it to currentPrice would corrupt "since watchlisted".
+    const today = new Date().toISOString().slice(0, 10);
     let migrationHappened = false;
     for (const stock of stocks) {
-      if (!stock.watchlistPrice && stock.fundamentals?.currentPrice) {
+      if (!stock.watchlistPrice && stock.fundamentals?.currentPrice && stock.addedDate === today) {
         stock.watchlistPrice = stock.fundamentals.currentPrice;
         await StockStore.set(stock.ticker, stock);
         migrationHappened = true;
@@ -549,7 +553,15 @@ const watchlistScreen = {
         if (result.quoteInfo.previousClose) fresh.priceContext.previousClose = result.quoteInfo.previousClose;
         if (result.quoteInfo.dayChangePct != null) fresh.priceContext.dayChangePct = result.quoteInfo.dayChangePct;
 
-        if (!fresh.watchlistPrice && result.quoteInfo.currentPrice) {
+        // Preserve watchlistPrice from the in-memory entry (loaded at screen open, before any
+        // refresh mutations). The DB record may have been stamped by the migration block with
+        // today's price if it was previously missing — the in-memory value is the safe source.
+        const inMemory = stocks.find(x => x.ticker === stock.ticker);
+        const preservedWatchlistPrice = inMemory?.watchlistPrice || fresh.watchlistPrice || null;
+        if (preservedWatchlistPrice) {
+          fresh.watchlistPrice = preservedWatchlistPrice;
+        } else if (result.quoteInfo.currentPrice) {
+          // Truly first-ever price fetch — record it as the watchlist baseline
           fresh.watchlistPrice = result.quoteInfo.currentPrice;
         }
 
