@@ -155,8 +155,9 @@ const SORT_SELECT_HTML = `<select id="watchlist-sort" style="font-size:11px; pad
 
 const watchlistScreen = {
   async render() {
-    // Restore persisted filter/sort/fav state
-    const savedFilters = window.uiState?.watchlistFilters || ["mainboard","sme","reit"];
+    // Restore persisted filter/sort/fav state — coerce to array defensively
+    const rawFilters = window.uiState?.watchlistFilters;
+    const savedFilters = Array.isArray(rawFilters) ? rawFilters : ["mainboard","sme","reit"];
     const savedFavOnly = window.uiState?.watchlistFavOnly || false;
 
     const filterChips = ["mainboard","sme","reit"].map(f =>
@@ -334,7 +335,8 @@ const watchlistScreen = {
     const listEl = document.getElementById("watchlist-list");
 
     // ── Filter state (restored from uiState) ──────────────────────────
-    const activeFilters = new Set(window.uiState?.watchlistFilters || ["mainboard","sme","reit"]);
+    const _storedFilters = window.uiState?.watchlistFilters;
+    const activeFilters = new Set(Array.isArray(_storedFilters) ? _storedFilters : ["mainboard","sme","reit"]);
     let favOnly = window.uiState?.watchlistFavOnly || false;
 
     document.querySelectorAll(".wl-chip[data-filter]").forEach(chip => {
