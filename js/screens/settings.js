@@ -595,7 +595,7 @@ const settingsScreen = {
 
         await Promise.allSettled(batch.map(async (stock) => {
           try {
-            const parsed = await fetchIndianApiData(stock.name || stock.ticker, apiKey);
+            const parsed = await fetchIndianApiData(stock.ticker, apiKey);
             await applyIndianApiResult(stock.ticker, parsed);
             succeeded++;
           } catch (err) {
