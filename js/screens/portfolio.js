@@ -87,12 +87,7 @@ const portfolioScreen = {
         <div id="position-sizing-wrap" style="display:none;">
           <div id="position-sizing" class="card"></div>
         </div>
-        <div class="section-label collapsible-header" id="earnings-header" style="cursor:pointer; display:flex; justify-content:space-between;">
-          Earnings season <span class="muted" style="font-size:11px;" id="earnings-chevron">▶ expand</span>
-        </div>
-        <div id="earnings-season-wrap" style="display:none;">
-          <div id="earnings-season" class="card"></div>
-        </div>
+
       </div>`;
   },
 
@@ -308,41 +303,13 @@ const portfolioScreen = {
               <td style="text-align:right;">${r.pct.toFixed(1)}%</td>
               ${hasTargets ? `
                 <td style="text-align:right; color:var(--color-text-tertiary);">${r.target !== null ? r.target+"%" : "—"}</td>
-                <td style="text-align:right; color:var(${r.diff===null?"--color-text-tertiary":Math.abs(r.diff)>5?"--color-red":"--color-green"});">${r.diff!==null?(r.diff>=0?"+":"")+r.diff.toFixed(1)+"%":"—"}</td>` : ""}
+                <td style="text-align:right; color:var(${r.diff===null?"--color-text-tertiary":r.diff>0?"--color-green":"--color-red"});">${r.diff!==null?(r.diff>=0?"+":"")+r.diff.toFixed(1)+"%":"—"}</td>` : ""}
             </tr>`).join("")}
           </tbody>
         </table>
         ${!hasTargets ? `<div class="muted" style="font-size:11px; margin-top:8px;">Set target allocations in each stock's edit screen to see over/underweight analysis.</div>` : ""}`;
     }
 
-    // ── Earnings season ───────────────────────────────────────────────
-    const earningsEl = document.getElementById("earnings-season");
-    const earningsRows = heldStocksWithValues
-      .map(({ stock }) => ({
-        name: stock.name || stock.ticker,
-        ticker: stock.ticker,
-        lastUpdated: stock.fundamentals?.lastUpdated ?? null,
-      }))
-      .sort((a, b) => {
-        if (!a.lastUpdated) return 1;
-        if (!b.lastUpdated) return -1;
-        return new Date(b.lastUpdated) - new Date(a.lastUpdated);
-      });
-
-    earningsEl.innerHTML = earningsRows.length === 0
-      ? `<span class="muted">No holdings.</span>`
-      : `<table style="width:100%; border-collapse:collapse; font-size:12px;">
-          <tbody>${earningsRows.map(r => {
-            const days = r.lastUpdated ? Math.floor((Date.now() - new Date(r.lastUpdated)) / 86400000) : null;
-            const stale = days === null || days > 45;
-            return `<tr style="border-bottom:0.5px solid var(--color-border); cursor:pointer;" onclick="window.location.hash='#stock/${encodeURIComponent(r.ticker)}'">
-              <td style="padding:5px 0;">${r.name}</td>
-              <td style="text-align:right; color:var(${stale?"--color-red":"--color-text-tertiary"});">${r.lastUpdated ? r.lastUpdated : "Never fetched"}</td>
-              <td style="text-align:right; color:var(${stale?"--color-red":"--color-text-tertiary"}); font-size:11px;">${days!==null?days+"d ago":""}</td>
-            </tr>`;
-          }).join("")}
-          </tbody>
-        </table>`;
 
 
     let passCount = 0;
@@ -655,7 +622,6 @@ const portfolioScreen = {
 
     // ── Collapsible toggle wiring ─────────────────────────────────────
     [["sizing-header","sizing-chevron","position-sizing-wrap"],
-     ["earnings-header","earnings-chevron","earnings-season-wrap"],
      ["valuation-header","valuation-chevron","valuation-wrap"],
      ["tax-header","tax-chevron","tax-wrap"]].forEach(([hId, cId, pId]) => {
       document.getElementById(hId).addEventListener("click", () => {
