@@ -306,6 +306,17 @@ const portfolioScreen = {
                 <td style="text-align:right; color:var(${r.diff===null?"--color-text-tertiary":r.diff>0?"--color-green":"--color-red"});">${r.diff!==null?(r.diff>=0?"+":"")+r.diff.toFixed(1)+"%":"—"}</td>` : ""}
             </tr>`).join("")}
           </tbody>
+          ${hasTargets ? (() => {
+            const totalActual = sizingRows.reduce((s, r) => s + r.pct, 0);
+            const totalTarget = sizingRows.reduce((s, r) => s + (r.target ?? 0), 0);
+            const totalDiff   = totalActual - totalTarget;
+            return `<tfoot><tr style="border-top:1px solid var(--color-border); font-weight:600;">
+              <td style="padding:5px 0;">Total</td>
+              <td style="text-align:right;">${totalActual.toFixed(1)}%</td>
+              <td style="text-align:right; color:var(--color-text-tertiary);">${totalTarget.toFixed(0)}%</td>
+              <td style="text-align:right; color:var(${totalDiff===0?"--color-text-tertiary":totalDiff>0?"--color-green":"--color-red"});">${totalDiff>=0?"+":""}${totalDiff.toFixed(1)}%</td>
+            </tr></tfoot>`;
+          })() : ""}
         </table>
         ${!hasTargets ? `<div class="muted" style="font-size:11px; margin-top:8px;">Set target allocations in each stock's edit screen to see over/underweight analysis.</div>` : ""}`;
     }
