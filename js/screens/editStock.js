@@ -63,6 +63,13 @@ const editStockScreen = {
               <div class="field-hint">Shows a badge when price drops below this</div>
             </div>
           </div>
+          <div style="margin-top:12px; padding-top:12px; border-top:0.5px solid var(--color-border);">
+            <div class="form-group" style="margin-bottom:0;">
+              <label>Watchlist baseline price (₹)</label>
+              <input type="number" id="watchlist-price-input" min="0" step="0.01" placeholder="Price when added to watchlist" value="${stock.watchlistPrice ?? ""}" />
+              <div class="field-hint">Used for "since watchlisted %" on the home screen. Correct this if the value looks wrong.</div>
+            </div>
+          </div>
         </div>
 
         <div class="section-label">Business</div>
@@ -115,6 +122,8 @@ const editStockScreen = {
       current.targetAllocation = !isNaN(allocVal) ? allocVal : null;
       const alertVal = parseFloat(document.getElementById("alert-price-input").value);
       current.alertPrice = !isNaN(alertVal) ? alertVal : null;
+      const watchlistPriceVal = parseFloat(document.getElementById("watchlist-price-input").value);
+      current.watchlistPrice = !isNaN(watchlistPriceVal) && watchlistPriceVal > 0 ? watchlistPriceVal : (current.watchlistPrice ?? null);
       current.qualitative = current.qualitative || {};
       current.qualitative.business = document.getElementById("business-textarea").value.trim();
       current.qualitative.moatDescription = document.getElementById("moat-textarea").value.trim();
