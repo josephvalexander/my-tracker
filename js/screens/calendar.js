@@ -55,8 +55,8 @@ const calendarScreen = {
   async afterRender() {
     const stocks   = await StockStore.getActive();
     const today    = new Date(); today.setHours(0,0,0,0);
-    const past30   = new Date(today); past30.setDate(past30.getDate() - 30);
-    const future90 = new Date(today); future90.setDate(future90.getDate() + 30);
+    const past30   = new Date(today); past30.setDate(past30.getDate() - 60);
+    const future90 = new Date(today); future90.setDate(future90.getDate() + 45);
     const sourceEl = document.getElementById("cal-source");
 
     const tickerSet  = new Set(stocks.map(s => s.ticker.toUpperCase()));
@@ -118,7 +118,7 @@ const calendarScreen = {
 
     if (events.length === 0) {
       document.getElementById("calendar-content").innerHTML =
-        `<div class="empty-state">No corporate actions in the past 30 or next 30 days.<br><span class="muted">${usedLive ? "NSE returned no events for your watchlisted stocks." : "Refresh fundamentals on each stock to get latest data."}</span></div>`;
+        `<div class="empty-state">No corporate actions in the past 60 or next 45 days.<br><span class="muted">${usedLive ? "NSE returned no events for your watchlisted stocks." : "Refresh fundamentals on each stock to get latest data."}</span></div>`;
       return;
     }
 
@@ -159,7 +159,7 @@ const calendarScreen = {
     }
 
     document.getElementById("calendar-content").innerHTML =
-      renderGroup("Upcoming (next 30 days)", upcoming) +
+      renderGroup("Upcoming (next 45 days)", upcoming) +
       renderGroup("Recent (past 30 days)", recent);
   },
 };
