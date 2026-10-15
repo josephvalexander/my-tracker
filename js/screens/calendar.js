@@ -14,11 +14,19 @@
 
 const WORKER_CA_URL = "https://portfolio-tracker-nse-proxy.josephv-mec.workers.dev/nse-corporate-actions";
 
-/** Parse NSE date string "16-Oct-2026" → Date */
+/** Parse NSE date string "16-Oct-2026" or "16-10-2026" → Date */
 function parseNseDate(str) {
-  if (!str || str === "-") return null;
-  const [d, m, y] = str.split("-");
-  return new Date(`${y}-${m}-${d}`);
+  if (!str || str === "-" || str.trim() === "") return null;
+  const parts = str.trim().split("-");
+  if (parts.length !== 3) return null;
+  const [d, m, y] = parts;
+  // Month may be abbreviated name ("Oct") or numeric ("10")
+  const months = { Jan:1, Feb:2, Mar:3, Apr:4, May:5, Jun:6,
+                   Jul:7, Aug:8, Sep:9, Oct:10, Nov:11, Dec:12 };
+  const month = isNaN(m) ? months[m] : parseInt(m, 10);
+  if (!month) return null;
+  const date = new Date(parseInt(y, 10), month - 1, parseInt(d, 10));
+  return isNaN(date.getTime()) ? null : date;
 }
 
 /** Classify NSE subject string into a type */
@@ -48,7 +56,7 @@ const calendarScreen = {
     const stocks   = await StockStore.getActive();
     const today    = new Date(); today.setHours(0,0,0,0);
     const past30   = new Date(today); past30.setDate(past30.getDate() - 30);
-    const future90 = new Date(today); future90.setDate(future90.getDate() + 90);
+    const future90 = new Date(today); future90.setDate(future90.getDate() + 30);
     const sourceEl = document.getElementById("cal-source");
 
     const tickerSet  = new Set(stocks.map(s => s.ticker.toUpperCase()));
@@ -64,24 +72,27 @@ const calendarScreen = {
       const res = await fetch(`${WORKER_CA_URL}?symbols=${encodeURIComponent(symbols)}`);
       if (res.ok) {
         const rows = await res.json();
-        for (const r of rows) {
-          // Use exDate as the primary date (what matters for trading); fall back to recDate
-          const date = parseNseDate(r.exDate) || parseNseDate(r.recDate);
-          if (!date || date < past30 || date > future90) continue;
-          const type = classifySubject(r.subject);
-          if (type === "Other") continue; // skip misc notices
-          events.push({
-            date,
-            ticker: r.symbol,
-            name: nameMap[r.symbol.toUpperCase()] || r.comp || r.symbol,
-            type,
-            desc: r.subject,
-            exDate: r.exDate !== "-" ? r.exDate : null,
-            recDate: r.recDate !== "-" ? r.recDate : null,
-          });
+        if (Array.isArray(rows) && rows.length > 0) {
+          for (const r of rows) {
+            // Use exDate as the primary date (what matters for trading); fall back to recDate
+            const date = parseNseDate(r.exDate) || parseNseDate(r.recDate);
+            if (!date || date < past30 || date > future90) continue;
+            const type = classifySubject(r.subject);
+            // Skip truly misc notices — keep Dividend, Split, Bonus, Rights, and AGM/EGM
+            if (type === "Other" && !/agm|egm|meeting/i.test(r.subject || "")) continue;
+            events.push({
+              date,
+              ticker: r.symbol,
+              name: nameMap[r.symbol.toUpperCase()] || r.comp || r.symbol,
+              type,
+              desc: r.subject,
+              exDate: r.exDate && r.exDate !== "-" ? r.exDate : null,
+              recDate: r.recDate && r.recDate !== "-" ? r.recDate : null,
+            });
+          }
+          usedLive = true;
+          sourceEl.textContent = `Live from NSE · ${new Date().toLocaleTimeString("en-IN", { hour:"2-digit", minute:"2-digit" })}`;
         }
-        usedLive = true;
-        sourceEl.textContent = `Live from NSE · ${new Date().toLocaleTimeString("en-IN", { hour:"2-digit", minute:"2-digit" })}`;
       }
     } catch { /* fall through to local */ }
 
@@ -107,11 +118,11 @@ const calendarScreen = {
 
     if (events.length === 0) {
       document.getElementById("calendar-content").innerHTML =
-        `<div class="empty-state">No upcoming corporate actions in the next 90 days.<br><span class="muted">${usedLive ? "NSE returned no events for your watchlisted stocks." : "Refresh fundamentals on each stock to get latest data."}</span></div>`;
+        `<div class="empty-state">No corporate actions in the past 30 or next 30 days.<br><span class="muted">${usedLive ? "NSE returned no events for your watchlisted stocks." : "Refresh fundamentals on each stock to get latest data."}</span></div>`;
       return;
     }
 
-    const TYPE_COLOR = { Dividend: "var(--color-green)", Split: "var(--color-purple, #534AB7)", Bonus: "#BA7517" };
+    const TYPE_COLOR = { Dividend: "var(--color-green)", Split: "var(--color-purple, #534AB7)", Bonus: "#BA7517", Rights: "#3B82F6", Other: "var(--color-text-secondary)" };
 
     const upcoming = events.filter(e => e.date >= today);
     const recent   = events.filter(e => e.date < today).reverse();
@@ -148,7 +159,7 @@ const calendarScreen = {
     }
 
     document.getElementById("calendar-content").innerHTML =
-      renderGroup("Upcoming (next 90 days)", upcoming) +
+      renderGroup("Upcoming (next 30 days)", upcoming) +
       renderGroup("Recent (past 30 days)", recent);
   },
 };
